@@ -1,0 +1,413 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TradingView Clone</title>
+    <script src="https://unpkg.com/lightweight-charts@4.1.1/dist/lightweight-charts.standalone.production.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { background: #131722; color: #d1d4dc; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
+
+        /* Шапка */
+        .header {
+            display: flex; align-items: center; gap: 20px;
+            padding: 12px 20px; background: #1e222d; border-bottom: 1px solid #2a2e39;
+            flex-wrap: wrap;
+        }
+        .header h1 { font-size: 18px; color: #fff; margin-right: 10px; }
+
+        /* Селектор символа */
+        select, button {
+            background: #2a2e39; color: #d1d4dc; border: 1px solid #363a45;
+            padding: 6px 12px; border-radius: 4px; cursor: pointer; font-size: 13px;
+        }
+        select:hover, button:hover { background: #363a45; }
+        button.active { background: #2962ff; color: #fff; border-color: #2962ff; }
+
+        /* Таймфреймы */
+        .timeframes { display: flex; gap: 4px; }
+
+        /* Live-тикер */
+        .ticker {
+            display: flex; gap: 16px; margin-left: auto; align-items: center; font-size: 14px;
+        }
+        .ticker .price { font-size: 20px; font-weight: bold; color: #fff; }
+        .ticker .positive { color: #26a69a; }
+        .ticker .negative { color: #ef5350; }
+        .ticker .label { color: #787b86; font-size: 11px; }
+
+        /* Графики */
+        .chart-section { padding: 8px 20px; }
+        .chart-title {
+            font-size: 12px; color: #787b86; padding: 8px 0 4px;
+            text-transform: uppercase; letter-spacing: 1px;
+        }
+        .chart-container { width: 100%; border-radius: 4px; overflow: hidden; }
+
+        /* Статус */
+        .status {
+            padding: 8px 20px; font-size: 11px; color: #787b86;
+            display: flex; justify-content: space-between;
+        }
+        .status .connected { color: #26a69a; }
+        .status .disconnected { color: #ef5350; }
+
+        /* Загрузка */
+        .loading {
+            display: flex; align-items: center; justify-content: center;
+            height: 200px; color: #787b86; font-size: 14px;
+        }
+    </style>
+</head>
+<body>
+
+<!-- Шапка с управлением и live-тикером -->
+<div class="header">
+    <h1>TradingView Clone</h1>
+
+    <select id="symbolSelect">
+        <option value="BTCUSDT">BTC/USDT</option>
+        <option value="ETHUSDT">ETH/USDT</option>
+        <option value="SOLUSDT">SOL/USDT</option>
+    </select>
+
+    <div class="timeframes" id="timeframes">
+        <button data-tf="1m">1m</button>
+        <button data-tf="5m">5m</button>
+        <button data-tf="15m">15m</button>
+        <button data-tf="1h" class="active">1H</button>
+        <button data-tf="4h">4H</button>
+        <button data-tf="1d">1D</button>
+    </div>
+
+    <div class="ticker">
+        <div>
+            <span class="label">Цена</span><br>
+            <span class="price" id="livePrice">--</span>
+        </div>
+        <div>
+            <span class="label">24ч Изм.</span><br>
+            <span id="liveChange">--</span>
+        </div>
+        <div>
+            <span class="label">Макс 24ч</span><br>
+            <span id="liveHigh">--</span>
+        </div>
+        <div>
+            <span class="label">Мин 24ч</span><br>
+            <span id="liveLow">--</span>
+        </div>
+        <div>
+            <span class="label">Объем (млн)</span><br>
+            <span id="liveVolume">--</span>
+        </div>
+    </div>
+</div>
+
+<!-- Основной свечной график + Alligator -->
+<div class="chart-section">
+    <div class="chart-title">OHLCV + Alligator</div>
+    <div class="chart-container" id="mainChart"></div>
+</div>
+
+<!-- Awesome Oscillator -->
+<div class="chart-section">
+    <div class="chart-title">Awesome Oscillator (AO)</div>
+    <div class="chart-container" id="aoChart"></div>
+</div>
+
+<!-- BW MFI -->
+<div class="chart-section">
+    <div class="chart-title">BW Market Facilitation Index</div>
+    <div class="chart-container" id="mfiChart"></div>
+</div>
+
+<!-- Статус подключения -->
+<div class="status">
+    <span id="wsStatus" class="disconnected">WebSocket: отключен</span>
+    <span id="lastUpdate">Последнее обновление: --</span>
+</div>
+
+<script>
+    // ============================================================
+    // Конфигурация
+    // ============================================================
+    const API_BASE = `${window.location.origin}`;
+    let currentSymbol = 'BTCUSDT';
+    let currentTimeframe = '1h';
+    let ws = null;
+
+    // Ссылки на графики и серии
+    let mainChart, candleSeries, jawSeries, teethSeries, lipsSeries;
+    let aoChart, aoSeries;
+    let mfiChart, mfiSeries;
+
+    // ============================================================
+    // Утилиты
+    // ============================================================
+
+    /** Конвертирует строку timestamp в unix-секунды для lightweight-charts */
+    function toUnix(ts) {
+        return Math.floor(new Date(ts).getTime() / 1000);
+    }
+
+    /** Общие настройки для всех графиков */
+    function chartOptions(height) {
+        return {
+            width: document.body.clientWidth - 40,
+            height: height,
+            layout: { background: { color: '#131722' }, textColor: '#d1d4dc' },
+            grid: { vertLines: { color: '#1e222d' }, horzLines: { color: '#1e222d' } },
+            crosshair: { mode: LightweightCharts.CrosshairMode.Normal },
+            timeScale: { timeVisible: true, secondsVisible: false },
+            rightPriceScale: { borderColor: '#2a2e39' },
+        };
+    }
+
+    // ============================================================
+    // Инициализация графиков
+    // ============================================================
+    function initCharts() {
+        // Основной график (свечи + Alligator)
+        mainChart = LightweightCharts.createChart(
+            document.getElementById('mainChart'), chartOptions(420)
+        );
+        candleSeries = mainChart.addCandlestickSeries({
+            upColor: '#26a69a', downColor: '#ef5350',
+            borderUpColor: '#26a69a', borderDownColor: '#ef5350',
+            wickUpColor: '#26a69a', wickDownColor: '#ef5350',
+        });
+        // Линии Alligator
+        jawSeries = mainChart.addLineSeries({ color: '#2962ff', lineWidth: 1, title: 'Jaw (13)' });
+        teethSeries = mainChart.addLineSeries({ color: '#ef5350', lineWidth: 1, title: 'Teeth (8)' });
+        lipsSeries = mainChart.addLineSeries({ color: '#26a69a', lineWidth: 1, title: 'Lips (5)' });
+
+        // AO график (гистограмма)
+        aoChart = LightweightCharts.createChart(
+            document.getElementById('aoChart'), chartOptions(180)
+        );
+        aoSeries = aoChart.addHistogramSeries({
+            color: '#26a69a',
+            priceFormat: { type: 'price', precision: 4, minMove: 0.0001 },
+        });
+
+        // BW MFI график (гистограмма с цветами)
+        mfiChart = LightweightCharts.createChart(
+            document.getElementById('mfiChart'), chartOptions(180)
+        );
+        mfiSeries = mfiChart.addHistogramSeries({
+            priceFormat: { type: 'price', precision: 8, minMove: 0.00000001 },
+        });
+
+        // Синхронизация скролла между графиками
+        mainChart.timeScale().subscribeVisibleLogicalRangeChange(range => {
+            if (range) {
+                aoChart.timeScale().setVisibleLogicalRange(range);
+                mfiChart.timeScale().setVisibleLogicalRange(range);
+            }
+        });
+    }
+
+    // ============================================================
+    // Загрузка данных
+    // ============================================================
+
+    /** Показывает сообщение об ошибке в контейнере графика */
+    function showError(containerId, message) {
+        const el = document.getElementById(containerId);
+        if (!el.querySelector('.error-msg')) {
+            const div = document.createElement('div');
+            div.className = 'error-msg';
+            div.style.cssText = 'position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);color:#ef5350;font-size:13px;z-index:10;text-align:center;pointer-events:none;';
+            el.style.position = 'relative';
+            el.appendChild(div);
+        }
+        el.querySelector('.error-msg').textContent = message;
+    }
+
+    /** Убирает сообщение об ошибке */
+    function clearError(containerId) {
+        const msg = document.getElementById(containerId)?.querySelector('.error-msg');
+        if (msg) msg.remove();
+    }
+
+    /** Загружает OHLCV-данные и отображает свечи */
+    async function fetchOHLCV() {
+        try {
+            const res = await fetch(`${API_BASE}/ohlcv?symbol=${currentSymbol}&timeframe=${currentTimeframe}&limit=200`);
+            const json = await res.json();
+            if (!res.ok || !json.data) {
+                showError('mainChart', `OHLCV: ${json.detail || 'Нет данных'}`);
+                return;
+            }
+            clearError('mainChart');
+            const data = json.data.map(d => ({
+                time: toUnix(d.timestamp),
+                open: d.Open, high: d.High, low: d.Low, close: d.Close
+            }));
+            candleSeries.setData(data);
+            mainChart.timeScale().fitContent();
+        } catch (e) {
+            showError('mainChart', 'OHLCV: Сервер недоступен');
+            console.error('OHLCV error:', e);
+        }
+    }
+
+    /** Загружает данные Alligator и рисует 3 линии */
+    async function fetchAlligator() {
+        try {
+            const res = await fetch(`${API_BASE}/alligator?symbol=${currentSymbol}&timeframe=${currentTimeframe}&limit=200`);
+            const json = await res.json();
+            if (!res.ok || !json.alligator) return;
+            const items = json.alligator;
+
+            jawSeries.setData(items.filter(d => d.Jaw > 0).map(d => ({ time: toUnix(d.timestamp), value: d.Jaw })));
+            teethSeries.setData(items.filter(d => d.Teeth > 0).map(d => ({ time: toUnix(d.timestamp), value: d.Teeth })));
+            lipsSeries.setData(items.filter(d => d.Lips > 0).map(d => ({ time: toUnix(d.timestamp), value: d.Lips })));
+        } catch (e) {
+            console.error('Alligator error:', e);
+        }
+    }
+
+    /** Загружает AO и отображает гистограмму */
+    async function fetchAO() {
+        try {
+            const res = await fetch(`${API_BASE}/ao?symbol=${currentSymbol}&timeframe=${currentTimeframe}&limit=200`);
+            const json = await res.json();
+            if (!res.ok || !json.ao) {
+                showError('aoChart', `AO: ${json.detail || 'Нет данных'}`);
+                return;
+            }
+            clearError('aoChart');
+            const data = json.ao.map((d, i, arr) => ({
+                time: toUnix(d.timestamp),
+                value: d.AO,
+                color: (i > 0 && d.AO >= arr[i - 1].AO) ? '#26a69a' : '#ef5350'
+            }));
+            aoSeries.setData(data);
+            aoChart.timeScale().fitContent();
+        } catch (e) {
+            showError('aoChart', 'AO: Сервер недоступен');
+            console.error('AO error:', e);
+        }
+    }
+
+    /** Загружает BW MFI и отображает гистограмму с цветами */
+    async function fetchBWMFI() {
+        try {
+            const res = await fetch(`${API_BASE}/bwmfi?symbol=${currentSymbol}&timeframe=${currentTimeframe}&limit=200`);
+            const json = await res.json();
+            if (!res.ok || !json.bwmfi) {
+                showError('mfiChart', `MFI: ${json.detail || 'Нет данных'}`);
+                return;
+            }
+            clearError('mfiChart');
+            const data = json.bwmfi.map(d => ({
+                time: toUnix(d.timestamp),
+                value: d.MFI,
+                color: d.color
+            }));
+            mfiSeries.setData(data);
+            mfiChart.timeScale().fitContent();
+        } catch (e) {
+            showError('mfiChart', 'MFI: Сервер недоступен');
+            console.error('BW MFI error:', e);
+        }
+    }
+
+    /** Загружает все данные параллельно */
+    async function fetchAll() {
+        await Promise.all([fetchOHLCV(), fetchAlligator(), fetchAO(), fetchBWMFI()]);
+        document.getElementById('lastUpdate').textContent =
+            `Последнее обновление: ${new Date().toLocaleTimeString()}`;
+    }
+
+    // ============================================================
+    // WebSocket (live-тикер)
+    // ============================================================
+    function connectWebSocket() {
+        // Закрываем предыдущее соединение
+        if (ws) {
+            ws.close();
+            ws = null;
+        }
+
+        const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        ws = new WebSocket(`${wsProtocol}//${window.location.host}/ws/${currentSymbol}`);
+
+        ws.onopen = () => {
+            const el = document.getElementById('wsStatus');
+            el.textContent = 'WebSocket: подключен';
+            el.className = 'connected';
+        };
+
+        ws.onmessage = (event) => {
+            const data = JSON.parse(event.data);
+            if (data.error) return;
+
+            // Обновляем live-тикер в шапке
+            document.getElementById('livePrice').textContent = data.price.toLocaleString();
+
+            const changeEl = document.getElementById('liveChange');
+            changeEl.textContent = `${data.change24h > 0 ? '+' : ''}${data.change24h}%`;
+            changeEl.className = data.change24h >= 0 ? 'positive' : 'negative';
+
+            document.getElementById('liveHigh').textContent = data.high24h.toLocaleString();
+            document.getElementById('liveLow').textContent = data.low24h.toLocaleString();
+            document.getElementById('liveVolume').textContent = `${data.volume24h}M`;
+        };
+
+        ws.onclose = () => {
+            const el = document.getElementById('wsStatus');
+            el.textContent = 'WebSocket: отключен';
+            el.className = 'disconnected';
+            // Переподключение через 3 секунды
+            setTimeout(connectWebSocket, 3000);
+        };
+
+        ws.onerror = () => {
+            ws.close();
+        };
+    }
+
+    // ============================================================
+    // Обработчики событий
+    // ============================================================
+
+    // Смена символа
+    document.getElementById('symbolSelect').addEventListener('change', (e) => {
+        currentSymbol = e.target.value;
+        fetchAll();
+        connectWebSocket();
+    });
+
+    // Смена таймфрейма
+    document.getElementById('timeframes').addEventListener('click', (e) => {
+        if (e.target.tagName !== 'BUTTON') return;
+        // Убираем active со всех кнопок
+        document.querySelectorAll('#timeframes button').forEach(b => b.classList.remove('active'));
+        e.target.classList.add('active');
+        currentTimeframe = e.target.dataset.tf;
+        fetchAll();
+    });
+
+    // Адаптация размера при ресайзе окна
+    window.addEventListener('resize', () => {
+        const w = document.body.clientWidth - 40;
+        mainChart.applyOptions({ width: w });
+        aoChart.applyOptions({ width: w });
+        mfiChart.applyOptions({ width: w });
+    });
+
+    // ============================================================
+    // Запуск
+    // ============================================================
+    window.onload = () => {
+        initCharts();
+        fetchAll();
+        connectWebSocket();
+    };
+</script>
+</body>
+</html>
