@@ -143,14 +143,17 @@
     let mainChart, candleSeries, jawSeries, teethSeries, lipsSeries;
     let aoChart, aoSeries;
     let mfiSquatTimes = new Set(); // timestamp'ы приседающих баров (BW MFI красный)
+    let lastCandle = null; // последний бар для live-обновления
 
     // ============================================================
     // Утилиты
     // ============================================================
 
-    /** Конвертирует строку timestamp в unix-секунды для lightweight-charts */
+    /** Конвертирует UTC-строку timestamp в unix-секунды с учётом локального часового пояса браузера */
     function toUnix(ts) {
-        return Math.floor(new Date(ts).getTime() / 1000);
+        const utcMs = new Date(ts.replace(' ', 'T') + 'Z').getTime(); // парсим как UTC
+        const localOffsetMs = -new Date().getTimezoneOffset() * 60 * 1000; // смещение браузера (+3ч для Москвы)
+        return Math.floor((utcMs + localOffsetMs) / 1000);
     }
 
     /** Общие настройки для всех графиков */
@@ -193,11 +196,19 @@
             priceFormat: { type: 'price', precision: 4, minMove: 0.0001 },
         });
 
-        // Синхронизация скролла между графиками
+        // Двусторонняя синхронизация логического диапазона (оба графика имеют 200 баров)
+        let isSyncing = false;
         mainChart.timeScale().subscribeVisibleLogicalRangeChange(range => {
-            if (range) {
-                aoChart.timeScale().setVisibleLogicalRange(range);
-            }
+            if (isSyncing || !range) return;
+            isSyncing = true;
+            aoChart.timeScale().setVisibleLogicalRange(range);
+            isSyncing = false;
+        });
+        aoChart.timeScale().subscribeVisibleLogicalRangeChange(range => {
+            if (isSyncing || !range) return;
+            isSyncing = true;
+            mainChart.timeScale().setVisibleLogicalRange(range);
+            isSyncing = false;
         });
     }
 
@@ -245,6 +256,7 @@
                 };
             });
             candleSeries.setData(data);
+            lastCandle = data[data.length - 1]; // запоминаем последний бар
             mainChart.timeScale().fitContent();
         } catch (e) {
             showError('mainChart', 'OHLCV: Сервер недоступен');
@@ -316,52 +328,48 @@
     }
 
     // ============================================================
-    // WebSocket (live-тикер)
+    // Live-тикер через REST /ticker (поллинг каждые 3 сек)
     // ============================================================
-    function connectWebSocket() {
-        // Закрываем предыдущее соединение
-        if (ws) {
-            ws.close();
-            ws = null;
+    let tickerInterval = null;
+
+    function updateTicker(data) {
+        document.getElementById('livePrice').textContent = data.price.toLocaleString();
+        const changeEl = document.getElementById('liveChange');
+        changeEl.textContent = `${data.change24h > 0 ? '+' : ''}${data.change24h}%`;
+        changeEl.className = data.change24h >= 0 ? 'positive' : 'negative';
+        document.getElementById('liveHigh').textContent = data.high24h.toLocaleString();
+        document.getElementById('liveLow').textContent = data.low24h.toLocaleString();
+        document.getElementById('liveVolume').textContent = `${data.volume24h}M`;
+        document.getElementById('wsStatus').textContent = 'Цена: live';
+        document.getElementById('wsStatus').className = 'connected';
+
+        // Обновляем последнюю свечу на графике текущей ценой
+        if (lastCandle && candleSeries) {
+            const updated = {
+                ...lastCandle,
+                close: data.price,
+                high: Math.max(lastCandle.high, data.price),
+                low: Math.min(lastCandle.low, data.price),
+            };
+            candleSeries.update(updated);
+            lastCandle = updated;
         }
-
-        const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-        ws = new WebSocket(`${wsProtocol}//${window.location.host}/ws/${currentSymbol}`);
-
-        ws.onopen = () => {
-            const el = document.getElementById('wsStatus');
-            el.textContent = 'WebSocket: подключен';
-            el.className = 'connected';
-        };
-
-        ws.onmessage = (event) => {
-            const data = JSON.parse(event.data);
-            if (data.error) return;
-
-            // Обновляем live-тикер в шапке
-            document.getElementById('livePrice').textContent = data.price.toLocaleString();
-
-            const changeEl = document.getElementById('liveChange');
-            changeEl.textContent = `${data.change24h > 0 ? '+' : ''}${data.change24h}%`;
-            changeEl.className = data.change24h >= 0 ? 'positive' : 'negative';
-
-            document.getElementById('liveHigh').textContent = data.high24h.toLocaleString();
-            document.getElementById('liveLow').textContent = data.low24h.toLocaleString();
-            document.getElementById('liveVolume').textContent = `${data.volume24h}M`;
-        };
-
-        ws.onclose = () => {
-            const el = document.getElementById('wsStatus');
-            el.textContent = 'WebSocket: отключен';
-            el.className = 'disconnected';
-            // Переподключение через 3 секунды
-            setTimeout(connectWebSocket, 3000);
-        };
-
-        ws.onerror = () => {
-            ws.close();
-        };
     }
+
+    async function fetchTicker() {
+        try {
+            const res = await fetch(`${API_BASE}/ticker?symbol=${currentSymbol}`);
+            if (res.ok) updateTicker(await res.json());
+        } catch (e) {}
+    }
+
+    function startTicker() {
+        if (tickerInterval) clearInterval(tickerInterval);
+        fetchTicker(); // сразу при запуске/смене символа
+        tickerInterval = setInterval(fetchTicker, 3000);
+    }
+
+    function connectWebSocket() { startTicker(); } // оставляем для совместимости
 
     // ============================================================
     // Обработчики событий

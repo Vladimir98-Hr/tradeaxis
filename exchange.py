@@ -28,6 +28,20 @@ def normalize_timeframe(timeframe: str) -> str:
     return EXCHANGE_TIMEFRAMES.get(timeframe.lower(), timeframe)
 
 
+def fetch_ticker(symbol: str) -> dict:
+    """Получает текущую цену и 24ч статистику с биржи."""
+    ex_symbol = normalize_symbol(symbol)
+    ticker = exchange.fetch_ticker(ex_symbol)
+    return {
+        "symbol": symbol,
+        "price": round(ticker['last'], 8),
+        "change24h": round(ticker.get('percentage') or 0, 2),
+        "high24h": round(ticker.get('high') or 0, 8),
+        "low24h": round(ticker.get('low') or 0, 8),
+        "volume24h": round((ticker.get('quoteVolume') or 0) / 1_000_000, 2),
+    }
+
+
 def fetch_ohlcv_df(symbol: str, timeframe: str, limit: int) -> pd.DataFrame:
     """
     Загружает OHLCV-данные (свечи) с биржи.

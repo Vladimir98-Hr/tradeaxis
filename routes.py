@@ -11,7 +11,7 @@ from pyrate_limiter import Limiter, Rate, Duration
 
 from config import RATE_LIMIT_TIMES, RATE_LIMIT_SECONDS
 from cache import get_cache_key, get_cached_data, set_cached_data
-from exchange import fetch_ohlcv_df
+from exchange import fetch_ohlcv_df, fetch_ticker
 from indicators import calculate_alligator, calculate_ao, calculate_bw_mfi
 
 # Маршрутизатор для REST API
@@ -21,6 +21,21 @@ router = APIRouter()
 _rate = Rate(RATE_LIMIT_TIMES, RATE_LIMIT_SECONDS * Duration.SECOND)
 _limiter = Limiter(_rate)
 rate_limit = Depends(RateLimiter(_limiter))
+
+
+@router.get("/ticker")
+async def get_ticker(symbol: str = "BTCUSDT"):
+    """Текущая цена и 24ч статистика. Кеш 5 секунд."""
+    key = get_cache_key(symbol, "", 0, "ticker")
+    cached = await get_cached_data(key)
+    if cached:
+        return cached
+    try:
+        data = fetch_ticker(symbol)
+        await set_cached_data(key, data, ttl=5)
+        return data
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.get("/health")
@@ -78,7 +93,7 @@ async def get_ao(symbol: str = "BTCUSDT", timeframe: str = "1h", limit: int = 20
         df = fetch_ohlcv_df(symbol, timeframe, limit)
         ao = calculate_ao(df)
         df_ao = pd.DataFrame({'timestamp': df['timestamp'], 'AO': ao.values})
-        result = df_ao.tail(100).to_dict('records')
+        result = df_ao.to_dict('records')
         response = {"symbol": symbol, "timeframe": timeframe, "count": len(result), "ao": result}
         await set_cached_data(key, response)
         return {"cached": False, **response}
