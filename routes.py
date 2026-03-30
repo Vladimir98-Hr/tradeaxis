@@ -9,10 +9,10 @@ from fastapi import APIRouter, Depends, HTTPException
 from fastapi_limiter.depends import RateLimiter
 from pyrate_limiter import Limiter, Rate, Duration
 
-from config import RATE_LIMIT_TIMES, RATE_LIMIT_SECONDS
+from config import RATE_LIMIT_TIMES, RATE_LIMIT_SECONDS, EXCHANGE_ID
 from cache import get_cache_key, get_cached_data, set_cached_data
 from exchange import fetch_ohlcv_df, fetch_ticker
-from indicators import calculate_alligator, calculate_ao, calculate_bw_mfi
+from indicators import calculate_alligator, calculate_ao, calculate_bw_mfi, find_fractals, find_divergences
 
 # Маршрутизатор для REST API
 router = APIRouter()
@@ -59,7 +59,7 @@ async def get_ohlcv(symbol: str = "BTCUSDT", timeframe: str = "1h", limit: int =
         await set_cached_data(key, response)
         return {"cached": False, **response}
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Bybit: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"{EXCHANGE_ID}: {str(e)}")
 
 
 @router.get("/alligator", dependencies=[rate_limit])
@@ -123,3 +123,42 @@ async def get_bwmfi(symbol: str = "BTCUSDT", timeframe: str = "1h", limit: int =
         return {"cached": False, **response}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"BW MFI: {str(e)}")
+
+
+@router.get("/fractals", dependencies=[rate_limit])
+async def get_fractals(symbol: str = "BTCUSDT", timeframe: str = "1h", limit: int = 200):
+    """Определение фракталов (локальных максимумов и минимумов)."""
+    key = get_cache_key(symbol, timeframe, limit, "fractals")
+    cached = await get_cached_data(key)
+    if cached:
+        return {"cached": True, **cached}
+
+    try:
+        df = fetch_ohlcv_df(symbol, timeframe, limit)
+        df_fractals = find_fractals(df)
+        highs = df_fractals.dropna(subset=['Fractal_High'])[['timestamp', 'Fractal_High']].rename(columns={'Fractal_High': 'value'}).to_dict('records')
+        lows = df_fractals.dropna(subset=['Fractal_Low'])[['timestamp', 'Fractal_Low']].rename(columns={'Fractal_Low': 'value'}).to_dict('records')
+        response = {"symbol": symbol, "timeframe": timeframe, "fractal_highs": highs, "fractal_lows": lows}
+        await set_cached_data(key, response)
+        return {"cached": False, **response}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Fractals: {str(e)}")
+
+
+@router.get("/divergences", dependencies=[rate_limit])
+async def get_divergences(symbol: str = "BTCUSDT", timeframe: str = "1h", limit: int = 200):
+    """Поиск бычьих и медвежьих дивергенций по AO."""
+    key = get_cache_key(symbol, timeframe, limit, "divergences")
+    cached = await get_cached_data(key)
+    if cached:
+        return {"cached": True, **cached}
+
+    try:
+        df = fetch_ohlcv_df(symbol, timeframe, limit)
+        ao = calculate_ao(df)
+        bearish, bullish = find_divergences(df, ao)
+        response = {"symbol": symbol, "timeframe": timeframe, "bearish": bearish, "bullish": bullish}
+        await set_cached_data(key, response)
+        return {"cached": False, **response}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Divergences: {str(e)}")

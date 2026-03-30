@@ -6,6 +6,7 @@ Market Facilitation Index (BW MFI).
 
 import numpy as np
 import pandas as pd
+from scipy.signal import argrelextrema
 
 
 def smma(data: np.ndarray, period: int) -> np.ndarray:
@@ -88,3 +89,43 @@ def calculate_bw_mfi(df: pd.DataFrame, color_style: bool = False):
 
     palette = palette.fillna('#000000')
     return mfi.fillna(0), palette.tolist()
+
+
+def find_fractals(df: pd.DataFrame, order: int = 5) -> pd.DataFrame:
+    """
+    Определение фракталов (локальных максимумов и минимумов).
+    Возвращает DataFrame с колонками Fractal_High и Fractal_Low.
+    order — количество баров слева и справа для подтверждения фрактала.
+    """
+    max_idx = argrelextrema(df['Close'].values, np.greater, order=order)[0]
+    min_idx = argrelextrema(df['Close'].values, np.less, order=order)[0]
+
+    result = df[['timestamp']].copy()
+    result['Fractal_High'] = np.nan
+    result['Fractal_Low'] = np.nan
+    result.iloc[max_idx, result.columns.get_loc('Fractal_High')] = df['High'].iloc[max_idx].values
+    result.iloc[min_idx, result.columns.get_loc('Fractal_Low')] = df['Low'].iloc[min_idx].values
+    return result
+
+
+def find_divergences(df: pd.DataFrame, ao: pd.Series) -> tuple:
+    """
+    Поиск бычьих и медвежьих дивергенций по AO.
+    Бычья: цена делает новый минимум, AO растёт.
+    Медвежья: цена делает новый максимум, AO падает.
+    Возвращает кортеж (bearish_list, bullish_list) — списки словарей {timestamp, value}.
+    """
+    bearish = []
+    bullish = []
+    for i in range(2, len(df) - 1):
+        # Медвежья дивергенция
+        if (df['High'].iloc[i] > df['High'].iloc[i - 1]
+                and ao.iloc[i] < ao.iloc[i - 1]
+                and df['High'].iloc[i] > df['High'].iloc[i + 1]):
+            bearish.append({"timestamp": df['timestamp'].iloc[i], "value": df['High'].iloc[i]})
+        # Бычья дивергенция
+        if (df['Low'].iloc[i] < df['Low'].iloc[i - 1]
+                and ao.iloc[i] > ao.iloc[i - 1]
+                and df['Low'].iloc[i] < df['Low'].iloc[i + 1]):
+            bullish.append({"timestamp": df['timestamp'].iloc[i], "value": df['Low'].iloc[i]})
+    return bearish, bullish

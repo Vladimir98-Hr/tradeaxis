@@ -3,11 +3,16 @@
 Содержит все настройки, константы и параметры подключения.
 """
 
+import os
+from dotenv import load_dotenv
+
+load_dotenv()
+
 # URL подключения к Redis
-REDIS_URL = "redis://localhost:6379"
+REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379")
 
 # Настройки биржи (публичный доступ, ключи не требуются для рыночных данных)
-EXCHANGE_ID = "okx"  # Биржа: okx, binance, bybit, kraken и т.д.
+EXCHANGE_ID = os.getenv("EXCHANGE_ID", "okx")  # Биржа: okx, binance, bybit, kraken и т.д.
 
 # Разрешенные таймфреймы (ключ - пользовательский формат, значение - формат биржи)
 EXCHANGE_TIMEFRAMES = {
@@ -27,5 +32,5 @@ RATE_LIMIT_TIMES = 60
 RATE_LIMIT_SECONDS = 60
 
 # Хост и порт сервера
-HOST = "0.0.0.0"
-PORT = 8000
+HOST = os.getenv("HOST", "0.0.0.0")
+PORT = int(os.getenv("PORT", "8000"))

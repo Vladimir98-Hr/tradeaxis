@@ -144,6 +144,8 @@
     let aoChart, aoSeries;
     let mfiSquatTimes = new Set(); // timestamp'ы приседающих баров (BW MFI красный)
     let lastCandle = null; // последний бар для live-обновления
+    let fractalHighs = []; // фракталы верх
+    let fractalLows = [];  // фракталы низ
 
     // ============================================================
     // Утилиты
@@ -257,6 +259,7 @@
             });
             candleSeries.setData(data);
             lastCandle = data[data.length - 1]; // запоминаем последний бар
+            applyFractalMarkers();
             mainChart.timeScale().fitContent();
         } catch (e) {
             showError('mainChart', 'OHLCV: Сервер недоступен');
@@ -302,6 +305,39 @@
         }
     }
 
+    /** Загружает фракталы и применяет маркеры на свечной график */
+    async function fetchFractals() {
+        try {
+            const res = await fetch(`${API_BASE}/fractals?symbol=${currentSymbol}&timeframe=${currentTimeframe}&limit=200`);
+            const json = await res.json();
+            if (!res.ok) return;
+            fractalHighs = (json.fractal_highs || []).map(d => ({
+                time: toUnix(d.timestamp),
+                position: 'aboveBar',
+                color: '#26a69a',
+                shape: 'arrowDown',
+                text: '',
+            }));
+            fractalLows = (json.fractal_lows || []).map(d => ({
+                time: toUnix(d.timestamp),
+                position: 'belowBar',
+                color: '#ef5350',
+                shape: 'arrowUp',
+                text: '',
+            }));
+            applyFractalMarkers();
+        } catch (e) {
+            console.error('Fractals error:', e);
+        }
+    }
+
+    /** Применяет фракталы как маркеры на candleSeries */
+    function applyFractalMarkers() {
+        if (!candleSeries) return;
+        const markers = [...fractalHighs, ...fractalLows].sort((a, b) => a.time - b.time);
+        candleSeries.setMarkers(markers);
+    }
+
     /** Загружает BW MFI, собирает timestamp'ы приседающих баров (красный = #E91E63) */
     async function fetchBWMFI() {
         try {
@@ -319,9 +355,9 @@
         }
     }
 
-    /** Загружает все данные: сначала BW MFI (для подсветки), затем остальное */
+    /** Загружает все данные: сначала BW MFI (для подсветки) и фракталы, затем остальное */
     async function fetchAll() {
-        await fetchBWMFI(); // сначала — чтобы mfiSquatTimes был готов
+        await Promise.all([fetchBWMFI(), fetchFractals()]); // сначала — чтобы данные были готовы до OHLCV
         await Promise.all([fetchOHLCV(), fetchAlligator(), fetchAO()]);
         document.getElementById('lastUpdate').textContent =
             `Последнее обновление: ${new Date().toLocaleTimeString()}`;
