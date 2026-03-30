@@ -81,6 +81,12 @@
         <button data-tf="1d">1D</button>
     </div>
 
+    <!-- Переключатель типа графика -->
+    <div style="display:flex; gap:4px;">
+        <button id="typeCandle" class="active">Свечи</button>
+        <button id="typeBar">Бары</button>
+    </div>
+
     <div class="ticker">
         <div>
             <span class="label">Цена</span><br>
@@ -117,11 +123,6 @@
     <div class="chart-container" id="aoChart"></div>
 </div>
 
-<!-- BW MFI -->
-<div class="chart-section">
-    <div class="chart-title">BW Market Facilitation Index</div>
-    <div class="chart-container" id="mfiChart"></div>
-</div>
 
 <!-- Статус подключения -->
 <div class="status">
@@ -141,7 +142,7 @@
     // Ссылки на графики и серии
     let mainChart, candleSeries, jawSeries, teethSeries, lipsSeries;
     let aoChart, aoSeries;
-    let mfiChart, mfiSeries;
+    let mfiSquatTimes = new Set(); // timestamp'ы приседающих баров (BW MFI красный)
 
     // ============================================================
     // Утилиты
@@ -192,19 +193,10 @@
             priceFormat: { type: 'price', precision: 4, minMove: 0.0001 },
         });
 
-        // BW MFI график (гистограмма с цветами)
-        mfiChart = LightweightCharts.createChart(
-            document.getElementById('mfiChart'), chartOptions(180)
-        );
-        mfiSeries = mfiChart.addHistogramSeries({
-            priceFormat: { type: 'price', precision: 8, minMove: 0.00000001 },
-        });
-
         // Синхронизация скролла между графиками
         mainChart.timeScale().subscribeVisibleLogicalRangeChange(range => {
             if (range) {
                 aoChart.timeScale().setVisibleLogicalRange(range);
-                mfiChart.timeScale().setVisibleLogicalRange(range);
             }
         });
     }
@@ -242,10 +234,16 @@
                 return;
             }
             clearError('mainChart');
-            const data = json.data.map(d => ({
-                time: toUnix(d.timestamp),
-                open: d.Open, high: d.High, low: d.Low, close: d.Close
-            }));
+            const data = json.data.map(d => {
+                const t = toUnix(d.timestamp);
+                // Приседающий бар BW MFI — подсвечиваем жёлтым
+                const isSquat = mfiSquatTimes.has(t);
+                return {
+                    time: t,
+                    open: d.Open, high: d.High, low: d.Low, close: d.Close,
+                    ...(isSquat ? { color: '#FFD700', borderColor: '#FFD700', wickColor: '#FFD700' } : {})
+                };
+            });
             candleSeries.setData(data);
             mainChart.timeScale().fitContent();
         } catch (e) {
@@ -286,39 +284,33 @@
                 color: (i > 0 && d.AO >= arr[i - 1].AO) ? '#26a69a' : '#ef5350'
             }));
             aoSeries.setData(data);
-            aoChart.timeScale().fitContent();
         } catch (e) {
             showError('aoChart', 'AO: Сервер недоступен');
             console.error('AO error:', e);
         }
     }
 
-    /** Загружает BW MFI и отображает гистограмму с цветами */
+    /** Загружает BW MFI, собирает timestamp'ы приседающих баров (красный = #E91E63) */
     async function fetchBWMFI() {
         try {
             const res = await fetch(`${API_BASE}/bwmfi?symbol=${currentSymbol}&timeframe=${currentTimeframe}&limit=200`);
             const json = await res.json();
-            if (!res.ok || !json.bwmfi) {
-                showError('mfiChart', `MFI: ${json.detail || 'Нет данных'}`);
-                return;
-            }
-            clearError('mfiChart');
-            const data = json.bwmfi.map(d => ({
-                time: toUnix(d.timestamp),
-                value: d.MFI,
-                color: d.color
-            }));
-            mfiSeries.setData(data);
-            mfiChart.timeScale().fitContent();
+            if (!res.ok || !json.bwmfi) return;
+            // Запоминаем только приседающие бары
+            mfiSquatTimes = new Set(
+                json.bwmfi
+                    .filter(d => d.color === '#E91E63')
+                    .map(d => toUnix(d.timestamp))
+            );
         } catch (e) {
-            showError('mfiChart', 'MFI: Сервер недоступен');
             console.error('BW MFI error:', e);
         }
     }
 
-    /** Загружает все данные параллельно */
+    /** Загружает все данные: сначала BW MFI (для подсветки), затем остальное */
     async function fetchAll() {
-        await Promise.all([fetchOHLCV(), fetchAlligator(), fetchAO(), fetchBWMFI()]);
+        await fetchBWMFI(); // сначала — чтобы mfiSquatTimes был готов
+        await Promise.all([fetchOHLCV(), fetchAlligator(), fetchAO()]);
         document.getElementById('lastUpdate').textContent =
             `Последнее обновление: ${new Date().toLocaleTimeString()}`;
     }
@@ -399,6 +391,35 @@
         aoChart.applyOptions({ width: w });
         mfiChart.applyOptions({ width: w });
     });
+
+    // ============================================================
+    // Переключатель типа графика (Свечи / Бары)
+    // ============================================================
+    let chartType = 'candle'; // текущий тип
+
+    function setChartType(type) {
+        chartType = type;
+        document.getElementById('typeCandle').classList.toggle('active', type === 'candle');
+        document.getElementById('typeBar').classList.toggle('active', type === 'bar');
+
+        // Удаляем старую серию и создаём новую
+        mainChart.removeSeries(candleSeries);
+        if (type === 'candle') {
+            candleSeries = mainChart.addCandlestickSeries({
+                upColor: '#26a69a', downColor: '#ef5350',
+                borderUpColor: '#26a69a', borderDownColor: '#ef5350',
+                wickUpColor: '#26a69a', wickDownColor: '#ef5350',
+            });
+        } else {
+            candleSeries = mainChart.addBarSeries({
+                upColor: '#26a69a', downColor: '#ef5350',
+            });
+        }
+        fetchOHLCV(); // перезагружаем данные в новую серию
+    }
+
+    document.getElementById('typeCandle').addEventListener('click', () => setChartType('candle'));
+    document.getElementById('typeBar').addEventListener('click', () => setChartType('bar'));
 
     // ============================================================
     // Запуск

@@ -64,23 +64,27 @@ def calculate_bw_mfi(df: pd.DataFrame, color_style: bool = False):
     - Fake: объем падает, MFI растет
     - Squat: объем растет, MFI падает
     """
-    mfi = np.zeros(len(df))
-    for i in range(1, len(df)):
-        if df['Volume'].iloc[i] > 0:
-            mfi[i] = (df['High'].iloc[i] - df['Low'].iloc[i]) / df['Volume'].iloc[i]
+    # Точная формула из оригинала: деление через pandas (NaN при Volume=0)
+    mfi = (df['High'] - df['Low']) / df['Volume']
 
-    palette = ['#000000'] * len(df)
-    for i in range(1, len(df)):
-        vol_curr, vol_prev = df['Volume'].iloc[i], df['Volume'].iloc[i - 1]
-        mfi_curr, mfi_prev = mfi[i], mfi[i - 1]
+    palette = pd.Series(index=df.index, dtype=object)
+    bar_range = df['High'] - df['Low']
+    # Кастомная формула: объём падает, но диапазон бара растёт
+    color_cond3 = (df['Volume'] < df['Volume'].shift(1)) & (bar_range > bar_range.shift(1))
+    color_cond1 = (df['Volume'] < df['Volume'].shift(1)) & (mfi < mfi.shift(1)) & ~color_cond3
+    color_cond2 = (df['Volume'] < df['Volume'].shift(1)) & (mfi > mfi.shift(1)) & ~color_cond3
+    color_cond4 = (df['Volume'] > df['Volume'].shift(1)) & (mfi > mfi.shift(1))
 
-        if vol_curr < vol_prev and mfi_curr < mfi_prev:
-            palette[i] = '#795548' if not color_style else '#9E9E9E'     # Fade
-        elif vol_curr < vol_prev and mfi_curr >= mfi_prev:
-            palette[i] = '#03A9F4' if not color_style else '#E53935'     # Fake
-        elif vol_curr >= vol_prev and mfi_curr < mfi_prev:
-            palette[i] = '#E91E63' if not color_style else '#00897B'     # Squat
-        elif vol_curr >= vol_prev and mfi_curr >= mfi_prev:
-            palette[i] = '#8BC34A' if not color_style else '#00897B'     # Green
+    if color_style:
+        palette[color_cond1] = '#9E9E9E'
+        palette[color_cond2] = '#E53935'
+        palette[color_cond3] = '#00897B'
+        palette[color_cond4] = '#00897B'
+    else:
+        palette[color_cond1] = '#795548'   # Fade
+        palette[color_cond2] = '#03A9F4'   # Fake
+        palette[color_cond3] = '#E91E63'   # Squat
+        palette[color_cond4] = '#8BC34A'   # Green
 
-    return pd.Series(mfi), palette
+    palette = palette.fillna('#000000')
+    return mfi.fillna(0), palette.tolist()
