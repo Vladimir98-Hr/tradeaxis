@@ -91,14 +91,14 @@ def calculate_bw_mfi(df: pd.DataFrame, color_style: bool = False):
     return mfi.fillna(0), palette.tolist()
 
 
-def find_fractals(df: pd.DataFrame, order: int = 5) -> pd.DataFrame:
+def find_fractals(df: pd.DataFrame, order: int = 2) -> pd.DataFrame:
     """
-    Определение фракталов (локальных максимумов и минимумов).
-    Возвращает DataFrame с колонками Fractal_High и Fractal_Low.
-    order — количество баров слева и справа для подтверждения фрактала.
+    Williams Fractals (как в TradingView).
+    order=2: High[i] строго выше High на 2 бара слева и справа.
+    Low[i] строго ниже Low на 2 бара слева и справа.
     """
-    max_idx = argrelextrema(df['Close'].values, np.greater, order=order)[0]
-    min_idx = argrelextrema(df['Close'].values, np.less, order=order)[0]
+    max_idx = argrelextrema(df['High'].values, np.greater, order=order)[0]
+    min_idx = argrelextrema(df['Low'].values, np.less, order=order)[0]
 
     result = df[['timestamp']].copy()
     result['Fractal_High'] = np.nan
@@ -110,10 +110,10 @@ def find_fractals(df: pd.DataFrame, order: int = 5) -> pd.DataFrame:
 
 def find_divergences(df: pd.DataFrame, ao: pd.Series) -> tuple:
     """
-    Поиск бычьих и медвежьих дивергенций по AO.
-    Бычья: цена делает новый минимум, AO растёт.
-    Медвежья: цена делает новый максимум, AO падает.
-    Возвращает кортеж (bearish_list, bullish_list) — списки словарей {timestamp, value}.
+    Поиск бычьих и медвежьих дивергенций по AO (логика из new.py).
+    Медвежья: High[i] > High[i-1] и ao[i] < ao[i-1] и High[i] > High[i+1]
+    Бычья: Low[i] < Low[i-1] и ao[i] > ao[i-1] и Low[i] < Low[i+1]
+    Возвращает кортеж (bearish_list, bullish_list) — списки словарей {timestamp, ao_value}.
     """
     bearish = []
     bullish = []
@@ -122,10 +122,10 @@ def find_divergences(df: pd.DataFrame, ao: pd.Series) -> tuple:
         if (df['High'].iloc[i] > df['High'].iloc[i - 1]
                 and ao.iloc[i] < ao.iloc[i - 1]
                 and df['High'].iloc[i] > df['High'].iloc[i + 1]):
-            bearish.append({"timestamp": df['timestamp'].iloc[i], "value": df['High'].iloc[i]})
+            bearish.append({"timestamp": df['timestamp'].iloc[i], "ao_value": float(ao.iloc[i])})
         # Бычья дивергенция
         if (df['Low'].iloc[i] < df['Low'].iloc[i - 1]
                 and ao.iloc[i] > ao.iloc[i - 1]
                 and df['Low'].iloc[i] < df['Low'].iloc[i + 1]):
-            bullish.append({"timestamp": df['timestamp'].iloc[i], "value": df['Low'].iloc[i]})
+            bullish.append({"timestamp": df['timestamp'].iloc[i], "ao_value": float(ao.iloc[i])})
     return bearish, bullish

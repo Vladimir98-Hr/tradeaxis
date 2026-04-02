@@ -146,6 +146,8 @@
     let lastCandle = null; // последний бар для live-обновления
     let fractalHighs = []; // фракталы верх
     let fractalLows = [];  // фракталы низ
+    let divergenceBearish = []; // медвежьи дивергенции
+    let divergenceBullish = []; // бычьи дивергенции
 
     // ============================================================
     // Утилиты
@@ -259,7 +261,7 @@
             });
             candleSeries.setData(data);
             lastCandle = data[data.length - 1]; // запоминаем последний бар
-            applyFractalMarkers();
+            applyAllMarkers();
             mainChart.timeScale().fitContent();
         } catch (e) {
             showError('mainChart', 'OHLCV: Сервер недоступен');
@@ -299,6 +301,7 @@
                 color: (i > 0 && d.AO >= arr[i - 1].AO) ? '#26a69a' : '#ef5350'
             }));
             aoSeries.setData(data);
+            applyDivergenceMarkers(); // маркеры дивергенций поверх AO
         } catch (e) {
             showError('aoChart', 'AO: Сервер недоступен');
             console.error('AO error:', e);
@@ -325,14 +328,48 @@
                 shape: 'arrowUp',
                 text: '',
             }));
-            applyFractalMarkers();
+            applyAllMarkers();
         } catch (e) {
             console.error('Fractals error:', e);
         }
     }
 
+    /** Загружает дивергенции и ставит маркеры на AO-график */
+    async function fetchDivergences() {
+        try {
+            const res = await fetch(`${API_BASE}/divergences?symbol=${currentSymbol}&timeframe=${currentTimeframe}&limit=200`);
+            const json = await res.json();
+            if (!res.ok) return;
+            divergenceBearish = (json.bearish || []).map(d => ({
+                time: toUnix(d.timestamp),
+                position: 'aboveBar',
+                color: '#e040fb',
+                shape: 'arrowDown',
+                text: '+',
+            }));
+            divergenceBullish = (json.bullish || []).map(d => ({
+                time: toUnix(d.timestamp),
+                position: 'belowBar',
+                color: '#29b6f6',
+                shape: 'arrowUp',
+                text: '+',
+            }));
+            applyDivergenceMarkers();
+        } catch (e) {
+            console.error('Divergences error:', e);
+        }
+    }
+
+    /** Применяет дивергенции как маркеры на aoSeries */
+    function applyDivergenceMarkers() {
+        if (!aoSeries) return;
+        const markers = [...divergenceBearish, ...divergenceBullish]
+            .sort((a, b) => a.time - b.time);
+        aoSeries.setMarkers(markers);
+    }
+
     /** Применяет фракталы как маркеры на candleSeries */
-    function applyFractalMarkers() {
+    function applyAllMarkers() {
         if (!candleSeries) return;
         const markers = [...fractalHighs, ...fractalLows].sort((a, b) => a.time - b.time);
         candleSeries.setMarkers(markers);
@@ -357,7 +394,7 @@
 
     /** Загружает все данные: сначала BW MFI (для подсветки) и фракталы, затем остальное */
     async function fetchAll() {
-        await Promise.all([fetchBWMFI(), fetchFractals()]); // сначала — чтобы данные были готовы до OHLCV
+        await Promise.all([fetchBWMFI(), fetchFractals(), fetchDivergences()]); // сначала — чтобы данные были готовы до OHLCV
         await Promise.all([fetchOHLCV(), fetchAlligator(), fetchAO()]);
         document.getElementById('lastUpdate').textContent =
             `Последнее обновление: ${new Date().toLocaleTimeString()}`;
