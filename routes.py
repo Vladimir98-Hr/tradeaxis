@@ -117,7 +117,7 @@ async def get_bwmfi(symbol: str = "BTCUSDT", timeframe: str = "1h", limit: int =
             'MFI': mfi.values,
             'color': palette
         })
-        result = df_mfi.tail(100).to_dict('records')
+        result = df_mfi.to_dict('records')
         response = {"symbol": symbol, "timeframe": timeframe, "count": len(result), "bwmfi": result}
         await set_cached_data(key, response)
         return {"cached": False, **response}

@@ -117,6 +117,12 @@
     <div class="chart-container" id="mainChart"></div>
 </div>
 
+<!-- Volume -->
+<div class="chart-section">
+    <div class="chart-title">Volume</div>
+    <div class="chart-container" id="volumeChart"></div>
+</div>
+
 <!-- Awesome Oscillator -->
 <div class="chart-section">
     <div class="chart-title">Awesome Oscillator (AO)</div>
@@ -141,6 +147,7 @@
 
     // Ссылки на графики и серии
     let mainChart, candleSeries, jawSeries, teethSeries, lipsSeries;
+    let volumeChart, volumeSeries;
     let aoChart, aoSeries;
     let mfiSquatTimes = new Set(); // timestamp'ы приседающих баров (BW MFI красный)
     let lastCandle = null; // последний бар для live-обновления
@@ -191,6 +198,15 @@
         teethSeries = mainChart.addLineSeries({ color: '#ef5350', lineWidth: 1, title: 'Teeth (8)' });
         lipsSeries = mainChart.addLineSeries({ color: '#26a69a', lineWidth: 1, title: 'Lips (5)' });
 
+        // Volume график (гистограмма)
+        volumeChart = LightweightCharts.createChart(
+            document.getElementById('volumeChart'), chartOptions(120)
+        );
+        volumeSeries = volumeChart.addHistogramSeries({
+            priceFormat: { type: 'volume' },
+            priceScaleId: 'right',
+        });
+
         // AO график (гистограмма)
         aoChart = LightweightCharts.createChart(
             document.getElementById('aoChart'), chartOptions(180)
@@ -200,19 +216,18 @@
             priceFormat: { type: 'price', precision: 4, minMove: 0.0001 },
         });
 
-        // Двусторонняя синхронизация логического диапазона (оба графика имеют 200 баров)
+        // Синхронизация timeScale между всеми тремя графиками
+        const allCharts = [mainChart, volumeChart, aoChart];
         let isSyncing = false;
-        mainChart.timeScale().subscribeVisibleLogicalRangeChange(range => {
-            if (isSyncing || !range) return;
-            isSyncing = true;
-            aoChart.timeScale().setVisibleLogicalRange(range);
-            isSyncing = false;
-        });
-        aoChart.timeScale().subscribeVisibleLogicalRangeChange(range => {
-            if (isSyncing || !range) return;
-            isSyncing = true;
-            mainChart.timeScale().setVisibleLogicalRange(range);
-            isSyncing = false;
+        allCharts.forEach(src => {
+            src.timeScale().subscribeVisibleLogicalRangeChange(range => {
+                if (isSyncing || !range) return;
+                isSyncing = true;
+                allCharts.forEach(dst => {
+                    if (dst !== src) dst.timeScale().setVisibleLogicalRange(range);
+                });
+                isSyncing = false;
+            });
         });
     }
 
@@ -260,6 +275,13 @@
                 };
             });
             candleSeries.setData(data);
+            // Volume гистограмма (зелёный/красный по направлению свечи)
+            const volData = json.data.map(d => ({
+                time: toUnix(d.timestamp),
+                value: d.Volume,
+                color: d.Close >= d.Open ? 'rgba(38,166,154,0.5)' : 'rgba(239,83,80,0.5)',
+            }));
+            volumeSeries.setData(volData);
             lastCandle = data[data.length - 1]; // запоминаем последний бар
             applyAllMarkers();
             mainChart.timeScale().fitContent();
@@ -301,7 +323,6 @@
                 color: (i > 0 && d.AO >= arr[i - 1].AO) ? '#26a69a' : '#ef5350'
             }));
             aoSeries.setData(data);
-            applyDivergenceMarkers(); // маркеры дивергенций поверх AO
         } catch (e) {
             showError('aoChart', 'AO: Сервер недоступен');
             console.error('AO error:', e);
@@ -334,7 +355,7 @@
         }
     }
 
-    /** Загружает дивергенции и ставит маркеры на AO-график */
+    /** Загружает дивергенции и ставит маркеры на основной график */
     async function fetchDivergences() {
         try {
             const res = await fetch(`${API_BASE}/divergences?symbol=${currentSymbol}&timeframe=${currentTimeframe}&limit=200`);
@@ -344,34 +365,36 @@
                 time: toUnix(d.timestamp),
                 position: 'aboveBar',
                 color: '#e040fb',
-                shape: 'arrowDown',
+                shape: 'circle',
                 text: '+',
+                size: 1,
             }));
             divergenceBullish = (json.bullish || []).map(d => ({
                 time: toUnix(d.timestamp),
                 position: 'belowBar',
                 color: '#29b6f6',
-                shape: 'arrowUp',
+                shape: 'circle',
                 text: '+',
+                size: 1,
             }));
-            applyDivergenceMarkers();
+            applyAllMarkers();
         } catch (e) {
             console.error('Divergences error:', e);
         }
     }
 
-    /** Применяет дивергенции как маркеры на aoSeries */
-    function applyDivergenceMarkers() {
-        if (!aoSeries) return;
-        const markers = [...divergenceBearish, ...divergenceBullish]
-            .sort((a, b) => a.time - b.time);
-        aoSeries.setMarkers(markers);
-    }
-
-    /** Применяет фракталы как маркеры на candleSeries */
+    /** Применяет фракталы + дивергенции как маркеры на candleSeries.
+     *  Дивергенции идут первыми (дальше от бара), фракталы вторыми (ближе). */
     function applyAllMarkers() {
         if (!candleSeries) return;
-        const markers = [...fractalHighs, ...fractalLows].sort((a, b) => a.time - b.time);
+        // Lightweight Charts стекирует маркеры на одном баре:
+        // первый в массиве — дальше от бара, последний — ближе
+        const markers = [
+            ...divergenceBearish,  // aboveBar '+' (дальше от свечи)
+            ...divergenceBullish,  // belowBar '+' (дальше от свечи)
+            ...fractalHighs,       // aboveBar стрелки (ближе к свече)
+            ...fractalLows,        // belowBar стрелки (ближе к свече)
+        ].sort((a, b) => a.time - b.time);
         candleSeries.setMarkers(markers);
     }
 
@@ -469,8 +492,8 @@
     window.addEventListener('resize', () => {
         const w = document.body.clientWidth - 40;
         mainChart.applyOptions({ width: w });
+        volumeChart.applyOptions({ width: w });
         aoChart.applyOptions({ width: w });
-        mfiChart.applyOptions({ width: w });
     });
 
     // ============================================================

@@ -110,22 +110,23 @@ def find_fractals(df: pd.DataFrame, order: int = 2) -> pd.DataFrame:
 
 def find_divergences(df: pd.DataFrame, ao: pd.Series) -> tuple:
     """
-    Поиск бычьих и медвежьих дивергенций по AO (логика из new.py).
-    Медвежья: High[i] > High[i-1] и ao[i] < ao[i-1] и High[i] > High[i+1]
-    Бычья: Low[i] < Low[i-1] и ao[i] > ao[i-1] и Low[i] < Low[i+1]
-    Возвращает кортеж (bearish_list, bullish_list) — списки словарей {timestamp, ao_value}.
+    Поиск дивергенций по AO (логика из TradingView Pine Script).
+    bull_div = ta.lowestbars(low, 5) == 0 and ao > ao[1] and low < low[1]
+    bear_div = ta.highestbars(high, 5) == 0 and ao < ao[1] and high > high[1]
     """
     bearish = []
     bullish = []
-    for i in range(2, len(df) - 1):
-        # Медвежья дивергенция
-        if (df['High'].iloc[i] > df['High'].iloc[i - 1]
-                and ao.iloc[i] < ao.iloc[i - 1]
-                and df['High'].iloc[i] > df['High'].iloc[i + 1]):
-            bearish.append({"timestamp": df['timestamp'].iloc[i], "ao_value": float(ao.iloc[i])})
-        # Бычья дивергенция
-        if (df['Low'].iloc[i] < df['Low'].iloc[i - 1]
+    for i in range(4, len(df)):
+        # Бычья: Low[i] — минимум за 5 баров назад, AO растёт, Low ниже предыдущего
+        low_window = df['Low'].iloc[i - 4:i + 1].values
+        if (df['Low'].iloc[i] <= low_window.min()
                 and ao.iloc[i] > ao.iloc[i - 1]
-                and df['Low'].iloc[i] < df['Low'].iloc[i + 1]):
-            bullish.append({"timestamp": df['timestamp'].iloc[i], "ao_value": float(ao.iloc[i])})
+                and df['Low'].iloc[i] < df['Low'].iloc[i - 1]):
+            bullish.append({"timestamp": df['timestamp'].iloc[i], "value": float(df['Low'].iloc[i])})
+        # Медвежья: High[i] — максимум за 5 баров назад, AO падает, High выше предыдущего
+        high_window = df['High'].iloc[i - 4:i + 1].values
+        if (df['High'].iloc[i] >= high_window.max()
+                and ao.iloc[i] < ao.iloc[i - 1]
+                and df['High'].iloc[i] > df['High'].iloc[i - 1]):
+            bearish.append({"timestamp": df['timestamp'].iloc[i], "value": float(df['High'].iloc[i])})
     return bearish, bullish
