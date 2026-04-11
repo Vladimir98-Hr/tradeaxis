@@ -6,134 +6,636 @@
     <title>TradingView Clone</title>
     <script src="https://unpkg.com/lightweight-charts@4.1.1/dist/lightweight-charts.standalone.production.js"></script>
     <style>
+        /* ============================================================
+           CSS-переменные для тем
+           ============================================================ */
         * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { background: #131722; color: #d1d4dc; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
 
-        /* Шапка */
-        .header {
-            display: flex; align-items: center; gap: 20px;
-            padding: 12px 20px; background: #1e222d; border-bottom: 1px solid #2a2e39;
+        body[data-theme="dark"] {
+            --bg-primary: #131722;
+            --bg-secondary: #1e222d;
+            --bg-card: #1a1e2e;
+            --bg-sidebar: #161b26;
+            --border-color: #2a2e39;
+            --text-primary: #d1d4dc;
+            --text-secondary: #787b86;
+            --text-accent: #ffffff;
+            --accent-blue: #2962ff;
+            --green: #26a69a;
+            --red: #ef5350;
+            --grid-line: #1e222d;
+            --shadow: 0 2px 8px rgba(0,0,0,0.3);
+            --hover-bg: #252a37;
+            --placeholder-bg: rgba(42, 46, 57, 0.5);
+            --placeholder-border: #2a2e39;
+            --chart-bg: #131722;
+            --chart-text: #d1d4dc;
+            --chart-grid: #1e222d;
+            --chart-border: #2a2e39;
+        }
+
+        body[data-theme="light"] {
+            --bg-primary: #f0f2f5;
+            --bg-secondary: #ffffff;
+            --bg-card: #ffffff;
+            --bg-sidebar: #f7f8fa;
+            --border-color: #e0e3eb;
+            --text-primary: #1e222d;
+            --text-secondary: #787b86;
+            --text-accent: #131722;
+            --accent-blue: #2962ff;
+            --green: #26a69a;
+            --red: #ef5350;
+            --grid-line: #e0e3eb;
+            --shadow: 0 2px 8px rgba(0,0,0,0.08);
+            --hover-bg: #eef0f4;
+            --placeholder-bg: rgba(224, 227, 235, 0.4);
+            --placeholder-border: #d1d4dc;
+            --chart-bg: #ffffff;
+            --chart-text: #1e222d;
+            --chart-grid: #e0e3eb;
+            --chart-border: #e0e3eb;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            overflow: hidden;
+        }
+
+        /* ============================================================
+           Grid Layout
+           ============================================================ */
+        .app-layout {
+            display: grid;
+            grid-template-columns: 60px 280px 1fr 260px;
+            grid-template-rows: 48px 1fr 32px;
+            height: 100vh;
+            min-width: 1100px;
+        }
+
+        /* ============================================================
+           Sidebar (колонка 1, все строки)
+           ============================================================ */
+        .sidebar {
+            grid-column: 1;
+            grid-row: 1 / -1;
+            background: var(--bg-sidebar);
+            border-right: 1px solid var(--border-color);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 12px 0;
+            gap: 4px;
+        }
+        .sidebar-logo {
+            width: 36px; height: 36px;
+            background: var(--accent-blue);
+            border-radius: 10px;
+            display: flex; align-items: center; justify-content: center;
+            margin-bottom: 16px;
+            cursor: pointer;
+        }
+        .sidebar-logo svg { width: 20px; height: 20px; fill: #fff; }
+        .sidebar-icons { display: flex; flex-direction: column; gap: 4px; flex: 1; }
+        .sidebar-btn {
+            width: 40px; height: 40px;
+            background: transparent;
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+            display: flex; align-items: center; justify-content: center;
+            color: var(--text-secondary);
+            transition: all 0.15s;
+        }
+        .sidebar-btn:hover { background: var(--hover-bg); color: var(--text-primary); }
+        .sidebar-btn.active { background: var(--accent-blue); color: #fff; }
+        .sidebar-btn svg { width: 20px; height: 20px; fill: currentColor; }
+        .sidebar-bottom {
+            margin-top: auto;
+            display: flex; flex-direction: column; align-items: center; gap: 8px;
+        }
+        .sidebar-avatar {
+            width: 34px; height: 34px;
+            border-radius: 50%;
+            background: var(--accent-blue);
+            display: flex; align-items: center; justify-content: center;
+            color: #fff; font-size: 14px; font-weight: 600;
+            cursor: pointer;
+        }
+
+        /* ============================================================
+           Topbar (колонки 2-4, строка 1)
+           ============================================================ */
+        .topbar {
+            grid-column: 2 / -1;
+            grid-row: 1;
+            background: var(--bg-secondary);
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            align-items: center;
+            padding: 0 16px;
+            gap: 8px;
+        }
+        .topbar-title {
+            font-size: 16px;
+            font-weight: 700;
+            color: var(--text-accent);
+            margin-right: 16px;
+        }
+        .topbar-tabs { display: flex; gap: 2px; }
+        .topbar-tab {
+            padding: 6px 14px;
+            font-size: 13px;
+            color: var(--text-secondary);
+            cursor: pointer;
+            border-radius: 6px;
+            transition: all 0.15s;
+            border: none;
+            background: transparent;
+            font-family: inherit;
+        }
+        .topbar-tab:hover { background: var(--hover-bg); color: var(--text-primary); }
+        .topbar-tab.active { background: var(--accent-blue); color: #fff; }
+        .topbar-right {
+            margin-left: auto;
+            display: flex; align-items: center; gap: 10px;
+        }
+        .theme-toggle {
+            width: 36px; height: 36px;
+            background: var(--hover-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            cursor: pointer;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 16px;
+            color: var(--text-primary);
+            transition: all 0.15s;
+        }
+        .theme-toggle:hover { background: var(--border-color); }
+        .currency-badge {
+            padding: 4px 10px;
+            background: var(--hover-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        /* ============================================================
+           Left Panel (колонка 2, строка 2)
+           ============================================================ */
+        .left-panel {
+            grid-column: 2;
+            grid-row: 2;
+            padding: 10px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            overflow-y: auto;
+            border-right: 1px solid var(--border-color);
+        }
+
+        /* Карточка */
+        .card {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            box-shadow: var(--shadow);
+        }
+
+        /* Баланс */
+        .balance-card {
+            padding: 16px;
+        }
+        .balance-label {
+            font-size: 12px;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 6px;
+        }
+        .balance-value {
+            font-size: 24px;
+            font-weight: 700;
+            color: var(--text-accent);
+        }
+        .balance-sub {
+            display: flex; gap: 16px; margin-top: 10px;
+            font-size: 12px; color: var(--text-secondary);
+        }
+        .balance-sub span { display: flex; flex-direction: column; gap: 2px; }
+        .balance-sub .val { color: var(--text-primary); font-weight: 500; }
+
+        /* Список пар */
+        .pairs-card { padding: 8px; }
+        .pairs-search {
+            width: 100%;
+            padding: 8px 12px;
+            background: var(--bg-primary);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            color: var(--text-primary);
+            font-size: 13px;
+            margin-bottom: 6px;
+            outline: none;
+            font-family: inherit;
+        }
+        .pairs-search::placeholder { color: var(--text-secondary); }
+        .pairs-search:focus { border-color: var(--accent-blue); }
+        .pairs-header {
+            display: grid;
+            grid-template-columns: 1fr auto;
+            gap: 8px;
+            padding: 4px 8px;
+            font-size: 11px;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        .pair-item {
+            display: grid;
+            grid-template-columns: 28px 1fr auto;
+            align-items: center;
+            gap: 8px;
+            padding: 8px;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.15s;
+        }
+        .pair-item:hover { background: var(--hover-bg); }
+        .pair-item.active { background: var(--accent-blue); color: #fff; }
+        .pair-item.active .pair-change { color: rgba(255,255,255,0.8); }
+        .pair-item.active .pair-name-sub { color: rgba(255,255,255,0.6); }
+        .pair-icon {
+            width: 28px; height: 28px;
+            border-radius: 50%;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 13px; font-weight: 700;
+        }
+        .pair-icon.btc { background: #f7931a20; color: #f7931a; }
+        .pair-icon.eth { background: #627eea20; color: #627eea; }
+        .pair-icon.sol { background: #9945ff20; color: #9945ff; }
+        .pair-info { min-width: 0; }
+        .pair-name { font-size: 13px; font-weight: 600; }
+        .pair-name-sub { font-size: 11px; color: var(--text-secondary); }
+        .pair-values { text-align: right; }
+        .pair-price { font-size: 13px; font-weight: 500; }
+        .pair-change { font-size: 11px; font-weight: 500; }
+        .pair-change.positive { color: var(--green); }
+        .pair-change.negative { color: var(--red); }
+
+        /* ============================================================
+           Center Panel (колонка 3, строка 2)
+           ============================================================ */
+        .center-panel {
+            grid-column: 3;
+            grid-row: 2;
+            padding: 10px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            overflow: hidden;
+            min-width: 0;
+        }
+
+        /* Карточка графика */
+        .chart-card {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            padding: 0;
+        }
+        .chart-header {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 10px 14px;
+            border-bottom: 1px solid var(--border-color);
             flex-wrap: wrap;
         }
-        .header h1 { font-size: 18px; color: #fff; margin-right: 10px; }
-
-        /* Селектор символа */
-        select, button {
-            background: #2a2e39; color: #d1d4dc; border: 1px solid #363a45;
-            padding: 6px 12px; border-radius: 4px; cursor: pointer; font-size: 13px;
+        .chart-symbol-info {
+            display: flex;
+            align-items: center;
+            gap: 10px;
         }
-        select:hover, button:hover { background: #363a45; }
-        button.active { background: #2962ff; color: #fff; border-color: #2962ff; }
-
-        /* Таймфреймы */
-        .timeframes { display: flex; gap: 4px; }
-
-        /* Live-тикер */
-        .ticker {
-            display: flex; gap: 16px; margin-left: auto; align-items: center; font-size: 14px;
+        .symbol-name {
+            font-size: 16px;
+            font-weight: 700;
+            color: var(--text-accent);
         }
-        .ticker .price { font-size: 20px; font-weight: bold; color: #fff; }
-        .ticker .positive { color: #26a69a; }
-        .ticker .negative { color: #ef5350; }
-        .ticker .label { color: #787b86; font-size: 11px; }
-
-        /* Графики */
-        .chart-section { padding: 8px 20px; }
-        .chart-title {
-            font-size: 12px; color: #787b86; padding: 8px 0 4px;
-            text-transform: uppercase; letter-spacing: 1px;
+        .symbol-price {
+            font-size: 18px;
+            font-weight: 700;
+            color: var(--text-accent);
         }
-        .chart-container { width: 100%; border-radius: 4px; overflow: hidden; }
-
-        /* Статус */
-        .status {
-            padding: 8px 20px; font-size: 11px; color: #787b86;
-            display: flex; justify-content: space-between;
+        .symbol-change {
+            font-size: 13px;
+            font-weight: 600;
+            padding: 2px 8px;
+            border-radius: 4px;
         }
-        .status .connected { color: #26a69a; }
-        .status .disconnected { color: #ef5350; }
-
-        /* Загрузка */
-        .loading {
-            display: flex; align-items: center; justify-content: center;
-            height: 200px; color: #787b86; font-size: 14px;
+        .symbol-change.positive { color: var(--green); background: rgba(38,166,154,0.1); }
+        .symbol-change.negative { color: var(--red); background: rgba(239,83,80,0.1); }
+        .chart-controls {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-left: auto;
         }
+        .chart-stats {
+            display: flex;
+            gap: 14px;
+            font-size: 12px;
+        }
+        .chart-stats .stat { display: flex; flex-direction: column; gap: 1px; }
+        .chart-stats .label { color: var(--text-secondary); font-size: 10px; text-transform: uppercase; }
+        .chart-stats .val { color: var(--text-primary); font-weight: 500; }
+
+        /* Таймфреймы и кнопки */
+        .timeframes { display: flex; gap: 2px; }
+        .timeframes button, .chart-type-toggle button {
+            background: transparent;
+            color: var(--text-secondary);
+            border: none;
+            padding: 4px 10px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+            font-weight: 500;
+            font-family: inherit;
+            transition: all 0.15s;
+        }
+        .timeframes button:hover, .chart-type-toggle button:hover {
+            background: var(--hover-bg);
+            color: var(--text-primary);
+        }
+        .timeframes button.active, .chart-type-toggle button.active {
+            background: var(--accent-blue);
+            color: #fff;
+        }
+        .chart-type-toggle { display: flex; gap: 2px; }
+
+        /* Контейнеры графиков */
+        .chart-body {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            min-height: 0;
+        }
+        .chart-container {
+            width: 100%;
+            overflow: hidden;
+        }
+        .chart-container-main { flex: 6; min-height: 0; }
+        .chart-container-volume { flex: 1.5; min-height: 0; }
+        .chart-container-ao { flex: 2.5; min-height: 0; }
+
+        /* ============================================================
+           Right Panel (колонка 4, строка 2)
+           ============================================================ */
+        .right-panel {
+            grid-column: 4;
+            grid-row: 2;
+            padding: 10px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            overflow-y: auto;
+            border-left: 1px solid var(--border-color);
+        }
+
+        /* ============================================================
+           Placeholder карточки
+           ============================================================ */
+        .placeholder-card {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            padding: 24px 16px;
+            background: var(--placeholder-bg);
+            border: 2px dashed var(--placeholder-border);
+            border-radius: 12px;
+            min-height: 120px;
+        }
+        .placeholder-card.tall { flex: 1; min-height: 200px; }
+        .placeholder-icon {
+            font-size: 28px;
+            opacity: 0.7;
+        }
+        .placeholder-label {
+            font-size: 13px;
+            font-weight: 500;
+            color: var(--text-secondary);
+        }
+        .placeholder-sub {
+            font-size: 11px;
+            color: var(--text-secondary);
+            opacity: 0.7;
+        }
+
+        /* ============================================================
+           Status bar (все колонки, строка 3)
+           ============================================================ */
+        .status-bar {
+            grid-column: 1 / -1;
+            grid-row: 3;
+            padding: 0 16px;
+            font-size: 11px;
+            color: var(--text-secondary);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: var(--bg-secondary);
+            border-top: 1px solid var(--border-color);
+        }
+        .status-bar .connected { color: var(--green); }
+        .status-bar .disconnected { color: var(--red); }
+
+        /* Скроллбар */
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: var(--border-color); border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: var(--text-secondary); }
     </style>
 </head>
-<body>
+<body data-theme="dark">
 
-<!-- Шапка с управлением и live-тикером -->
-<div class="header">
-    <h1>TradingView Clone</h1>
+<div class="app-layout">
 
-    <select id="symbolSelect">
-        <option value="BTCUSDT">BTC/USDT</option>
-        <option value="ETHUSDT">ETH/USDT</option>
-        <option value="SOLUSDT">SOL/USDT</option>
-    </select>
-
-    <div class="timeframes" id="timeframes">
-        <button data-tf="1m">1m</button>
-        <button data-tf="5m">5m</button>
-        <button data-tf="15m">15m</button>
-        <button data-tf="1h" class="active">1H</button>
-        <button data-tf="4h">4H</button>
-        <button data-tf="1d">1D</button>
-    </div>
-
-    <!-- Переключатель типа графика -->
-    <div style="display:flex; gap:4px;">
-        <button id="typeCandle" class="active">Свечи</button>
-        <button id="typeBar">Бары</button>
-    </div>
-
-    <div class="ticker">
-        <div>
-            <span class="label">Цена</span><br>
-            <span class="price" id="livePrice">--</span>
+    <!-- ============================================================
+         Sidebar
+         ============================================================ -->
+    <nav class="sidebar">
+        <div class="sidebar-logo">
+            <svg viewBox="0 0 24 24"><path d="M3.5 18.49l6-6.01 4 4L22 6.92l-1.41-1.41-7.09 7.97-4-4L2 16.99z"/></svg>
         </div>
-        <div>
-            <span class="label">24ч Изм.</span><br>
-            <span id="liveChange">--</span>
+        <div class="sidebar-icons">
+            <button class="sidebar-btn active" title="Графики">
+                <svg viewBox="0 0 24 24"><path d="M3 13h2v-2H3v2zm0 4h2v-2H3v2zm0-8h2V7H3v2zm4 4h14v-2H7v2zm0 4h14v-2H7v2zM7 7v2h14V7H7z"/></svg>
+            </button>
+            <button class="sidebar-btn" title="Портфель">
+                <svg viewBox="0 0 24 24"><path d="M21 18v1c0 1.1-.9 2-2 2H5c-1.11 0-2-.9-2-2V5c0-1.1.89-2 2-2h14c1.1 0 2 .9 2 2v1h-9c-1.11 0-2 .9-2 2v8c0 1.1.89 2 2 2h9zm-9-2h10V8H12v8zm4-2.5c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5z"/></svg>
+            </button>
+            <button class="sidebar-btn" title="Торговля">
+                <svg viewBox="0 0 24 24"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zM9 17H7v-7h2v7zm4 0h-2V7h2v10zm4 0h-2v-4h2v4z"/></svg>
+            </button>
+            <button class="sidebar-btn" title="Настройки">
+                <svg viewBox="0 0 24 24"><path d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58c.18-.14.23-.41.12-.61l-1.92-3.32c-.12-.22-.37-.29-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54c-.04-.24-.24-.41-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.07.62-.07.94s.02.64.07.94l-2.03 1.58c-.18.14-.23.41-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"/></svg>
+            </button>
+            <button class="sidebar-btn" title="Информация">
+                <svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"/></svg>
+            </button>
         </div>
-        <div>
-            <span class="label">Макс 24ч</span><br>
-            <span id="liveHigh">--</span>
+        <div class="sidebar-bottom">
+            <div class="sidebar-avatar">V</div>
         </div>
-        <div>
-            <span class="label">Мин 24ч</span><br>
-            <span id="liveLow">--</span>
+    </nav>
+
+    <!-- ============================================================
+         Topbar
+         ============================================================ -->
+    <header class="topbar">
+        <span class="topbar-title">CryptoChart</span>
+        <div class="topbar-tabs">
+            <button class="topbar-tab active">OKX</button>
+            <button class="topbar-tab">Binance</button>
+            <button class="topbar-tab">Kraken</button>
+            <button class="topbar-tab">Bitfinex</button>
         </div>
-        <div>
-            <span class="label">Объем (млн)</span><br>
-            <span id="liveVolume">--</span>
+        <div class="topbar-right">
+            <button class="theme-toggle" id="themeToggle" title="Сменить тему">
+                <span id="themeIcon">&#9788;</span>
+            </button>
+            <span class="currency-badge">USD</span>
         </div>
-    </div>
-</div>
+    </header>
 
-<!-- Основной свечной график + Alligator -->
-<div class="chart-section">
-    <div class="chart-title">OHLCV + Alligator</div>
-    <div class="chart-container" id="mainChart"></div>
-</div>
+    <!-- ============================================================
+         Left Panel
+         ============================================================ -->
+    <aside class="left-panel">
+        <!-- Баланс -->
+        <div class="card balance-card">
+            <div class="balance-label">Портфель</div>
+            <div class="balance-value" id="balanceValue">--</div>
+            <div class="balance-sub">
+                <span>Объем 24ч<br><span class="val" id="balanceVolume">--</span></span>
+                <span>Изм. 24ч<br><span class="val" id="balanceChange">--</span></span>
+            </div>
+        </div>
 
-<!-- Volume -->
-<div class="chart-section">
-    <div class="chart-title">Volume</div>
-    <div class="chart-container" id="volumeChart"></div>
-</div>
+        <!-- Список пар -->
+        <div class="card pairs-card">
+            <input type="text" class="pairs-search" id="pairsSearch" placeholder="Поиск пары...">
+            <div class="pairs-header">
+                <span>Пара</span>
+                <span>Цена / Изм.</span>
+            </div>
+            <div id="pairsList" style="max-height: calc(100vh - 340px); overflow-y: auto;">
+                <!-- Пары загружаются динамически -->
+                <div style="padding: 16px; text-align: center; color: var(--text-secondary); font-size: 13px;">
+                    Загрузка пар...
+                </div>
+            </div>
+        </div>
 
-<!-- Awesome Oscillator -->
-<div class="chart-section">
-    <div class="chart-title">Awesome Oscillator (AO)</div>
-    <div class="chart-container" id="aoChart"></div>
-</div>
+        <!-- Placeholder -->
+        <div class="placeholder-card">
+            <span class="placeholder-icon">&#128202;</span>
+            <span class="placeholder-label">Маржин / Аналитика</span>
+            <span class="placeholder-sub">В разработке</span>
+        </div>
+    </aside>
 
+    <!-- ============================================================
+         Center Panel
+         ============================================================ -->
+    <main class="center-panel">
+        <div class="card chart-card">
+            <!-- Шапка графика -->
+            <div class="chart-header">
+                <div class="chart-symbol-info">
+                    <span class="symbol-name" id="chartSymbolName">BTC/USDT</span>
+                    <span class="symbol-price" id="livePrice">--</span>
+                    <span class="symbol-change" id="liveChange">--</span>
+                </div>
+                <div class="chart-stats">
+                    <div class="stat">
+                        <span class="label">Макс 24ч</span>
+                        <span class="val" id="liveHigh">--</span>
+                    </div>
+                    <div class="stat">
+                        <span class="label">Мин 24ч</span>
+                        <span class="val" id="liveLow">--</span>
+                    </div>
+                    <div class="stat">
+                        <span class="label">Объем (млн)</span>
+                        <span class="val" id="liveVolume">--</span>
+                    </div>
+                </div>
+                <div class="chart-controls">
+                    <div class="timeframes" id="timeframes">
+                        <button data-tf="1m">1m</button>
+                        <button data-tf="5m">5m</button>
+                        <button data-tf="15m">15m</button>
+                        <button data-tf="1h" class="active">1H</button>
+                        <button data-tf="4h">4H</button>
+                        <button data-tf="1d">1D</button>
+                    </div>
+                    <div class="chart-type-toggle">
+                        <button id="typeCandle" class="active">Свечи</button>
+                        <button id="typeBar">Бары</button>
+                    </div>
+                </div>
+            </div>
 
-<!-- Статус подключения -->
-<div class="status">
-    <span id="wsStatus" class="disconnected">WebSocket: отключен</span>
-    <span id="lastUpdate">Последнее обновление: --</span>
+            <!-- Графики -->
+            <div class="chart-body">
+                <div class="chart-container chart-container-main" id="mainChart"></div>
+                <div class="chart-container chart-container-volume" id="volumeChart"></div>
+                <div class="chart-container chart-container-ao" id="aoChart"></div>
+            </div>
+        </div>
+
+        <!-- Placeholder -->
+        <div class="placeholder-card" style="min-height:140px;">
+            <span class="placeholder-icon">&#128203;</span>
+            <span class="placeholder-label">Таблица активов</span>
+            <span class="placeholder-sub">All assets / Gainers / Losers — В разработке</span>
+        </div>
+    </main>
+
+    <!-- ============================================================
+         Right Panel
+         ============================================================ -->
+    <aside class="right-panel">
+        <div class="placeholder-card tall">
+            <span class="placeholder-icon">&#128200;</span>
+            <span class="placeholder-label">Криптовалюты</span>
+            <span class="placeholder-sub">Crypto / Assets / Shares — В разработке</span>
+        </div>
+        <div class="placeholder-card tall">
+            <span class="placeholder-icon">&#128213;</span>
+            <span class="placeholder-label">Ордербук</span>
+            <span class="placeholder-sub">Order book / Recent trades — В разработке</span>
+        </div>
+    </aside>
+
+    <!-- ============================================================
+         Status bar
+         ============================================================ -->
+    <footer class="status-bar">
+        <span id="wsStatus" class="disconnected">WebSocket: отключен</span>
+        <span id="lastUpdate">Последнее обновление: --</span>
+    </footer>
+
 </div>
 
 <script>
@@ -143,40 +645,100 @@
     const API_BASE = `${window.location.origin}`;
     let currentSymbol = 'BTCUSDT';
     let currentTimeframe = '1h';
-    let ws = null;
 
     // Ссылки на графики и серии
     let mainChart, candleSeries, jawSeries, teethSeries, lipsSeries;
     let volumeChart, volumeSeries;
     let aoChart, aoSeries;
-    let mfiSquatTimes = new Set(); // timestamp'ы приседающих баров (BW MFI красный)
-    let lastCandle = null; // последний бар для live-обновления
-    let fractalHighs = []; // фракталы верх
-    let fractalLows = [];  // фракталы низ
-    let divergenceBearish = []; // медвежьи дивергенции
-    let divergenceBullish = []; // бычьи дивергенции
+    let mfiSquatTimes = new Set();
+    let lastCandle = null;
+    let fractalHighs = [];
+    let fractalLows = [];
+    let divergenceBearish = [];
+    let divergenceBullish = [];
+
+    // Динамический список символов (загружается с API)
+    let allSymbols = []; // [{symbol: 'BTCUSDT', name: 'BTC/USDT', base: 'BTC'}, ...]
+
+    // ============================================================
+    // Тема
+    // ============================================================
+    const savedTheme = localStorage.getItem('theme') || 'dark';
+    document.body.dataset.theme = savedTheme;
+    updateThemeIcon();
+
+    function toggleTheme() {
+        const newTheme = document.body.dataset.theme === 'dark' ? 'light' : 'dark';
+        document.body.dataset.theme = newTheme;
+        localStorage.setItem('theme', newTheme);
+        updateThemeIcon();
+        applyThemeToCharts();
+    }
+
+    function updateThemeIcon() {
+        const icon = document.getElementById('themeIcon');
+        icon.innerHTML = document.body.dataset.theme === 'dark' ? '&#9788;' : '&#9790;';
+    }
+
+    function getThemeColors() {
+        const isDark = document.body.dataset.theme === 'dark';
+        return {
+            bg: isDark ? '#131722' : '#ffffff',
+            text: isDark ? '#d1d4dc' : '#1e222d',
+            grid: isDark ? '#1e222d' : '#e0e3eb',
+            border: isDark ? '#2a2e39' : '#e0e3eb',
+        };
+    }
+
+    function applyThemeToCharts() {
+        const c = getThemeColors();
+        const opts = {
+            layout: { background: { color: c.bg }, textColor: c.text },
+            grid: { vertLines: { color: c.grid }, horzLines: { color: c.grid } },
+            rightPriceScale: { borderColor: c.border },
+        };
+        [mainChart, volumeChart, aoChart].forEach(chart => {
+            if (chart) chart.applyOptions(opts);
+        });
+    }
+
+    document.getElementById('themeToggle').addEventListener('click', toggleTheme);
 
     // ============================================================
     // Утилиты
     // ============================================================
-
-    /** Конвертирует UTC-строку timestamp в unix-секунды с учётом локального часового пояса браузера */
     function toUnix(ts) {
-        const utcMs = new Date(ts.replace(' ', 'T') + 'Z').getTime(); // парсим как UTC
-        const localOffsetMs = -new Date().getTimezoneOffset() * 60 * 1000; // смещение браузера (+3ч для Москвы)
+        const utcMs = new Date(ts.replace(' ', 'T') + 'Z').getTime();
+        const localOffsetMs = -new Date().getTimezoneOffset() * 60 * 1000;
         return Math.floor((utcMs + localOffsetMs) / 1000);
     }
 
-    /** Общие настройки для всех графиков */
-    function chartOptions(height) {
+    function getChartWidth() {
+        const body = document.querySelector('.chart-body');
+        return body ? body.clientWidth : 800;
+    }
+
+    function getChartHeights() {
+        const body = document.querySelector('.chart-body');
+        if (!body) return { main: 300, volume: 80, ao: 120 };
+        const h = body.clientHeight;
         return {
-            width: document.body.clientWidth - 40,
+            main: Math.floor(h * 0.6),
+            volume: Math.floor(h * 0.15),
+            ao: Math.floor(h * 0.25),
+        };
+    }
+
+    function chartOptions(height) {
+        const c = getThemeColors();
+        return {
+            width: getChartWidth(),
             height: height,
-            layout: { background: { color: '#131722' }, textColor: '#d1d4dc' },
-            grid: { vertLines: { color: '#1e222d' }, horzLines: { color: '#1e222d' } },
+            layout: { background: { color: c.bg }, textColor: c.text },
+            grid: { vertLines: { color: c.grid }, horzLines: { color: c.grid } },
             crosshair: { mode: LightweightCharts.CrosshairMode.Normal },
             timeScale: { timeVisible: true, secondsVisible: false },
-            rightPriceScale: { borderColor: '#2a2e39' },
+            rightPriceScale: { borderColor: c.border },
         };
     }
 
@@ -184,39 +746,37 @@
     // Инициализация графиков
     // ============================================================
     function initCharts() {
-        // Основной график (свечи + Alligator)
+        const heights = getChartHeights();
+
         mainChart = LightweightCharts.createChart(
-            document.getElementById('mainChart'), chartOptions(420)
+            document.getElementById('mainChart'), chartOptions(heights.main)
         );
         candleSeries = mainChart.addCandlestickSeries({
             upColor: '#26a69a', downColor: '#ef5350',
             borderUpColor: '#26a69a', borderDownColor: '#ef5350',
             wickUpColor: '#26a69a', wickDownColor: '#ef5350',
         });
-        // Линии Alligator
         jawSeries = mainChart.addLineSeries({ color: '#2962ff', lineWidth: 1, title: 'Jaw (13)' });
         teethSeries = mainChart.addLineSeries({ color: '#ef5350', lineWidth: 1, title: 'Teeth (8)' });
         lipsSeries = mainChart.addLineSeries({ color: '#26a69a', lineWidth: 1, title: 'Lips (5)' });
 
-        // Volume график (гистограмма)
         volumeChart = LightweightCharts.createChart(
-            document.getElementById('volumeChart'), chartOptions(120)
+            document.getElementById('volumeChart'), chartOptions(heights.volume)
         );
         volumeSeries = volumeChart.addHistogramSeries({
             priceFormat: { type: 'volume' },
             priceScaleId: 'right',
         });
 
-        // AO график (гистограмма)
         aoChart = LightweightCharts.createChart(
-            document.getElementById('aoChart'), chartOptions(180)
+            document.getElementById('aoChart'), chartOptions(heights.ao)
         );
         aoSeries = aoChart.addHistogramSeries({
             color: '#26a69a',
             priceFormat: { type: 'price', precision: 4, minMove: 0.0001 },
         });
 
-        // Синхронизация timeScale между всеми тремя графиками
+        // Синхронизация timeScale
         const allCharts = [mainChart, volumeChart, aoChart];
         let isSyncing = false;
         allCharts.forEach(src => {
@@ -231,11 +791,23 @@
         });
     }
 
+    // ResizeObserver для адаптации графиков
+    function setupResizeObserver() {
+        const body = document.querySelector('.chart-body');
+        if (!body) return;
+        const ro = new ResizeObserver(() => {
+            const w = getChartWidth();
+            const h = getChartHeights();
+            if (mainChart) mainChart.applyOptions({ width: w, height: h.main });
+            if (volumeChart) volumeChart.applyOptions({ width: w, height: h.volume });
+            if (aoChart) aoChart.applyOptions({ width: w, height: h.ao });
+        });
+        ro.observe(body);
+    }
+
     // ============================================================
     // Загрузка данных
     // ============================================================
-
-    /** Показывает сообщение об ошибке в контейнере графика */
     function showError(containerId, message) {
         const el = document.getElementById(containerId);
         if (!el.querySelector('.error-msg')) {
@@ -248,13 +820,11 @@
         el.querySelector('.error-msg').textContent = message;
     }
 
-    /** Убирает сообщение об ошибке */
     function clearError(containerId) {
         const msg = document.getElementById(containerId)?.querySelector('.error-msg');
         if (msg) msg.remove();
     }
 
-    /** Загружает OHLCV-данные и отображает свечи */
     async function fetchOHLCV() {
         try {
             const res = await fetch(`${API_BASE}/ohlcv?symbol=${currentSymbol}&timeframe=${currentTimeframe}&limit=200`);
@@ -266,7 +836,6 @@
             clearError('mainChart');
             const data = json.data.map(d => {
                 const t = toUnix(d.timestamp);
-                // Приседающий бар BW MFI — подсвечиваем жёлтым
                 const isSquat = mfiSquatTimes.has(t);
                 return {
                     time: t,
@@ -275,14 +844,13 @@
                 };
             });
             candleSeries.setData(data);
-            // Volume гистограмма (зелёный/красный по направлению свечи)
             const volData = json.data.map(d => ({
                 time: toUnix(d.timestamp),
                 value: d.Volume,
                 color: d.Close >= d.Open ? 'rgba(38,166,154,0.5)' : 'rgba(239,83,80,0.5)',
             }));
             volumeSeries.setData(volData);
-            lastCandle = data[data.length - 1]; // запоминаем последний бар
+            lastCandle = data[data.length - 1];
             applyAllMarkers();
             mainChart.timeScale().fitContent();
         } catch (e) {
@@ -291,14 +859,12 @@
         }
     }
 
-    /** Загружает данные Alligator и рисует 3 линии */
     async function fetchAlligator() {
         try {
             const res = await fetch(`${API_BASE}/alligator?symbol=${currentSymbol}&timeframe=${currentTimeframe}&limit=200`);
             const json = await res.json();
             if (!res.ok || !json.alligator) return;
             const items = json.alligator;
-
             jawSeries.setData(items.filter(d => d.Jaw > 0).map(d => ({ time: toUnix(d.timestamp), value: d.Jaw })));
             teethSeries.setData(items.filter(d => d.Teeth > 0).map(d => ({ time: toUnix(d.timestamp), value: d.Teeth })));
             lipsSeries.setData(items.filter(d => d.Lips > 0).map(d => ({ time: toUnix(d.timestamp), value: d.Lips })));
@@ -307,7 +873,6 @@
         }
     }
 
-    /** Загружает AO и отображает гистограмму */
     async function fetchAO() {
         try {
             const res = await fetch(`${API_BASE}/ao?symbol=${currentSymbol}&timeframe=${currentTimeframe}&limit=200`);
@@ -329,25 +894,18 @@
         }
     }
 
-    /** Загружает фракталы и применяет маркеры на свечной график */
     async function fetchFractals() {
         try {
             const res = await fetch(`${API_BASE}/fractals?symbol=${currentSymbol}&timeframe=${currentTimeframe}&limit=200`);
             const json = await res.json();
             if (!res.ok) return;
             fractalHighs = (json.fractal_highs || []).map(d => ({
-                time: toUnix(d.timestamp),
-                position: 'aboveBar',
-                color: '#26a69a',
-                shape: 'arrowDown',
-                text: '',
+                time: toUnix(d.timestamp), position: 'aboveBar',
+                color: '#26a69a', shape: 'arrowDown', text: '',
             }));
             fractalLows = (json.fractal_lows || []).map(d => ({
-                time: toUnix(d.timestamp),
-                position: 'belowBar',
-                color: '#ef5350',
-                shape: 'arrowUp',
-                text: '',
+                time: toUnix(d.timestamp), position: 'belowBar',
+                color: '#ef5350', shape: 'arrowUp', text: '',
             }));
             applyAllMarkers();
         } catch (e) {
@@ -355,27 +913,18 @@
         }
     }
 
-    /** Загружает дивергенции и ставит маркеры на основной график */
     async function fetchDivergences() {
         try {
             const res = await fetch(`${API_BASE}/divergences?symbol=${currentSymbol}&timeframe=${currentTimeframe}&limit=200`);
             const json = await res.json();
             if (!res.ok) return;
             divergenceBearish = (json.bearish || []).map(d => ({
-                time: toUnix(d.timestamp),
-                position: 'aboveBar',
-                color: '#e040fb',
-                shape: 'circle',
-                text: '+',
-                size: 1,
+                time: toUnix(d.timestamp), position: 'aboveBar',
+                color: '#e040fb', shape: 'circle', text: '+', size: 1,
             }));
             divergenceBullish = (json.bullish || []).map(d => ({
-                time: toUnix(d.timestamp),
-                position: 'belowBar',
-                color: '#29b6f6',
-                shape: 'circle',
-                text: '+',
-                size: 1,
+                time: toUnix(d.timestamp), position: 'belowBar',
+                color: '#29b6f6', shape: 'circle', text: '+', size: 1,
             }));
             applyAllMarkers();
         } catch (e) {
@@ -383,41 +932,30 @@
         }
     }
 
-    /** Применяет фракталы + дивергенции как маркеры на candleSeries.
-     *  Дивергенции идут первыми (дальше от бара), фракталы вторыми (ближе). */
     function applyAllMarkers() {
         if (!candleSeries) return;
-        // Lightweight Charts стекирует маркеры на одном баре:
-        // первый в массиве — дальше от бара, последний — ближе
         const markers = [
-            ...divergenceBearish,  // aboveBar '+' (дальше от свечи)
-            ...divergenceBullish,  // belowBar '+' (дальше от свечи)
-            ...fractalHighs,       // aboveBar стрелки (ближе к свече)
-            ...fractalLows,        // belowBar стрелки (ближе к свече)
+            ...divergenceBearish, ...divergenceBullish,
+            ...fractalHighs, ...fractalLows,
         ].sort((a, b) => a.time - b.time);
         candleSeries.setMarkers(markers);
     }
 
-    /** Загружает BW MFI, собирает timestamp'ы приседающих баров (красный = #E91E63) */
     async function fetchBWMFI() {
         try {
             const res = await fetch(`${API_BASE}/bwmfi?symbol=${currentSymbol}&timeframe=${currentTimeframe}&limit=200`);
             const json = await res.json();
             if (!res.ok || !json.bwmfi) return;
-            // Запоминаем только приседающие бары
             mfiSquatTimes = new Set(
-                json.bwmfi
-                    .filter(d => d.color === '#E91E63')
-                    .map(d => toUnix(d.timestamp))
+                json.bwmfi.filter(d => d.color === '#E91E63').map(d => toUnix(d.timestamp))
             );
         } catch (e) {
             console.error('BW MFI error:', e);
         }
     }
 
-    /** Загружает все данные: сначала BW MFI (для подсветки) и фракталы, затем остальное */
     async function fetchAll() {
-        await Promise.all([fetchBWMFI(), fetchFractals(), fetchDivergences()]); // сначала — чтобы данные были готовы до OHLCV
+        await Promise.all([fetchBWMFI(), fetchFractals(), fetchDivergences()]);
         await Promise.all([fetchOHLCV(), fetchAlligator(), fetchAO()]);
         document.getElementById('lastUpdate').textContent =
             `Последнее обновление: ${new Date().toLocaleTimeString()}`;
@@ -432,14 +970,13 @@
         document.getElementById('livePrice').textContent = data.price.toLocaleString();
         const changeEl = document.getElementById('liveChange');
         changeEl.textContent = `${data.change24h > 0 ? '+' : ''}${data.change24h}%`;
-        changeEl.className = data.change24h >= 0 ? 'positive' : 'negative';
+        changeEl.className = `symbol-change ${data.change24h >= 0 ? 'positive' : 'negative'}`;
         document.getElementById('liveHigh').textContent = data.high24h.toLocaleString();
         document.getElementById('liveLow').textContent = data.low24h.toLocaleString();
         document.getElementById('liveVolume').textContent = `${data.volume24h}M`;
         document.getElementById('wsStatus').textContent = 'Цена: live';
         document.getElementById('wsStatus').className = 'connected';
 
-        // Обновляем последнюю свечу на графике текущей ценой
         if (lastCandle && candleSeries) {
             const updated = {
                 ...lastCandle,
@@ -452,61 +989,148 @@
         }
     }
 
-    async function fetchTicker() {
+    // ============================================================
+    // Динамическая загрузка списка пар
+    // ============================================================
+
+    /** Генерирует цвет иконки на основе хэша имени */
+    function symbolColor(base) {
+        const colors = ['#f7931a','#627eea','#9945ff','#e84142','#2775ca','#00d395','#e6007a','#1a9e5c','#ff6b35','#4a90d9','#c23631','#f0b90b','#8dc63f','#26a17b','#e91e63'];
+        let hash = 0;
+        for (let i = 0; i < base.length; i++) hash = base.charCodeAt(i) + ((hash << 5) - hash);
+        return colors[Math.abs(hash) % colors.length];
+    }
+
+    /** Загружает список пар с API и рендерит в DOM */
+    async function fetchSymbolsList() {
+        const container = document.getElementById('pairsList');
+        try {
+            const res = await fetch(`${API_BASE}/symbols`);
+            const json = await res.json();
+            if (!res.ok || !json.symbols) {
+                container.innerHTML = '<div style="padding:16px;text-align:center;color:var(--text-secondary)">Ошибка загрузки пар</div>';
+                return;
+            }
+            allSymbols = json.symbols;
+            container.innerHTML = '';
+            allSymbols.forEach(sym => {
+                const color = symbolColor(sym.base);
+                const isActive = sym.symbol === currentSymbol;
+                const div = document.createElement('div');
+                div.className = `pair-item${isActive ? ' active' : ''}`;
+                div.dataset.symbol = sym.symbol;
+                div.innerHTML = `
+                    <div class="pair-icon" style="background:${color}20;color:${color}">${sym.base[0]}</div>
+                    <div class="pair-info">
+                        <div class="pair-name">${sym.name}</div>
+                        <div class="pair-name-sub">${sym.base}</div>
+                    </div>
+                    <div class="pair-values">
+                        <div class="pair-price" data-price="${sym.symbol}">--</div>
+                        <div class="pair-change" data-change="${sym.symbol}">--</div>
+                    </div>
+                `;
+                div.addEventListener('click', () => selectPair(sym));
+                container.appendChild(div);
+            });
+        } catch (e) {
+            container.innerHTML = '<div style="padding:16px;text-align:center;color:var(--text-secondary)">Сервер недоступен</div>';
+            console.error('Symbols error:', e);
+        }
+    }
+
+    /** Выбор пары из списка */
+    function selectPair(sym) {
+        document.querySelectorAll('.pair-item').forEach(p => p.classList.remove('active'));
+        const el = document.querySelector(`.pair-item[data-symbol="${sym.symbol}"]`);
+        if (el) el.classList.add('active');
+        currentSymbol = sym.symbol;
+        document.getElementById('chartSymbolName').textContent = sym.name;
+        fetchAll();
+    }
+
+    // Обновление тикера текущей пары (каждые 3 сек)
+    async function fetchCurrentTicker() {
         try {
             const res = await fetch(`${API_BASE}/ticker?symbol=${currentSymbol}`);
-            if (res.ok) updateTicker(await res.json());
+            if (!res.ok) return;
+            const data = await res.json();
+            updateTicker(data);
+            // Обновляем цену в списке пар
+            const priceEl = document.querySelector(`[data-price="${currentSymbol}"]`);
+            const changeEl = document.querySelector(`[data-change="${currentSymbol}"]`);
+            if (priceEl) priceEl.textContent = `$${data.price.toLocaleString()}`;
+            if (changeEl) {
+                changeEl.textContent = `${data.change24h > 0 ? '+' : ''}${data.change24h}%`;
+                changeEl.className = `pair-change ${data.change24h >= 0 ? 'positive' : 'negative'}`;
+            }
         } catch (e) {}
+    }
+
+    // Обновление цен видимых пар (каждые 30 сек)
+    async function fetchVisibleTickers() {
+        const container = document.getElementById('pairsList');
+        const visible = container.querySelectorAll('.pair-item:not([style*="display: none"])');
+        // Обновляем первые 20 видимых пар (не считая текущей — она обновляется чаще)
+        let count = 0;
+        for (const el of visible) {
+            const sym = el.dataset.symbol;
+            if (sym === currentSymbol || count >= 20) continue;
+            try {
+                const res = await fetch(`${API_BASE}/ticker?symbol=${sym}`);
+                if (!res.ok) continue;
+                const data = await res.json();
+                const priceEl = el.querySelector(`[data-price="${sym}"]`);
+                const changeEl = el.querySelector(`[data-change="${sym}"]`);
+                if (priceEl) priceEl.textContent = `$${data.price.toLocaleString()}`;
+                if (changeEl) {
+                    changeEl.textContent = `${data.change24h > 0 ? '+' : ''}${data.change24h}%`;
+                    changeEl.className = `pair-change ${data.change24h >= 0 ? 'positive' : 'negative'}`;
+                }
+                count++;
+            } catch (e) {}
+        }
     }
 
     function startTicker() {
         if (tickerInterval) clearInterval(tickerInterval);
-        fetchTicker(); // сразу при запуске/смене символа
-        tickerInterval = setInterval(fetchTicker, 3000);
+        fetchCurrentTicker();
+        tickerInterval = setInterval(fetchCurrentTicker, 3000);
+        // Обновление видимых пар реже
+        fetchVisibleTickers();
+        setInterval(fetchVisibleTickers, 30000);
     }
-
-    function connectWebSocket() { startTicker(); } // оставляем для совместимости
 
     // ============================================================
     // Обработчики событий
     // ============================================================
 
-    // Смена символа
-    document.getElementById('symbolSelect').addEventListener('change', (e) => {
-        currentSymbol = e.target.value;
-        fetchAll();
-        connectWebSocket();
+    // Поиск пар
+    document.getElementById('pairsSearch').addEventListener('input', (e) => {
+        const q = e.target.value.toLowerCase();
+        document.querySelectorAll('.pair-item').forEach(el => {
+            const name = el.querySelector('.pair-name').textContent.toLowerCase();
+            const sub = el.querySelector('.pair-name-sub').textContent.toLowerCase();
+            el.style.display = (name.includes(q) || sub.includes(q)) ? '' : 'none';
+        });
     });
 
     // Смена таймфрейма
     document.getElementById('timeframes').addEventListener('click', (e) => {
         if (e.target.tagName !== 'BUTTON') return;
-        // Убираем active со всех кнопок
         document.querySelectorAll('#timeframes button').forEach(b => b.classList.remove('active'));
         e.target.classList.add('active');
         currentTimeframe = e.target.dataset.tf;
         fetchAll();
     });
 
-    // Адаптация размера при ресайзе окна
-    window.addEventListener('resize', () => {
-        const w = document.body.clientWidth - 40;
-        mainChart.applyOptions({ width: w });
-        volumeChart.applyOptions({ width: w });
-        aoChart.applyOptions({ width: w });
-    });
-
-    // ============================================================
     // Переключатель типа графика (Свечи / Бары)
-    // ============================================================
-    let chartType = 'candle'; // текущий тип
+    let chartType = 'candle';
 
     function setChartType(type) {
         chartType = type;
         document.getElementById('typeCandle').classList.toggle('active', type === 'candle');
         document.getElementById('typeBar').classList.toggle('active', type === 'bar');
-
-        // Удаляем старую серию и создаём новую
         mainChart.removeSeries(candleSeries);
         if (type === 'candle') {
             candleSeries = mainChart.addCandlestickSeries({
@@ -519,7 +1143,7 @@
                 upColor: '#26a69a', downColor: '#ef5350',
             });
         }
-        fetchOHLCV(); // перезагружаем данные в новую серию
+        fetchOHLCV();
     }
 
     document.getElementById('typeCandle').addEventListener('click', () => setChartType('candle'));
@@ -528,10 +1152,14 @@
     // ============================================================
     // Запуск
     // ============================================================
-    window.onload = () => {
-        initCharts();
-        fetchAll();
-        connectWebSocket();
+    window.onload = async () => {
+        requestAnimationFrame(async () => {
+            initCharts();
+            setupResizeObserver();
+            await fetchSymbolsList();
+            fetchAll();
+            startTicker();
+        });
     };
 </script>
 </body>

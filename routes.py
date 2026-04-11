@@ -7,20 +7,17 @@
 import pandas as pd
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi_limiter.depends import RateLimiter
-from pyrate_limiter import Limiter, Rate, Duration
 
 from config import RATE_LIMIT_TIMES, RATE_LIMIT_SECONDS, EXCHANGE_ID
 from cache import get_cache_key, get_cached_data, set_cached_data
-from exchange import fetch_ohlcv_df, fetch_ticker
+from exchange import fetch_ohlcv_df, fetch_ticker, fetch_symbols
 from indicators import calculate_alligator, calculate_ao, calculate_bw_mfi, find_fractals, find_divergences
 
 # Маршрутизатор для REST API
 router = APIRouter()
 
 # Rate-limiter: RATE_LIMIT_TIMES запросов за RATE_LIMIT_SECONDS секунд
-_rate = Rate(RATE_LIMIT_TIMES, RATE_LIMIT_SECONDS * Duration.SECOND)
-_limiter = Limiter(_rate)
-rate_limit = Depends(RateLimiter(_limiter))
+rate_limit = Depends(RateLimiter(times=RATE_LIMIT_TIMES, seconds=RATE_LIMIT_SECONDS))
 
 
 @router.get("/ticker")
@@ -42,6 +39,22 @@ async def get_ticker(symbol: str = "BTCUSDT"):
 async def health():
     """Проверка работоспособности API."""
     return {"status": "TradingView Clone API - Все индикаторы работают!"}
+
+
+@router.get("/symbols")
+async def get_symbols():
+    """Список доступных USDT spot-пар с биржи."""
+    key = get_cache_key("", "", 0, "symbols")
+    cached = await get_cached_data(key)
+    if cached:
+        return cached
+    try:
+        symbols = fetch_symbols()
+        result = {"symbols": symbols, "count": len(symbols)}
+        await set_cached_data(key, result, ttl=3600)
+        return result
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.get("/ohlcv", dependencies=[rate_limit])

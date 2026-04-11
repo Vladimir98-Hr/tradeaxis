@@ -13,6 +13,21 @@ from config import EXCHANGE_ID, EXCHANGE_TIMEFRAMES
 exchange = getattr(ccxt, EXCHANGE_ID)()
 
 
+def fetch_symbols() -> list:
+    """Загрузить доступные USDT spot-пары с биржи."""
+    exchange.load_markets()
+    symbols = []
+    for sym, market in exchange.markets.items():
+        if market.get('quote') == 'USDT' and market.get('spot'):
+            symbols.append({
+                'symbol': market['base'] + 'USDT',
+                'name': sym,
+                'base': market['base'],
+            })
+    symbols.sort(key=lambda x: x['base'])
+    return symbols
+
+
 def normalize_symbol(symbol: str) -> str:
     """Нормализует символ торговой пары (убирает '/', приводит к верхнему регистру)."""
     s = symbol.replace('/', '').upper()
