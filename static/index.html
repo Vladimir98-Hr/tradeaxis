@@ -825,113 +825,6 @@
         if (msg) msg.remove();
     }
 
-    async function fetchOHLCV() {
-        try {
-            const res = await fetch(`${API_BASE}/ohlcv?symbol=${currentSymbol}&timeframe=${currentTimeframe}&limit=200`);
-            const json = await res.json();
-            if (!res.ok || !json.data) {
-                showError('mainChart', `OHLCV: ${json.detail || 'Нет данных'}`);
-                return;
-            }
-            clearError('mainChart');
-            const data = json.data.map(d => {
-                const t = toUnix(d.timestamp);
-                const isSquat = mfiSquatTimes.has(t);
-                return {
-                    time: t,
-                    open: d.Open, high: d.High, low: d.Low, close: d.Close,
-                    ...(isSquat ? { color: '#FFD700', borderColor: '#FFD700', wickColor: '#FFD700' } : {})
-                };
-            });
-            candleSeries.setData(data);
-            const volData = json.data.map(d => ({
-                time: toUnix(d.timestamp),
-                value: d.Volume,
-                color: d.Close >= d.Open ? 'rgba(38,166,154,0.5)' : 'rgba(239,83,80,0.5)',
-            }));
-            volumeSeries.setData(volData);
-            lastCandle = data[data.length - 1];
-            applyAllMarkers();
-            mainChart.timeScale().fitContent();
-        } catch (e) {
-            showError('mainChart', 'OHLCV: Сервер недоступен');
-            console.error('OHLCV error:', e);
-        }
-    }
-
-    async function fetchAlligator() {
-        try {
-            const res = await fetch(`${API_BASE}/alligator?symbol=${currentSymbol}&timeframe=${currentTimeframe}&limit=200`);
-            const json = await res.json();
-            if (!res.ok || !json.alligator) return;
-            const items = json.alligator;
-            jawSeries.setData(items.filter(d => d.Jaw > 0).map(d => ({ time: toUnix(d.timestamp), value: d.Jaw })));
-            teethSeries.setData(items.filter(d => d.Teeth > 0).map(d => ({ time: toUnix(d.timestamp), value: d.Teeth })));
-            lipsSeries.setData(items.filter(d => d.Lips > 0).map(d => ({ time: toUnix(d.timestamp), value: d.Lips })));
-        } catch (e) {
-            console.error('Alligator error:', e);
-        }
-    }
-
-    async function fetchAO() {
-        try {
-            const res = await fetch(`${API_BASE}/ao?symbol=${currentSymbol}&timeframe=${currentTimeframe}&limit=200`);
-            const json = await res.json();
-            if (!res.ok || !json.ao) {
-                showError('aoChart', `AO: ${json.detail || 'Нет данных'}`);
-                return;
-            }
-            clearError('aoChart');
-            const data = json.ao.map((d, i, arr) => ({
-                time: toUnix(d.timestamp),
-                value: d.AO,
-                color: (i > 0 && d.AO >= arr[i - 1].AO) ? '#26a69a' : '#ef5350'
-            }));
-            aoSeries.setData(data);
-        } catch (e) {
-            showError('aoChart', 'AO: Сервер недоступен');
-            console.error('AO error:', e);
-        }
-    }
-
-    async function fetchFractals() {
-        try {
-            const res = await fetch(`${API_BASE}/fractals?symbol=${currentSymbol}&timeframe=${currentTimeframe}&limit=200`);
-            const json = await res.json();
-            if (!res.ok) return;
-            fractalHighs = (json.fractal_highs || []).map(d => ({
-                time: toUnix(d.timestamp), position: 'aboveBar',
-                color: '#26a69a', shape: 'arrowDown', text: '',
-            }));
-            fractalLows = (json.fractal_lows || []).map(d => ({
-                time: toUnix(d.timestamp), position: 'belowBar',
-                color: '#ef5350', shape: 'arrowUp', text: '',
-            }));
-            applyAllMarkers();
-        } catch (e) {
-            console.error('Fractals error:', e);
-        }
-    }
-
-    async function fetchDivergences() {
-        try {
-            const res = await fetch(`${API_BASE}/divergences?symbol=${currentSymbol}&timeframe=${currentTimeframe}&limit=200`);
-            const json = await res.json();
-            if (!res.ok) return;
-            divergenceBearish = (json.bearish || []).map(d => ({
-                time: toUnix(d.timestamp), position: 'aboveBar',
-                color: '#e040fb', shape: 'circle', text: '+', size: 1,
-            }));
-            divergenceBullish = (json.bullish || []).map(d => ({
-                time: toUnix(d.timestamp), position: 'belowBar',
-                color: '#29b6f6', shape: 'circle', text: '+', size: 1,
-            }));
-            applyAllMarkers();
-        } catch (e) {
-            console.error('Divergences error:', e);
-        }
-    }
-
     function applyAllMarkers() {
         if (!candleSeries) return;
         const markers = [
@@ -941,22 +834,86 @@
         candleSeries.setMarkers(markers);
     }
 
-    async function fetchBWMFI() {
-        try {
-            const res = await fetch(`${API_BASE}/bwmfi?symbol=${currentSymbol}&timeframe=${currentTimeframe}&limit=200`);
-            const json = await res.json();
-            if (!res.ok || !json.bwmfi) return;
-            mfiSquatTimes = new Set(
-                json.bwmfi.filter(d => d.color === '#E91E63').map(d => toUnix(d.timestamp))
-            );
-        } catch (e) {
-            console.error('BW MFI error:', e);
-        }
-    }
-
+    /** Один запрос к /chart-data — все данные за раз */
     async function fetchAll() {
-        await Promise.all([fetchBWMFI(), fetchFractals(), fetchDivergences()]);
-        await Promise.all([fetchOHLCV(), fetchAlligator(), fetchAO()]);
+        try {
+            const res = await fetch(`${API_BASE}/chart-data?symbol=${currentSymbol}&timeframe=${currentTimeframe}&limit=200`);
+            const json = await res.json();
+            if (!res.ok || !json.data) {
+                showError('mainChart', `${json.detail || 'Нет данных'}`);
+                return;
+            }
+            clearError('mainChart');
+            clearError('aoChart');
+
+            // BW MFI squat timestamps (для подсветки свечей)
+            mfiSquatTimes = new Set(
+                (json.bwmfi || []).filter(d => d.color === '#E91E63').map(d => toUnix(d.timestamp))
+            );
+
+            // OHLCV свечи + Volume
+            const candles = json.data.map(d => {
+                const t = toUnix(d.timestamp);
+                const isSquat = mfiSquatTimes.has(t);
+                return {
+                    time: t,
+                    open: d.Open, high: d.High, low: d.Low, close: d.Close,
+                    ...(isSquat ? { color: '#FFD700', borderColor: '#FFD700', wickColor: '#FFD700' } : {})
+                };
+            });
+            candleSeries.setData(candles);
+
+            const volData = json.data.map(d => ({
+                time: toUnix(d.timestamp),
+                value: d.Volume,
+                color: d.Close >= d.Open ? 'rgba(38,166,154,0.5)' : 'rgba(239,83,80,0.5)',
+            }));
+            volumeSeries.setData(volData);
+            lastCandle = candles[candles.length - 1];
+
+            // Alligator
+            if (json.alligator) {
+                jawSeries.setData(json.alligator.filter(d => d.Jaw > 0).map(d => ({ time: toUnix(d.timestamp), value: d.Jaw })));
+                teethSeries.setData(json.alligator.filter(d => d.Teeth > 0).map(d => ({ time: toUnix(d.timestamp), value: d.Teeth })));
+                lipsSeries.setData(json.alligator.filter(d => d.Lips > 0).map(d => ({ time: toUnix(d.timestamp), value: d.Lips })));
+            }
+
+            // AO
+            if (json.ao) {
+                const aoData = json.ao.map((d, i, arr) => ({
+                    time: toUnix(d.timestamp),
+                    value: d.AO,
+                    color: (i > 0 && d.AO >= arr[i - 1].AO) ? '#26a69a' : '#ef5350'
+                }));
+                aoSeries.setData(aoData);
+            }
+
+            // Фракталы
+            fractalHighs = (json.fractal_highs || []).map(d => ({
+                time: toUnix(d.timestamp), position: 'aboveBar',
+                color: '#26a69a', shape: 'arrowDown', text: '',
+            }));
+            fractalLows = (json.fractal_lows || []).map(d => ({
+                time: toUnix(d.timestamp), position: 'belowBar',
+                color: '#ef5350', shape: 'arrowUp', text: '',
+            }));
+
+            // Дивергенции
+            divergenceBearish = (json.bearish || []).map(d => ({
+                time: toUnix(d.timestamp), position: 'aboveBar',
+                color: '#e040fb', shape: 'circle', text: '+', size: 1,
+            }));
+            divergenceBullish = (json.bullish || []).map(d => ({
+                time: toUnix(d.timestamp), position: 'belowBar',
+                color: '#29b6f6', shape: 'circle', text: '+', size: 1,
+            }));
+
+            applyAllMarkers();
+            mainChart.timeScale().fitContent();
+        } catch (e) {
+            showError('mainChart', 'Сервер недоступен');
+            console.error('Chart data error:', e);
+        }
         document.getElementById('lastUpdate').textContent =
             `Последнее обновление: ${new Date().toLocaleTimeString()}`;
     }
@@ -1067,38 +1024,37 @@
         } catch (e) {}
     }
 
-    // Обновление цен видимых пар (каждые 30 сек)
+    // Обновление цен ВСЕХ пар одним batch-запросом к /tickers
+    // Загрузка ВСЕХ цен одним запросом к /tickers-all
     async function fetchVisibleTickers() {
-        const container = document.getElementById('pairsList');
-        const visible = container.querySelectorAll('.pair-item:not([style*="display: none"])');
-        // Обновляем первые 20 видимых пар (не считая текущей — она обновляется чаще)
-        let count = 0;
-        for (const el of visible) {
-            const sym = el.dataset.symbol;
-            if (sym === currentSymbol || count >= 20) continue;
-            try {
-                const res = await fetch(`${API_BASE}/ticker?symbol=${sym}`);
-                if (!res.ok) continue;
-                const data = await res.json();
-                const priceEl = el.querySelector(`[data-price="${sym}"]`);
-                const changeEl = el.querySelector(`[data-change="${sym}"]`);
+        try {
+            const res = await fetch(`${API_BASE}/tickers-all`);
+            if (!res.ok) return;
+            const json = await res.json();
+            const tickers = json.tickers || {};
+            for (const [sym, data] of Object.entries(tickers)) {
+                const priceEl = document.querySelector(`[data-price="${sym}"]`);
+                const changeEl = document.querySelector(`[data-change="${sym}"]`);
                 if (priceEl) priceEl.textContent = `$${data.price.toLocaleString()}`;
                 if (changeEl) {
                     changeEl.textContent = `${data.change24h > 0 ? '+' : ''}${data.change24h}%`;
                     changeEl.className = `pair-change ${data.change24h >= 0 ? 'positive' : 'negative'}`;
                 }
-                count++;
-            } catch (e) {}
-        }
+                // Обновляем основной тикер для текущего символа
+                if (sym === currentSymbol) updateTicker(data);
+            }
+        } catch (e) {}
     }
 
+    let visibleTickerInterval = null;
     function startTicker() {
         if (tickerInterval) clearInterval(tickerInterval);
+        if (visibleTickerInterval) clearInterval(visibleTickerInterval);
         fetchCurrentTicker();
         tickerInterval = setInterval(fetchCurrentTicker, 3000);
-        // Обновление видимых пар реже
+        // Загрузка цен всех пар сразу и потом каждые 15 сек
         fetchVisibleTickers();
-        setInterval(fetchVisibleTickers, 30000);
+        visibleTickerInterval = setInterval(fetchVisibleTickers, 15000);
     }
 
     // ============================================================

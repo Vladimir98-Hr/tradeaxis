@@ -5,6 +5,7 @@
 Биржа задается в config.py (EXCHANGE_ID).
 """
 
+import asyncio
 import ccxt
 import pandas as pd
 from config import EXCHANGE_ID, EXCHANGE_TIMEFRAMES
@@ -72,3 +73,35 @@ def fetch_ohlcv_df(symbol: str, timeframe: str, limit: int) -> pd.DataFrame:
     df['timestamp'] = pd.to_datetime(df['timestamp'], unit='ms').dt.strftime('%Y-%m-%d %H:%M:%S')
     df = df.astype({'Open': float, 'High': float, 'Low': float, 'Close': float, 'Volume': float})
     return df
+
+
+def fetch_all_tickers() -> dict:
+    """Все USDT spot тикеры одним вызовом к бирже."""
+    tickers = exchange.fetch_tickers()
+    result = {}
+    for sym, t in tickers.items():
+        if '/USDT' in sym:
+            base = sym.replace('/USDT', '')
+            result[base + 'USDT'] = {
+                "symbol": base + 'USDT',
+                "price": round(t['last'] or 0, 8),
+                "change24h": round(t.get('percentage') or 0, 2),
+                "high24h": round(t.get('high') or 0, 8),
+                "low24h": round(t.get('low') or 0, 8),
+                "volume24h": round((t.get('quoteVolume') or 0) / 1_000_000, 2),
+            }
+    return result
+
+
+# Async-обёртки: ccxt синхронный, to_thread() не блокирует event loop FastAPI
+async def async_fetch_ohlcv_df(symbol: str, timeframe: str, limit: int) -> pd.DataFrame:
+    return await asyncio.to_thread(fetch_ohlcv_df, symbol, timeframe, limit)
+
+async def async_fetch_ticker(symbol: str) -> dict:
+    return await asyncio.to_thread(fetch_ticker, symbol)
+
+async def async_fetch_symbols() -> list:
+    return await asyncio.to_thread(fetch_symbols)
+
+async def async_fetch_all_tickers() -> dict:
+    return await asyncio.to_thread(fetch_all_tickers)
