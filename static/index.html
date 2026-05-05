@@ -458,6 +458,36 @@
         .status-bar .connected { color: var(--green); }
         .status-bar .disconnected { color: var(--red); }
 
+        /* ============================================================
+           Сканер дивергенций
+           ============================================================ */
+        .div-scan-card { padding: 10px; display: flex; flex-direction: column; gap: 6px; }
+        .div-scan-header {
+            display: flex; justify-content: space-between; align-items: center;
+            font-size: 13px; font-weight: 600; color: var(--text-accent); padding: 2px 4px;
+        }
+        .div-scan-btn {
+            background: var(--hover-bg); border: 1px solid var(--border-color);
+            border-radius: 6px; color: var(--text-primary); font-size: 12px;
+            padding: 4px 10px; cursor: pointer; font-family: inherit; transition: all 0.15s;
+        }
+        .div-scan-btn:hover { background: var(--border-color); }
+        .div-scan-btn:disabled { opacity: 0.5; cursor: default; }
+        .div-scan-info { font-size: 11px; color: var(--text-secondary); padding: 0 4px; }
+        .div-scan-list { display: flex; flex-direction: column; gap: 2px; max-height: 380px; overflow-y: auto; }
+        .div-scan-item {
+            display: grid; grid-template-columns: 22px 1fr auto;
+            align-items: center; gap: 8px; padding: 7px 8px;
+            border-radius: 8px; cursor: pointer; transition: all 0.15s; font-size: 13px;
+        }
+        .div-scan-item:hover { background: var(--hover-bg); }
+        .div-scan-badge { font-size: 13px; font-weight: 700; text-align: center; }
+        .div-scan-item.bull .div-scan-badge { color: var(--green); }
+        .div-scan-item.bear .div-scan-badge { color: var(--red); }
+        .div-scan-name { font-weight: 500; color: var(--text-primary); }
+        .div-scan-price { font-size: 12px; color: var(--text-secondary); }
+        .div-scan-empty { padding: 16px; text-align: center; color: var(--text-secondary); font-size: 13px; }
+
         /* Скроллбар */
         ::-webkit-scrollbar { width: 6px; }
         ::-webkit-scrollbar-track { background: transparent; }
@@ -616,10 +646,16 @@
          Right Panel
          ============================================================ -->
     <aside class="right-panel">
-        <div class="placeholder-card tall">
-            <span class="placeholder-icon">&#128200;</span>
-            <span class="placeholder-label">Криптовалюты</span>
-            <span class="placeholder-sub">Crypto / Assets / Shares — В разработке</span>
+        <!-- Сканер дивергентных баров -->
+        <div class="card div-scan-card">
+            <div class="div-scan-header">
+                <span>Дивергенции 1D</span>
+                <button class="div-scan-btn" id="divScanBtn" onclick="fetchDivScan()">⟳ Сканировать</button>
+            </div>
+            <div class="div-scan-info" id="divScanInfo"></div>
+            <div class="div-scan-list" id="divScanList">
+                <div class="div-scan-empty">Нажмите «Сканировать»</div>
+            </div>
         </div>
         <div class="placeholder-card tall">
             <span class="placeholder-icon">&#128213;</span>
@@ -648,6 +684,7 @@
 
     // Ссылки на графики и серии
     let mainChart, candleSeries, jawSeries, teethSeries, lipsSeries;
+    let bbUpperSeries, bbLowerSeries;
     let volumeChart, volumeSeries;
     let aoChart, aoSeries;
     let mfiSquatTimes = new Set();
@@ -695,7 +732,7 @@
         const opts = {
             layout: { background: { color: c.bg }, textColor: c.text },
             grid: { vertLines: { color: c.grid }, horzLines: { color: c.grid } },
-            rightPriceScale: { borderColor: c.border },
+            rightPriceScale: { borderColor: c.border, minimumWidth: 80 },
         };
         [mainChart, volumeChart, aoChart].forEach(chart => {
             if (chart) chart.applyOptions(opts);
@@ -729,7 +766,8 @@
         };
     }
 
-    function chartOptions(height) {
+    // Базовые опции — общие для всех графиков
+    function chartOptions(height, showTimeScale = false) {
         const c = getThemeColors();
         return {
             width: getChartWidth(),
@@ -737,8 +775,8 @@
             layout: { background: { color: c.bg }, textColor: c.text },
             grid: { vertLines: { color: c.grid }, horzLines: { color: c.grid } },
             crosshair: { mode: LightweightCharts.CrosshairMode.Normal },
-            timeScale: { timeVisible: true, secondsVisible: false },
-            rightPriceScale: { borderColor: c.border },
+            timeScale: { timeVisible: true, secondsVisible: false, visible: showTimeScale },
+            rightPriceScale: { borderColor: c.border, minimumWidth: 80 },
         };
     }
 
@@ -748,9 +786,25 @@
     function initCharts() {
         const heights = getChartHeights();
 
+        // Ось времени скрыта — только у нижнего (AO) она видна
         mainChart = LightweightCharts.createChart(
-            document.getElementById('mainChart'), chartOptions(heights.main)
+            document.getElementById('mainChart'), chartOptions(heights.main, false)
         );
+
+        // Bollinger Bands — добавляем ПЕРВЫМИ чтобы рендерились за свечами
+        bbUpperSeries = mainChart.addLineSeries({
+            color: 'rgba(33,150,243,0.9)',
+            lineWidth: 2,
+            priceLineVisible: false,
+            lastValueVisible: false,
+        });
+        bbLowerSeries = mainChart.addLineSeries({
+            color: 'rgba(33,150,243,0.9)',
+            lineWidth: 2,
+            priceLineVisible: false,
+            lastValueVisible: false,
+        });
+
         candleSeries = mainChart.addCandlestickSeries({
             upColor: '#26a69a', downColor: '#ef5350',
             borderUpColor: '#26a69a', borderDownColor: '#ef5350',
@@ -760,24 +814,28 @@
         teethSeries = mainChart.addLineSeries({ color: '#ef5350', lineWidth: 1, title: 'Teeth (8)' });
         lipsSeries = mainChart.addLineSeries({ color: '#26a69a', lineWidth: 1, title: 'Lips (5)' });
 
+
         volumeChart = LightweightCharts.createChart(
-            document.getElementById('volumeChart'), chartOptions(heights.volume)
+            document.getElementById('volumeChart'), chartOptions(heights.volume, false)
         );
         volumeSeries = volumeChart.addHistogramSeries({
             priceFormat: { type: 'volume' },
             priceScaleId: 'right',
         });
 
+        // AO — нижний график, показывает ось времени
         aoChart = LightweightCharts.createChart(
-            document.getElementById('aoChart'), chartOptions(heights.ao)
+            document.getElementById('aoChart'), chartOptions(heights.ao, true)
         );
         aoSeries = aoChart.addHistogramSeries({
             color: '#26a69a',
             priceFormat: { type: 'price', precision: 4, minMove: 0.0001 },
         });
 
-        // Синхронизация timeScale
         const allCharts = [mainChart, volumeChart, aoChart];
+        const allFirstSeries = [candleSeries, volumeSeries, aoSeries];
+
+        // Синхронизация timeScale (горизонтальный скролл/зум)
         let isSyncing = false;
         allCharts.forEach(src => {
             src.timeScale().subscribeVisibleLogicalRangeChange(range => {
@@ -789,6 +847,7 @@
                 isSyncing = false;
             });
         });
+
     }
 
     // ResizeObserver для адаптации графиков
@@ -823,6 +882,22 @@
     function clearError(containerId) {
         const msg = document.getElementById(containerId)?.querySelector('.error-msg');
         if (msg) msg.remove();
+    }
+
+    // Bollinger Bands — расчёт на клиенте по формуле из TradingView Pine Script
+    // basis = ta.sma(close, 20), dev = 2 * ta.stdev(close, 20, biased=true)
+    // Прогрессивный расчёт: с первой свечи, окно растёт до period
+    function calcBB(candles, period = 20, mult = 2) {
+        const bb = [];
+        for (let i = 0; i < candles.length; i++) {
+            const closes = candles.slice(Math.max(0, i - period + 1), i + 1).map(c => c.close);
+            const len = closes.length;
+            const mean = closes.reduce((a, b) => a + b, 0) / len;
+            const variance = closes.reduce((a, b) => a + (b - mean) ** 2, 0) / len;
+            const std = Math.sqrt(variance);
+            bb.push({ time: candles[i].time, upper: mean + mult * std, lower: mean - mult * std });
+        }
+        return bb;
     }
 
     function applyAllMarkers() {
@@ -907,6 +982,11 @@
                 time: toUnix(d.timestamp), position: 'belowBar',
                 color: '#29b6f6', shape: 'circle', text: '+', size: 1,
             }));
+
+            // Bollinger Bands — вычисляем на клиенте из уже загруженных свечей
+            const bbData = calcBB(candles);
+            bbUpperSeries.setData(bbData.map(d => ({ time: d.time, value: d.upper })));
+            bbLowerSeries.setData(bbData.map(d => ({ time: d.time, value: d.lower })));
 
             applyAllMarkers();
             mainChart.timeScale().fitContent();
@@ -1099,11 +1179,46 @@
                 upColor: '#26a69a', downColor: '#ef5350',
             });
         }
-        fetchOHLCV();
+        fetchAll();
     }
 
     document.getElementById('typeCandle').addEventListener('click', () => setChartType('candle'));
     document.getElementById('typeBar').addEventListener('click', () => setChartType('bar'));
+
+
+    // ============================================================
+    // Сканер дивергентных баров
+    // ============================================================
+    async function fetchDivScan() {
+        const btn = document.getElementById('divScanBtn');
+        const list = document.getElementById('divScanList');
+        const info = document.getElementById('divScanInfo');
+        btn.disabled = true;
+        btn.textContent = '...';
+        list.innerHTML = '<div class="div-scan-empty">Сканирование всех пар...<br>Может занять 20–40 сек</div>';
+        info.textContent = '';
+        try {
+            const res = await fetch(`${API_BASE}/scan/divergences?timeframe=1d&limit=50`);
+            const json = await res.json();
+            if (!res.ok) throw new Error(json.detail || 'Ошибка');
+            info.textContent = `Найдено: ${json.count} из ${json.scanned} пар`;
+            if (!json.divergences?.length) {
+                list.innerHTML = '<div class="div-scan-empty">Дивергенций не найдено</div>';
+            } else {
+                list.innerHTML = json.divergences.map(d => `
+                    <div class="div-scan-item ${d.type}" onclick="selectPair({symbol:'${d.symbol}',name:'${d.name}',base:'${d.base}'})">
+                        <span class="div-scan-badge">${d.type === 'bull' ? '▲' : '▼'}</span>
+                        <span class="div-scan-name">${d.name}</span>
+                        <span class="div-scan-price">$${Number(d.close).toLocaleString()}</span>
+                    </div>
+                `).join('');
+            }
+        } catch(e) {
+            list.innerHTML = `<div class="div-scan-empty" style="color:var(--red)">${e.message}</div>`;
+        }
+        btn.disabled = false;
+        btn.textContent = '⟳ Сканировать';
+    }
 
     // ============================================================
     // Запуск

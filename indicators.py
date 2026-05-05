@@ -130,3 +130,20 @@ def find_divergences(df: pd.DataFrame, ao: pd.Series) -> tuple:
                 and df['High'].iloc[i] > df['High'].iloc[i - 1]):
             bearish.append({"timestamp": df['timestamp'].iloc[i], "value": float(df['High'].iloc[i])})
     return bearish, bullish
+
+
+def calculate_bollinger_bands(df: pd.DataFrame, period: int = 20, std_dev: float = 2.0) -> pd.DataFrame:
+    """
+    Полосы Боллинджера (Bollinger Bands).
+    Верхняя: SMA(period) + std_dev * σ
+    Средняя: SMA(period)
+    Нижняя: SMA(period) - std_dev * σ
+    """
+    close = df['Close']
+    middle = close.rolling(window=period).mean()
+    std = close.rolling(window=period).std()
+    result = df[['timestamp']].copy()
+    result['BB_Upper'] = middle + std_dev * std
+    result['BB_Middle'] = middle
+    result['BB_Lower'] = middle - std_dev * std
+    return result.fillna(0)

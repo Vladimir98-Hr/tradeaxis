@@ -6,22 +6,35 @@
 
 import asyncio
 import pandas as pd
-from fastapi import APIRouter, Depends, HTTPException
-from pyrate_limiter import Duration, Rate, Limiter
-from fastapi_limiter.depends import RateLimiter
+from fastapi import APIRouter, HTTPException
 
-from config import RATE_LIMIT_TIMES, RATE_LIMIT_SECONDS, EXCHANGE_ID
+from config import EXCHANGE_ID
 from cache import get_cache_key, get_cached_data, set_cached_data
 from exchange import async_fetch_ohlcv_df, async_fetch_ticker, async_fetch_symbols, async_fetch_all_tickers
-from indicators import calculate_alligator, calculate_ao, calculate_bw_mfi, find_fractals, find_divergences
+from indicators import calculate_alligator, calculate_ao, calculate_bw_mfi, find_fractals, find_divergences, calculate_bollinger_bands
 
 # Маршрутизатор для REST API
 router = APIRouter()
 
-# Rate-limiter: RATE_LIMIT_TIMES запросов за RATE_LIMIT_SECONDS секунд
-_limiter = Limiter(Rate(RATE_LIMIT_TIMES, Duration.SECOND * RATE_LIMIT_SECONDS))
-rate_limit = Depends(RateLimiter(limiter=_limiter))
 
+def _check_last_bar_divergence(df, ao):
+    """Проверяет есть ли дивергентный бар на последнем баре (логика из Pine Script / ccxt-сканера)."""
+    i = len(df) - 1
+    if i < 4:
+        return False, False
+    low_window = df['Low'].iloc[i - 4:i + 1].values
+    is_bull = (
+        bool(df['Low'].iloc[i] <= low_window.min()) and
+        bool(ao.iloc[i] > ao.iloc[i - 1]) and
+        bool(df['Low'].iloc[i] < df['Low'].iloc[i - 1])
+    )
+    high_window = df['High'].iloc[i - 4:i + 1].values
+    is_bear = (
+        bool(df['High'].iloc[i] >= high_window.max()) and
+        bool(ao.iloc[i] < ao.iloc[i - 1]) and
+        bool(df['High'].iloc[i] > df['High'].iloc[i - 1])
+    )
+    return is_bull, is_bear
 
 @router.get("/ticker")
 async def get_ticker(symbol: str = "BTCUSDT"):
@@ -60,7 +73,7 @@ async def get_symbols():
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.get("/ohlcv", dependencies=[rate_limit])
+@router.get("/ohlcv")
 async def get_ohlcv(symbol: str = "BTCUSDT", timeframe: str = "1h", limit: int = 100):
     """Получение OHLCV-данных (свечей) для указанного символа и таймфрейма."""
     key = get_cache_key(symbol, timeframe, limit, "ohlcv")
@@ -78,7 +91,7 @@ async def get_ohlcv(symbol: str = "BTCUSDT", timeframe: str = "1h", limit: int =
         raise HTTPException(status_code=500, detail=f"{EXCHANGE_ID}: {str(e)}")
 
 
-@router.get("/alligator", dependencies=[rate_limit])
+@router.get("/alligator")
 async def get_alligator(symbol: str = "BTCUSDT", timeframe: str = "1h", limit: int = 200):
     """Получение данных индикатора Alligator."""
     key = get_cache_key(symbol, timeframe, limit, "alligator")
@@ -97,7 +110,7 @@ async def get_alligator(symbol: str = "BTCUSDT", timeframe: str = "1h", limit: i
         raise HTTPException(status_code=500, detail=f"Alligator: {str(e)}")
 
 
-@router.get("/ao", dependencies=[rate_limit])
+@router.get("/ao")
 async def get_ao(symbol: str = "BTCUSDT", timeframe: str = "1h", limit: int = 200):
     """Получение данных Awesome Oscillator (AO)."""
     key = get_cache_key(symbol, timeframe, limit, "ao")
@@ -117,7 +130,7 @@ async def get_ao(symbol: str = "BTCUSDT", timeframe: str = "1h", limit: int = 20
         raise HTTPException(status_code=500, detail=f"AO: {str(e)}")
 
 
-@router.get("/bwmfi", dependencies=[rate_limit])
+@router.get("/bwmfi")
 async def get_bwmfi(symbol: str = "BTCUSDT", timeframe: str = "1h", limit: int = 200, color_style: bool = False):
     """Получение данных Bill Williams Market Facilitation Index."""
     key = get_cache_key(symbol, timeframe, limit, f"bwmfi_{color_style}")
@@ -141,7 +154,7 @@ async def get_bwmfi(symbol: str = "BTCUSDT", timeframe: str = "1h", limit: int =
         raise HTTPException(status_code=500, detail=f"BW MFI: {str(e)}")
 
 
-@router.get("/fractals", dependencies=[rate_limit])
+@router.get("/fractals")
 async def get_fractals(symbol: str = "BTCUSDT", timeframe: str = "1h", limit: int = 200):
     """Определение фракталов (локальных максимумов и минимумов)."""
     key = get_cache_key(symbol, timeframe, limit, "fractals")
@@ -161,7 +174,7 @@ async def get_fractals(symbol: str = "BTCUSDT", timeframe: str = "1h", limit: in
         raise HTTPException(status_code=500, detail=f"Fractals: {str(e)}")
 
 
-@router.get("/divergences", dependencies=[rate_limit])
+@router.get("/divergences")
 async def get_divergences(symbol: str = "BTCUSDT", timeframe: str = "1h", limit: int = 200):
     """Поиск бычьих и медвежьих дивергенций по AO."""
     key = get_cache_key(symbol, timeframe, limit, "divergences")
@@ -180,7 +193,7 @@ async def get_divergences(symbol: str = "BTCUSDT", timeframe: str = "1h", limit:
         raise HTTPException(status_code=500, detail=f"Divergences: {str(e)}")
 
 
-@router.get("/chart-data", dependencies=[rate_limit])
+@router.get("/chart-data")
 async def get_chart_data(symbol: str = "BTCUSDT", timeframe: str = "1h", limit: int = 200):
     """Комбинированный endpoint: OHLCV + все индикаторы за один запрос к бирже."""
     key = get_cache_key(symbol, timeframe, limit, "chart_data")
@@ -215,6 +228,10 @@ async def get_chart_data(symbol: str = "BTCUSDT", timeframe: str = "1h", limit: 
         # Divergences
         bearish, bullish = find_divergences(df, ao)
 
+        # Bollinger Bands
+        df_bb = calculate_bollinger_bands(df)
+        bollinger = df_bb.to_dict('records')
+
         response = {
             "symbol": symbol,
             "timeframe": timeframe,
@@ -226,11 +243,60 @@ async def get_chart_data(symbol: str = "BTCUSDT", timeframe: str = "1h", limit: 
             "fractal_lows": fractal_lows,
             "bearish": bearish,
             "bullish": bullish,
+            "bollinger": bollinger,
         }
         await set_cached_data(key, response)
         return response
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Chart data: {str(e)}")
+
+
+@router.get("/scan/divergences")
+async def scan_divergences(timeframe: str = "1d", limit: int = 50):
+    """Сканирует все USDT пары на дивергентный бар последнего закрытого бара."""
+    cache_ttl = 3600 if timeframe in ('1d', '1w') else 900
+    key = get_cache_key("scan", timeframe, limit, "scan_div")
+    cached = await get_cached_data(key)
+    if cached:
+        return cached
+
+    try:
+        symbols = await async_fetch_symbols()
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Symbols: {str(e)}")
+
+    sem = asyncio.Semaphore(20)
+
+    async def scan_one(sym_info):
+        async with sem:
+            try:
+                df = await async_fetch_ohlcv_df(sym_info['symbol'], timeframe, limit)
+                if len(df) < 10:
+                    return None
+                ao = calculate_ao(df)
+                is_bull, is_bear = _check_last_bar_divergence(df, ao)
+                if not is_bull and not is_bear:
+                    return None
+                return {
+                    "symbol": sym_info['symbol'],
+                    "name": sym_info['name'],
+                    "base": sym_info['base'],
+                    "type": "bull" if is_bull else "bear",
+                    "close": float(df['Close'].iloc[-1]),
+                }
+            except Exception:
+                return None
+
+    results = await asyncio.gather(*[scan_one(s) for s in symbols])
+    divergences = [r for r in results if r]
+    response = {
+        "timeframe": timeframe,
+        "count": len(divergences),
+        "scanned": len(symbols),
+        "divergences": divergences,
+    }
+    await set_cached_data(key, response, ttl=cache_ttl)
+    return response
 
 
 @router.get("/tickers")
