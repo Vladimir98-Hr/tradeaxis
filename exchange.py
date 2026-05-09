@@ -77,7 +77,7 @@ def fetch_ohlcv_df(symbol: str, timeframe: str, limit: int) -> pd.DataFrame:
 
 def fetch_all_tickers() -> dict:
     """Все USDT spot тикеры одним вызовом к бирже."""
-    tickers = exchange.fetch_tickers()
+    tickers = exchange.fetch_tickers(params={'instType': 'SPOT'})
     result = {}
     for sym, t in tickers.items():
         if '/USDT' in sym:

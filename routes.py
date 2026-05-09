@@ -193,6 +193,41 @@ async def get_divergences(symbol: str = "BTCUSDT", timeframe: str = "1h", limit:
         raise HTTPException(status_code=500, detail=f"Divergences: {str(e)}")
 
 
+@router.get("/scan/volatile")
+async def scan_volatile(threshold: float = 3.0, top: int = 20):
+    """Пары с высокой волатильностью за 24ч. Один вызов к бирже через fetch_all_tickers."""
+    key = get_cache_key("", "", 0, f"volatile_{threshold}_{top}")
+    cached = await get_cached_data(key)
+    if cached:
+        return cached
+    try:
+        tickers = await async_fetch_all_tickers()
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Tickers: {str(e)}")
+
+    results = []
+    for sym, t in tickers.items():
+        change = t.get('change24h', 0) or 0
+        price = t.get('price', 0) or 0
+        high = t.get('high24h', 0) or 0
+        low = t.get('low24h', 0) or 0
+        if abs(change) < threshold or price == 0:
+            continue
+        range_pct = round((high - low) / price * 100, 2) if price > 0 else 0
+        score = round(abs(change) + range_pct * 0.5, 2)
+        base = sym.replace('USDT', '')
+        results.append({
+            "symbol": sym, "name": f"{base}/USDT", "base": base,
+            "price": t['price'], "change24h": change,
+            "range_pct": range_pct, "score": score,
+        })
+
+    results.sort(key=lambda x: x['score'], reverse=True)
+    response = {"threshold": threshold, "count": len(results[:top]), "pairs": results[:top]}
+    await set_cached_data(key, response, ttl=300)
+    return response
+
+
 @router.get("/chart-data")
 async def get_chart_data(symbol: str = "BTCUSDT", timeframe: str = "1h", limit: int = 200):
     """Комбинированный endpoint: OHLCV + все индикаторы за один запрос к бирже."""

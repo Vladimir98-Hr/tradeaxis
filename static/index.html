@@ -487,6 +487,9 @@
         .div-scan-name { font-weight: 500; color: var(--text-primary); }
         .div-scan-price { font-size: 12px; color: var(--text-secondary); }
         .div-scan-empty { padding: 16px; text-align: center; color: var(--text-secondary); font-size: 13px; }
+        .vol-timer { font-size: 11px; color: var(--text-secondary); font-weight: 400; }
+        .vol-pos { color: var(--green); }
+        .vol-neg { color: var(--red); }
 
         /* Скроллбар */
         ::-webkit-scrollbar { width: 6px; }
@@ -657,10 +660,16 @@
                 <div class="div-scan-empty">Нажмите «Сканировать»</div>
             </div>
         </div>
-        <div class="placeholder-card tall">
-            <span class="placeholder-icon">&#128213;</span>
-            <span class="placeholder-label">Ордербук</span>
-            <span class="placeholder-sub">Order book / Recent trades — В разработке</span>
+        <!-- Сканер волатильности -->
+        <div class="card div-scan-card">
+            <div class="div-scan-header">
+                <span>Волатильность 24h</span>
+                <span class="vol-timer" id="volScanTimer"></span>
+            </div>
+            <div class="div-scan-info" id="volScanInfo"></div>
+            <div class="div-scan-list" id="volScanList">
+                <div class="div-scan-empty">Загрузка...</div>
+            </div>
         </div>
     </aside>
 
@@ -1187,6 +1196,46 @@
 
 
     // ============================================================
+    // Сканер волатильности
+    // ============================================================
+    let volNextRefresh = 0;
+
+    async function fetchVolScan() {
+        const list = document.getElementById('volScanList');
+        const info = document.getElementById('volScanInfo');
+        list.innerHTML = '<div class="div-scan-empty">Сканирование...</div>';
+        try {
+            const res = await fetch(`${API_BASE}/scan/volatile?threshold=3&top=20`);
+            const json = await res.json();
+            if (!res.ok) throw new Error(json.detail || 'Ошибка');
+            info.textContent = `Найдено: ${json.count} пар (|Δ24ч| > ${json.threshold}%)`;
+            list.innerHTML = json.pairs?.length
+                ? json.pairs.map(p => {
+                    const sign = p.change24h >= 0 ? '+' : '';
+                    const cls = p.change24h >= 0 ? 'vol-pos' : 'vol-neg';
+                    return `<div class="div-scan-item" onclick="selectPair({symbol:'${p.symbol}',name:'${p.name}',base:'${p.base}'})">
+                        <span class="div-scan-badge ${cls}">${sign}${p.change24h}%</span>
+                        <span class="div-scan-name">${p.name}</span>
+                        <span class="div-scan-price">$${Number(p.price).toLocaleString()}</span>
+                    </div>`;
+                }).join('')
+                : '<div class="div-scan-empty">Нет пар выше порога</div>';
+            volNextRefresh = Date.now() + 30 * 60 * 1000;
+        } catch(e) {
+            list.innerHTML = `<div class="div-scan-empty" style="color:var(--red)">${e.message}</div>`;
+        }
+    }
+
+    function tickVolTimer() {
+        const el = document.getElementById('volScanTimer');
+        if (!el) return;
+        const left = Math.max(0, Math.round((volNextRefresh - Date.now()) / 1000));
+        const m = Math.floor(left / 60), s = left % 60;
+        el.textContent = left > 0 ? `↻ ${m}:${s.toString().padStart(2,'0')}` : '';
+        if (left === 0 && volNextRefresh > 0) { volNextRefresh = 0; fetchVolScan(); }
+    }
+
+    // ============================================================
     // Сканер дивергентных баров
     // ============================================================
     async function fetchDivScan() {
@@ -1230,6 +1279,8 @@
             await fetchSymbolsList();
             fetchAll();
             startTicker();
+            fetchVolScan();
+            setInterval(tickVolTimer, 1000);
         });
     };
 </script>
