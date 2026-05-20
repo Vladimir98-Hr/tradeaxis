@@ -19,7 +19,7 @@ def fetch_symbols() -> list:
     exchange.load_markets()
     symbols = []
     for sym, market in exchange.markets.items():
-        if market.get('quote') == 'USDT' and market.get('spot'):
+        if market.get('quote') == 'USDT' and market.get('spot') and market.get('base'):
             symbols.append({
                 'symbol': market['base'] + 'USDT',
                 'name': sym,
@@ -82,6 +82,8 @@ def fetch_all_tickers() -> dict:
     for sym, t in tickers.items():
         if '/USDT' in sym:
             base = sym.replace('/USDT', '')
+            if not base:
+                continue
             result[base + 'USDT'] = {
                 "symbol": base + 'USDT',
                 "price": round(t['last'] or 0, 8),

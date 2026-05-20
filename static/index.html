@@ -158,6 +158,16 @@
         }
         .topbar-tab:hover { background: var(--hover-bg); color: var(--text-primary); }
         .topbar-tab.active { background: var(--accent-blue); color: #fff; }
+        /* Категории MOEX */
+        .moex-categories { display: flex; gap: 4px; padding: 8px 12px 4px; }
+        .moex-cat {
+            flex: 1; padding: 5px 4px; font-size: 12px; font-weight: 500;
+            background: transparent; color: var(--text-secondary);
+            border: 1px solid var(--border-color); border-radius: 6px;
+            cursor: pointer; font-family: inherit; transition: all 0.15s;
+        }
+        .moex-cat:hover { background: var(--hover-bg); color: var(--text-primary); }
+        .moex-cat.active { background: var(--accent-blue); color: #fff; border-color: var(--accent-blue); }
         .topbar-right {
             margin-left: auto;
             display: flex; align-items: center; gap: 10px;
@@ -476,7 +486,7 @@
         .div-scan-info { font-size: 11px; color: var(--text-secondary); padding: 0 4px; }
         .div-scan-list { display: flex; flex-direction: column; gap: 2px; max-height: 380px; overflow-y: auto; }
         .div-scan-item {
-            display: grid; grid-template-columns: 22px 1fr auto;
+            display: grid; grid-template-columns: 52px 1fr;
             align-items: center; gap: 8px; padding: 7px 8px;
             border-radius: 8px; cursor: pointer; transition: all 0.15s; font-size: 13px;
         }
@@ -536,11 +546,9 @@
          ============================================================ -->
     <header class="topbar">
         <span class="topbar-title">CryptoChart</span>
-        <div class="topbar-tabs">
-            <button class="topbar-tab active">OKX</button>
-            <button class="topbar-tab">Binance</button>
-            <button class="topbar-tab">Kraken</button>
-            <button class="topbar-tab">Bitfinex</button>
+        <div class="topbar-tabs" id="marketTabs">
+            <button class="topbar-tab active" data-market="crypto">Крипто</button>
+            <button class="topbar-tab" data-market="moex">MOEX</button>
         </div>
         <div class="topbar-right">
             <button class="theme-toggle" id="themeToggle" title="Сменить тему">
@@ -562,6 +570,13 @@
                 <span>Объем 24ч<br><span class="val" id="balanceVolume">--</span></span>
                 <span>Изм. 24ч<br><span class="val" id="balanceChange">--</span></span>
             </div>
+        </div>
+
+        <!-- Категории MOEX (скрыты при крипто) -->
+        <div class="moex-categories" id="moexCategories" style="display:none">
+            <button class="moex-cat active" data-cat="stocks">Акции</button>
+            <button class="moex-cat" data-cat="futures">Фьюч</button>
+            <button class="moex-cat" data-cat="commodities">Сырьё</button>
         </div>
 
         <!-- Список пар -->
@@ -663,7 +678,7 @@
         <!-- Сканер волатильности -->
         <div class="card div-scan-card">
             <div class="div-scan-header">
-                <span>Волатильность 24h</span>
+                <span>Волатильность 30m</span>
                 <span class="vol-timer" id="volScanTimer"></span>
             </div>
             <div class="div-scan-info" id="volScanInfo"></div>
@@ -690,6 +705,8 @@
     const API_BASE = `${window.location.origin}`;
     let currentSymbol = 'BTCUSDT';
     let currentTimeframe = '1h';
+    let currentMarket = 'crypto';        // 'crypto' | 'moex'
+    let currentMoexCategory = 'stocks';  // 'stocks' | 'futures' | 'commodities'
 
     // Ссылки на графики и серии
     let mainChart, candleSeries, jawSeries, teethSeries, lipsSeries;
@@ -918,10 +935,13 @@
         candleSeries.setMarkers(markers);
     }
 
-    /** Один запрос к /chart-data — все данные за раз */
+    /** Один запрос к /chart-data (или /moex/chart-data) — все данные за раз */
     async function fetchAll() {
         try {
-            const res = await fetch(`${API_BASE}/chart-data?symbol=${currentSymbol}&timeframe=${currentTimeframe}&limit=200`);
+            const url = currentMarket === 'moex'
+                ? `${API_BASE}/moex/chart-data?symbol=${currentSymbol}&timeframe=${currentTimeframe}&limit=200&market=${currentMoexCategory}`
+                : `${API_BASE}/chart-data?symbol=${currentSymbol}&timeframe=${currentTimeframe}&limit=200`;
+            const res = await fetch(url);
             const json = await res.json();
             if (!res.ok || !json.data) {
                 showError('mainChart', `${json.detail || 'Нет данных'}`);
@@ -999,6 +1019,15 @@
 
             applyAllMarkers();
             mainChart.timeScale().fitContent();
+
+            // Обновить цену в header для MOEX (нет live ticker)
+            if (currentMarket === 'moex' && lastCandle) {
+                document.getElementById('livePrice').textContent = lastCandle.close.toLocaleString();
+                document.getElementById('liveChange').textContent = '';
+                document.getElementById('liveHigh').textContent = '--';
+                document.getElementById('liveLow').textContent = '--';
+                document.getElementById('liveVolume').textContent = '--';
+            }
         } catch (e) {
             showError('mainChart', 'Сервер недоступен');
             console.error('Chart data error:', e);
@@ -1082,6 +1111,87 @@
         } catch (e) {
             container.innerHTML = '<div style="padding:16px;text-align:center;color:var(--text-secondary)">Сервер недоступен</div>';
             console.error('Symbols error:', e);
+        }
+    }
+
+    /** Загружает список MOEX инструментов по категории */
+    async function fetchMoexSymbols(category) {
+        const container = document.getElementById('pairsList');
+        container.innerHTML = '<div style="padding:16px;text-align:center;color:var(--text-secondary);font-size:13px">Загрузка...</div>';
+        try {
+            const res = await fetch(`${API_BASE}/moex/symbols?category=${category}`);
+            const json = await res.json();
+            container.innerHTML = '';
+            json.symbols.forEach(sym => {
+                const color = symbolColor(sym.base);
+                const div = document.createElement('div');
+                div.className = `pair-item${sym.symbol === currentSymbol ? ' active' : ''}`;
+                div.dataset.symbol = sym.symbol;
+                div.innerHTML = `
+                    <div class="pair-icon" style="background:${color}20;color:${color}">${sym.base[0]}</div>
+                    <div class="pair-info">
+                        <div class="pair-name">${sym.name}</div>
+                        <div class="pair-name-sub">${sym.base}</div>
+                    </div>
+                    <div class="pair-values">
+                        <div class="pair-price" data-price="${sym.symbol}">--</div>
+                    </div>`;
+                div.addEventListener('click', () => selectPair(sym));
+                container.appendChild(div);
+            });
+            if (json.symbols.length > 0) selectPair(json.symbols[0]);
+        } catch(e) {
+            container.innerHTML = '<div style="padding:16px;text-align:center;color:var(--text-secondary)">Ошибка загрузки</div>';
+        }
+    }
+
+    /** Показывает/скрывает кнопки таймфреймов для выбранного рынка */
+    function updateTimeframesForMarket(market) {
+        const tfContainer = document.getElementById('timeframes');
+        // Добавить 10m и 1w кнопки если их нет
+        ['10m', '1w'].forEach(tf => {
+            let btn = tfContainer.querySelector(`[data-tf="${tf}"]`);
+            if (!btn) {
+                btn = document.createElement('button');
+                btn.dataset.tf = tf;
+                btn.textContent = tf === '10m' ? '10m' : '1W';
+                tfContainer.appendChild(btn);
+            }
+            btn.style.display = market === 'moex' ? '' : 'none';
+        });
+        // Крипто-только таймфреймы
+        ['5m', '15m', '4h'].forEach(tf => {
+            const btn = tfContainer.querySelector(`[data-tf="${tf}"]`);
+            if (btn) btn.style.display = market === 'crypto' ? '' : 'none';
+        });
+        // Сбросить активный таймфрейм если он скрыт
+        const activeTf = tfContainer.querySelector('button.active');
+        if (activeTf && activeTf.style.display === 'none') {
+            currentTimeframe = '1d';
+            tfContainer.querySelectorAll('button').forEach(b => b.classList.remove('active'));
+            const d1 = tfContainer.querySelector('[data-tf="1d"]');
+            if (d1) d1.classList.add('active');
+        }
+    }
+
+    /** Переключает рынок: crypto или moex */
+    function switchMarket(market) {
+        currentMarket = market;
+        document.querySelectorAll('#marketTabs .topbar-tab').forEach(b =>
+            b.classList.toggle('active', b.dataset.market === market));
+        const moexCats = document.getElementById('moexCategories');
+        if (market === 'moex') {
+            moexCats.style.display = 'flex';
+            if (tickerInterval) clearInterval(tickerInterval);
+            if (visibleTickerInterval) clearInterval(visibleTickerInterval);
+            document.getElementById('wsStatus').textContent = 'MOEX: исторические данные';
+            document.getElementById('wsStatus').className = '';
+            updateTimeframesForMarket('moex');
+            fetchMoexSymbols(currentMoexCategory);
+        } else {
+            moexCats.style.display = 'none';
+            updateTimeframesForMarket('crypto');
+            fetchSymbolsList().then(() => { fetchAll(); startTicker(); });
         }
     }
 
@@ -1194,6 +1304,22 @@
     document.getElementById('typeCandle').addEventListener('click', () => setChartType('candle'));
     document.getElementById('typeBar').addEventListener('click', () => setChartType('bar'));
 
+    // Переключатель рынков (Крипто / MOEX)
+    document.getElementById('marketTabs').addEventListener('click', (e) => {
+        const btn = e.target.closest('[data-market]');
+        if (btn) switchMarket(btn.dataset.market);
+    });
+
+    // Категории MOEX (Акции / Фьюч / Сырьё)
+    document.getElementById('moexCategories').addEventListener('click', (e) => {
+        const btn = e.target.closest('[data-cat]');
+        if (!btn) return;
+        document.querySelectorAll('.moex-cat').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        currentMoexCategory = btn.dataset.cat;
+        fetchMoexSymbols(currentMoexCategory);
+    });
+
 
     // ============================================================
     // Сканер волатильности
@@ -1208,19 +1334,21 @@
             const res = await fetch(`${API_BASE}/scan/volatile?threshold=3&top=20`);
             const json = await res.json();
             if (!res.ok) throw new Error(json.detail || 'Ошибка');
-            info.textContent = `Найдено: ${json.count} пар (|Δ24ч| > ${json.threshold}%)`;
-            list.innerHTML = json.pairs?.length
-                ? json.pairs.map(p => {
-                    const sign = p.change24h >= 0 ? '+' : '';
-                    const cls = p.change24h >= 0 ? 'vol-pos' : 'vol-neg';
+            const THRESHOLD = 3;
+            const filtered = (json.pairs ?? []).filter(p => Math.abs(p.change_30m ?? 0) >= THRESHOLD);
+            info.textContent = `Найдено: ${filtered.length} пар (скачок за 30м > ${THRESHOLD}%)`;
+            list.innerHTML = filtered.length
+                ? filtered.map(p => {
+                    const chg = p.change_30m ?? 0;
+                    const sign = chg >= 0 ? '+' : '';
+                    const cls = chg >= 0 ? 'vol-pos' : 'vol-neg';
                     return `<div class="div-scan-item" onclick="selectPair({symbol:'${p.symbol}',name:'${p.name}',base:'${p.base}'})">
-                        <span class="div-scan-badge ${cls}">${sign}${p.change24h}%</span>
+                        <span class="div-scan-badge ${cls}">${sign}${chg}%</span>
                         <span class="div-scan-name">${p.name}</span>
-                        <span class="div-scan-price">$${Number(p.price).toLocaleString()}</span>
                     </div>`;
                 }).join('')
                 : '<div class="div-scan-empty">Нет пар выше порога</div>';
-            volNextRefresh = Date.now() + 30 * 60 * 1000;
+            volNextRefresh = Date.now() + 5 * 60 * 1000;
         } catch(e) {
             list.innerHTML = `<div class="div-scan-empty" style="color:var(--red)">${e.message}</div>`;
         }
@@ -1258,7 +1386,6 @@
                     <div class="div-scan-item ${d.type}" onclick="selectPair({symbol:'${d.symbol}',name:'${d.name}',base:'${d.base}'})">
                         <span class="div-scan-badge">${d.type === 'bull' ? '▲' : '▼'}</span>
                         <span class="div-scan-name">${d.name}</span>
-                        <span class="div-scan-price">$${Number(d.close).toLocaleString()}</span>
                     </div>
                 `).join('');
             }

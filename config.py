@@ -34,3 +34,36 @@ RATE_LIMIT_SECONDS = 60
 # Хост и порт сервера
 HOST = os.getenv("HOST", "0.0.0.0")
 PORT = int(os.getenv("PORT", "8000"))
+
+# Акции MOEX (через MOEX ISS API, без токена, борд TQBR)
+MOEX_SYMBOLS = {
+    "SBER":  {"name": "SBER / Сбербанк",      "base": "SBER"},
+    "GAZP":  {"name": "GAZP / Газпром",        "base": "GAZP"},
+    "LKOH":  {"name": "LKOH / Лукойл",        "base": "LKOH"},
+    "YNDX":  {"name": "YNDX / Яндекс",        "base": "YNDX"},
+    "NVTK":  {"name": "NVTK / Новатэк",       "base": "NVTK"},
+    "ROSN":  {"name": "ROSN / Роснефть",      "base": "ROSN"},
+    "GMKN":  {"name": "GMKN / Норникель",     "base": "GMKN"},
+    "MTSS":  {"name": "MTSS / МТС",           "base": "MTSS"},
+    "SBERP": {"name": "SBERP / Сбербанк п",   "base": "SBERP"},
+    "VTBR":  {"name": "VTBR / ВТБ",           "base": "VTBR"},
+    "MGNT":  {"name": "MGNT / Магнит",        "base": "MGNT"},
+    "TATN":  {"name": "TATN / Татнефть",      "base": "TATN"},
+    "ALRS":  {"name": "ALRS / Алроса",        "base": "ALRS"},
+    "POLY":  {"name": "POLY / Polymetal",     "base": "POLY"},
+    "MOEX":  {"name": "MOEX / Московская биржа", "base": "MOEX"},
+}
+
+# Фьючерсы и сырьё MOEX (обновлять раз в квартал при смене контракта)
+MOEX_FUTURES = {
+    # Фьючерсы (cat=futures)
+    "SiM5": {"name": "Si / USD-RUB",      "base": "Si",  "cat": "futures"},
+    "RIM5": {"name": "Ri / Индекс РТС",   "base": "Ri",  "cat": "futures"},
+    "MXM5": {"name": "MX / Индекс МосБ",  "base": "MX",  "cat": "futures"},
+    "EuM5": {"name": "Eu / EUR-RUB",      "base": "Eu",  "cat": "futures"},
+    # Сырьё (cat=commodities)
+    "BRM5": {"name": "BR / Нефть Brent",  "base": "BR",  "cat": "commodities"},
+    "GDM5": {"name": "GD / Золото",       "base": "GD",  "cat": "commodities"},
+    "SVM5": {"name": "SV / Серебро",      "base": "SV",  "cat": "commodities"},
+    "NGM5": {"name": "NG / Природный газ","base": "NG",  "cat": "commodities"},
+}
