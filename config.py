@@ -40,7 +40,7 @@ MOEX_SYMBOLS = {
     "SBER":  {"name": "SBER / Сбербанк",      "base": "SBER"},
     "GAZP":  {"name": "GAZP / Газпром",        "base": "GAZP"},
     "LKOH":  {"name": "LKOH / Лукойл",        "base": "LKOH"},
-    "YNDX":  {"name": "YNDX / Яндекс",        "base": "YNDX"},
+    "YDEX":  {"name": "YDEX / Яндекс",        "base": "YDEX"},
     "NVTK":  {"name": "NVTK / Новатэк",       "base": "NVTK"},
     "ROSN":  {"name": "ROSN / Роснефть",      "base": "ROSN"},
     "GMKN":  {"name": "GMKN / Норникель",     "base": "GMKN"},
@@ -50,20 +50,21 @@ MOEX_SYMBOLS = {
     "MGNT":  {"name": "MGNT / Магнит",        "base": "MGNT"},
     "TATN":  {"name": "TATN / Татнефть",      "base": "TATN"},
     "ALRS":  {"name": "ALRS / Алроса",        "base": "ALRS"},
-    "POLY":  {"name": "POLY / Polymetal",     "base": "POLY"},
+    "PLZL":  {"name": "PLZL / Полюс",         "base": "PLZL"},
     "MOEX":  {"name": "MOEX / Московская биржа", "base": "MOEX"},
 }
 
-# Фьючерсы и сырьё MOEX (обновлять раз в квартал при смене контракта)
+# Фьючерсы и сырьё MOEX — базовые тикеры.
+# Конкретный контракт (SiM6, BRM6...) определяется автоматически в moex.get_active_future_secid().
 MOEX_FUTURES = {
     # Фьючерсы (cat=futures)
-    "SiM5": {"name": "Si / USD-RUB",      "base": "Si",  "cat": "futures"},
-    "RIM5": {"name": "Ri / Индекс РТС",   "base": "Ri",  "cat": "futures"},
-    "MXM5": {"name": "MX / Индекс МосБ",  "base": "MX",  "cat": "futures"},
-    "EuM5": {"name": "Eu / EUR-RUB",      "base": "Eu",  "cat": "futures"},
+    "Si": {"name": "Si / USD-RUB",       "cat": "futures"},
+    "Ri": {"name": "Ri / Индекс РТС",    "cat": "futures"},
+    "MX": {"name": "MX / Индекс МосБ",   "cat": "futures"},
+    "Eu": {"name": "Eu / EUR-RUB",        "cat": "futures"},
     # Сырьё (cat=commodities)
-    "BRM5": {"name": "BR / Нефть Brent",  "base": "BR",  "cat": "commodities"},
-    "GDM5": {"name": "GD / Золото",       "base": "GD",  "cat": "commodities"},
-    "SVM5": {"name": "SV / Серебро",      "base": "SV",  "cat": "commodities"},
-    "NGM5": {"name": "NG / Природный газ","base": "NG",  "cat": "commodities"},
+    "BR": {"name": "BR / Нефть Brent",   "cat": "commodities"},
+    "GD": {"name": "GD / Золото",         "cat": "commodities"},
+    "SV": {"name": "SV / Серебро",        "cat": "commodities"},
+    "NG": {"name": "NG / Природный газ",  "cat": "commodities"},
 }

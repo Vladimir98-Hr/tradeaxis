@@ -12,7 +12,7 @@ from config import EXCHANGE_ID, MOEX_SYMBOLS, MOEX_FUTURES
 from cache import get_cache_key, get_cached_data, set_cached_data
 from exchange import async_fetch_ohlcv_df, async_fetch_ticker, async_fetch_symbols, async_fetch_all_tickers
 from indicators import calculate_alligator, calculate_ao, calculate_bw_mfi, find_fractals, find_divergences, calculate_bollinger_bands
-from moex import fetch_ohlcv_moex, fetch_ohlcv_moex_futures
+from moex import fetch_ohlcv_moex, fetch_ohlcv_moex_futures, fetch_moex_tickers
 
 # Маршрутизатор для REST API
 router = APIRouter()
@@ -110,12 +110,40 @@ async def get_moex_symbols(category: str = "stocks"):
         ]
     else:
         symbols = [
-            {"symbol": k, "name": v["name"], "base": v["base"]}
+            {"symbol": k, "name": v["name"], "base": k}
             for k, v in MOEX_FUTURES.items()
             if v["cat"] == category
         ]
     result = {"category": category, "symbols": symbols}
     await set_cached_data(key, result, ttl=3600)
+    return result
+
+
+@router.get("/moex/tickers")
+async def get_moex_tickers(category: str = "stocks"):
+    """Текущие цены и изменение для инструментов MOEX по категории."""
+    key = get_cache_key("", "", 0, f"moex_tickers_{category}")
+    cached = await get_cached_data(key)
+    if cached:
+        return cached
+    if category == "stocks":
+        symbols = list(MOEX_SYMBOLS.keys())
+    else:
+        symbols = [k for k, v in MOEX_FUTURES.items() if v.get("cat") == category]
+        if not symbols:
+            symbols = list(MOEX_FUTURES.keys())
+        # Тикеры фьючерсов через отдельный метод (не MOEX ISS batch для акций)
+        # fetch_moex_tickers для forts использует базовый тикер — возвращаем пустой dict,
+        # фронт покажет прочерки (live цены для forts через ISS marketdata ограничены)
+        result = {"tickers": {}}
+        await set_cached_data(key, result, ttl=60)
+        return result
+    try:
+        tickers = await fetch_moex_tickers(symbols, category)
+    except Exception:
+        tickers = {}
+    result = {"tickers": tickers}
+    await set_cached_data(key, result, ttl=60)
     return result
 
 
@@ -306,9 +334,9 @@ async def scan_volatile(threshold: float = 1.5, top: int = 20):
         raise HTTPException(status_code=500, detail=f"Tickers: {str(e)}")
 
     sorted_tickers = sorted(all_tickers.values(), key=lambda t: t.get('volume24h', 0), reverse=True)
-    top_symbols = sorted_tickers
+    top_symbols = sorted_tickers[:50]
 
-    sem = asyncio.Semaphore(20)
+    sem = asyncio.Semaphore(6)
 
     async def scan_one(t_info):
         async with sem:
@@ -342,7 +370,7 @@ async def scan_volatile(threshold: float = 1.5, top: int = 20):
     pairs = [r for r in results if r]
     pairs.sort(key=lambda x: x['score'], reverse=True)
     response = {"threshold": threshold, "count": len(pairs[:top]), "pairs": pairs[:top]}
-    await set_cached_data(key, response, ttl=300)
+    await set_cached_data(key, response, ttl=600)
     return response
 
 
@@ -418,7 +446,7 @@ async def scan_divergences(timeframe: str = "1d", limit: int = 50):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Symbols: {str(e)}")
 
-    sem = asyncio.Semaphore(20)
+    sem = asyncio.Semaphore(6)
 
     async def scan_one(sym_info):
         async with sem:
@@ -449,6 +477,101 @@ async def scan_divergences(timeframe: str = "1d", limit: int = 50):
         "divergences": divergences,
     }
     await set_cached_data(key, response, ttl=cache_ttl)
+    return response
+
+
+@router.get("/moex/scan/divergences")
+async def moex_scan_divergences(timeframe: str = "1d", limit: int = 50):
+    """Сканирует все MOEX инструменты (акции + фьючерсы + сырьё) на дивергентный бар."""
+    cache_ttl = 3600 if timeframe in ('1d', '1w') else 900
+    key = get_cache_key("moex_scan", timeframe, limit, "moex_scan_div")
+    cached = await get_cached_data(key)
+    if cached:
+        return cached
+
+    all_instruments = []
+    for sym, meta in MOEX_SYMBOLS.items():
+        all_instruments.append({"symbol": sym, "name": meta["name"], "cat": "stocks"})
+    for sym, meta in MOEX_FUTURES.items():
+        all_instruments.append({"symbol": sym, "name": meta["name"], "cat": meta["cat"]})
+
+    divergences = []
+    for inst in all_instruments:
+        try:
+            if inst["cat"] == "stocks":
+                df = await fetch_ohlcv_moex(inst["symbol"], timeframe, limit)
+            else:
+                df = await fetch_ohlcv_moex_futures(inst["symbol"], timeframe, limit)
+            if len(df) < 10:
+                continue
+            ao = calculate_ao(df)
+            is_bull, is_bear = _check_last_bar_divergence(df, ao)
+            if is_bull or is_bear:
+                divergences.append({
+                    "symbol": inst["symbol"],
+                    "name": inst["name"],
+                    "cat": inst["cat"],
+                    "type": "bull" if is_bull else "bear",
+                    "close": float(df["Close"].iloc[-1]),
+                })
+        except Exception:
+            continue
+
+    response = {
+        "timeframe": timeframe,
+        "count": len(divergences),
+        "scanned": len(all_instruments),
+        "divergences": divergences,
+    }
+    await set_cached_data(key, response, ttl=cache_ttl)
+    return response
+
+
+@router.get("/moex/scan/volatile")
+async def moex_scan_volatile(threshold: float = 1.0, top: int = 20):
+    """Пары MOEX с высокой волатильностью за последние 30 минут (10m свечи)."""
+    key = get_cache_key("moex_vol", "10m", top, f"moex_volatile_{threshold}")
+    cached = await get_cached_data(key)
+    if cached:
+        return cached
+
+    all_instruments = []
+    for sym, meta in MOEX_SYMBOLS.items():
+        all_instruments.append({"symbol": sym, "name": meta["name"], "base": meta["base"], "cat": "stocks"})
+    for sym, meta in MOEX_FUTURES.items():
+        all_instruments.append({"symbol": sym, "name": meta["name"], "base": sym, "cat": meta["cat"]})
+
+    pairs = []
+    for inst in all_instruments:
+        try:
+            if inst["cat"] == "stocks":
+                df = await fetch_ohlcv_moex(inst["symbol"], "10m", 14)
+            else:
+                df = await fetch_ohlcv_moex_futures(inst["symbol"], "10m", 14)
+            if len(df) < 8:
+                continue
+            closes = df["Close"].values
+            change_30m = (closes[-1] - closes[-4]) / closes[-4] * 100
+            bar_changes = [(closes[i] - closes[i-1]) / closes[i-1] * 100 for i in range(1, len(closes))]
+            oscillation = sum(abs(c) for c in bar_changes) / len(bar_changes)
+            score = abs(change_30m) + oscillation * 3
+            if abs(change_30m) < threshold:
+                continue
+            pairs.append({
+                "symbol": inst["symbol"],
+                "name": inst["name"],
+                "base": inst["base"],
+                "price": float(closes[-1]),
+                "change_30m": round(change_30m, 2),
+                "oscillation": round(oscillation, 3),
+                "score": round(score, 2),
+            })
+        except Exception:
+            continue
+
+    pairs.sort(key=lambda x: x["score"], reverse=True)
+    response = {"threshold": threshold, "count": len(pairs[:top]), "pairs": pairs[:top]}
+    await set_cached_data(key, response, ttl=300)
     return response
 
 

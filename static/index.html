@@ -405,6 +405,30 @@
         .chart-container-volume { flex: 1.5; min-height: 0; }
         .chart-container-ao { flex: 2.5; min-height: 0; }
 
+        /* Fullscreen режим */
+        .center-panel.fullscreen {
+            position: fixed;
+            inset: 0;
+            z-index: 500;
+            padding: 8px;
+            background: var(--bg-color);
+            display: flex;
+            flex-direction: column;
+        }
+        .center-panel.fullscreen .chart-body { flex: 1; }
+        .fs-btn {
+            background: none;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            color: var(--text-secondary);
+            cursor: pointer;
+            padding: 3px 8px;
+            font-size: 14px;
+            line-height: 1;
+            transition: color .15s, border-color .15s;
+        }
+        .fs-btn:hover { color: var(--text-primary); border-color: var(--text-secondary); }
+
         /* ============================================================
            Right Panel (колонка 4, строка 2)
            ============================================================ */
@@ -454,16 +478,7 @@
            Status bar (все колонки, строка 3)
            ============================================================ */
         .status-bar {
-            grid-column: 1 / -1;
-            grid-row: 3;
-            padding: 0 16px;
-            font-size: 11px;
-            color: var(--text-secondary);
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            background: var(--bg-secondary);
-            border-top: 1px solid var(--border-color);
+            display: none !important;
         }
         .status-bar .connected { color: var(--green); }
         .status-bar .disconnected { color: var(--red); }
@@ -506,6 +521,203 @@
         ::-webkit-scrollbar-track { background: transparent; }
         ::-webkit-scrollbar-thumb { background: var(--border-color); border-radius: 3px; }
         ::-webkit-scrollbar-thumb:hover { background: var(--text-secondary); }
+
+        /* ============================================================
+           Калькулятор риска — модальное окно
+           ============================================================ */
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,.6);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+        }
+        .rc-box {
+            background: var(--panel-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            width: 480px;
+            max-width: 96vw;
+            max-height: 92vh;
+            overflow-y: auto;
+            padding: 0;
+            box-shadow: 0 8px 40px rgba(0,0,0,.5);
+            color: var(--text-primary);
+            font-size: 13px;
+        }
+        .rc-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 14px 18px 12px;
+            border-bottom: 1px solid var(--border-color);
+            font-size: 15px;
+            font-weight: 600;
+            position: sticky;
+            top: 0;
+            background: var(--panel-bg);
+            z-index: 1;
+        }
+        .rc-close {
+            background: none;
+            border: none;
+            color: var(--text-secondary);
+            font-size: 22px;
+            cursor: pointer;
+            line-height: 1;
+            padding: 0 4px;
+        }
+        .rc-close:hover { color: var(--text-primary); }
+        .rc-body { padding: 14px 18px 18px; display: flex; flex-direction: column; gap: 10px; }
+        /* Заголовок блока */
+        .rc-section {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin: 4px 0 2px;
+        }
+        .rc-section-num {
+            width: 22px; height: 22px;
+            border-radius: 50%;
+            background: var(--accent-color);
+            color: #fff;
+            font-size: 11px;
+            font-weight: 700;
+            display: flex; align-items: center; justify-content: center;
+            flex-shrink: 0;
+        }
+        .rc-section-title { font-size: 13px; font-weight: 600; }
+        .rc-section-sub { font-size: 11px; color: var(--text-secondary); }
+        .rc-divider { border: none; border-top: 1px solid var(--border-color); margin: 4px 0; }
+        .rc-label { font-size: 11px; color: var(--text-secondary); margin-bottom: 3px; text-transform: uppercase; letter-spacing: .5px; }
+        .rc-input {
+            width: 100%;
+            box-sizing: border-box;
+            background: var(--bg-color);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            color: var(--text-primary);
+            padding: 8px 10px;
+            font-size: 13px;
+            outline: none;
+            transition: border-color .15s;
+        }
+        .rc-input:focus { border-color: var(--accent-color); }
+        .rc-input:disabled { opacity: .4; cursor: not-allowed; }
+        .rc-2col { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+        .rc-dir-group { display: flex; gap: 8px; }
+        .rc-dir-btn {
+            flex: 1;
+            padding: 8px 0;
+            border-radius: 8px;
+            border: 1px solid var(--border-color);
+            background: var(--bg-color);
+            color: var(--text-secondary);
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all .15s;
+        }
+        .rc-dir-btn:disabled { opacity: .4; cursor: not-allowed; }
+        .rc-dir-btn.long.active  { background: rgba(38,166,154,.15); border-color: #26a69a; color: #26a69a; }
+        .rc-dir-btn.short.active { background: rgba(239,83,80,.15);  border-color: #ef5350; color: #ef5350; }
+        .rc-radio-group { display: flex; gap: 6px; }
+        .rc-radio-btn {
+            flex: 1;
+            padding: 7px 0;
+            border-radius: 8px;
+            border: 1px solid var(--border-color);
+            background: var(--bg-color);
+            color: var(--text-secondary);
+            font-size: 12px;
+            cursor: pointer;
+            transition: all .15s;
+        }
+        .rc-radio-btn.active { border-color: var(--accent-color); color: var(--accent-color); background: rgba(41,98,255,.1); }
+        .rc-calc-btn {
+            width: 100%;
+            padding: 10px;
+            border-radius: 8px;
+            border: none;
+            background: var(--accent-color);
+            color: #fff;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: opacity .15s;
+        }
+        .rc-calc-btn:hover { opacity: .88; }
+        .rc-calc-btn:disabled { opacity: .35; cursor: not-allowed; }
+        /* Карточки результатов */
+        .rc-cards { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+        .rc-card {
+            background: var(--bg-color);
+            border-radius: 8px;
+            padding: 8px 10px;
+            display: flex; flex-direction: column; gap: 2px;
+        }
+        .rc-card-label { font-size: 10px; color: var(--text-secondary); text-transform: uppercase; letter-spacing: .4px; }
+        .rc-card-val { font-size: 15px; font-weight: 700; }
+        .rc-card-sub { font-size: 11px; color: var(--text-secondary); }
+        .rc-card.highlight { border: 1px solid var(--accent-color); }
+        .rc-card.danger { border: 1px solid #ef5350; }
+        /* Стоп-результат */
+        .rc-stop-result {
+            background: var(--bg-color);
+            border-radius: 8px;
+            padding: 10px 12px;
+            display: flex; align-items: center; justify-content: space-between;
+        }
+        .rc-stop-price {
+            font-size: 20px;
+            font-weight: 700;
+        }
+        .rc-stop-price.long  { color: #26a69a; }
+        .rc-stop-price.short { color: #ef5350; }
+        /* Счётчик сессии */
+        .rc-session-slots { display: flex; gap: 6px; }
+        .rc-slot {
+            flex: 1;
+            background: var(--bg-color);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 8px;
+            display: flex; flex-direction: column; gap: 4px;
+        }
+        .rc-slot-label { font-size: 10px; color: var(--text-secondary); text-align: center; }
+        .rc-slot input {
+            width: 100%; box-sizing: border-box;
+            background: transparent;
+            border: none;
+            border-bottom: 1px solid var(--border-color);
+            color: var(--text-primary);
+            font-size: 13px; font-weight: 600;
+            text-align: center;
+            outline: none;
+            padding: 2px 0;
+        }
+        .rc-slot input::placeholder { color: var(--text-secondary); font-weight: 400; }
+        .rc-slot-status { font-size: 10px; text-align: center; }
+        .rc-slot-status.ok   { color: #26a69a; }
+        .rc-slot-status.over { color: #ef5350; }
+        .rc-session-remain {
+            display: flex; justify-content: space-between; align-items: center;
+            background: var(--bg-color);
+            border-radius: 8px;
+            padding: 8px 12px;
+            font-size: 12px;
+        }
+        .rc-remain-val { font-size: 15px; font-weight: 700; }
+        .rc-remain-val.ok   { color: #26a69a; }
+        .rc-remain-val.over { color: #ef5350; }
+        .rc-error {
+            color: #ef5350;
+            font-size: 12px;
+            text-align: center;
+            min-height: 14px;
+        }
     </style>
 </head>
 <body data-theme="dark">
@@ -523,8 +735,8 @@
             <button class="sidebar-btn active" title="Графики">
                 <svg viewBox="0 0 24 24"><path d="M3 13h2v-2H3v2zm0 4h2v-2H3v2zm0-8h2V7H3v2zm4 4h14v-2H7v2zm0 4h14v-2H7v2zM7 7v2h14V7H7z"/></svg>
             </button>
-            <button class="sidebar-btn" title="Портфель">
-                <svg viewBox="0 0 24 24"><path d="M21 18v1c0 1.1-.9 2-2 2H5c-1.11 0-2-.9-2-2V5c0-1.1.89-2 2-2h14c1.1 0 2 .9 2 2v1h-9c-1.11 0-2 .9-2 2v8c0 1.1.89 2 2 2h9zm-9-2h10V8H12v8zm4-2.5c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5z"/></svg>
+            <button class="sidebar-btn" title="Калькулятор риска" onclick="openRiskCalc()">
+                <svg viewBox="0 0 24 24"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-7 3c1.93 0 3.5 1.57 3.5 3.5S13.93 13 12 13s-3.5-1.57-3.5-3.5S10.07 6 12 6zm7 13H5v-.23c0-.62.28-1.2.76-1.58C7.47 15.82 9.64 15 12 15s4.53.82 6.24 2.19c.48.38.76.97.76 1.58V19z"/></svg>
             </button>
             <button class="sidebar-btn" title="Торговля">
                 <svg viewBox="0 0 24 24"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zM9 17H7v-7h2v7zm4 0h-2V7h2v10zm4 0h-2v-4h2v4z"/></svg>
@@ -641,6 +853,7 @@
                         <button id="typeCandle" class="active">Свечи</button>
                         <button id="typeBar">Бары</button>
                     </div>
+                    <button class="fs-btn" id="fsBtn" title="Полный экран (F)" onclick="toggleFullscreen()">⛶</button>
                 </div>
             </div>
 
@@ -667,7 +880,7 @@
         <!-- Сканер дивергентных баров -->
         <div class="card div-scan-card">
             <div class="div-scan-header">
-                <span>Дивергенции 1D</span>
+                <span id="divScanTitle">Дивергенции 1D · Крипто</span>
                 <button class="div-scan-btn" id="divScanBtn" onclick="fetchDivScan()">⟳ Сканировать</button>
             </div>
             <div class="div-scan-info" id="divScanInfo"></div>
@@ -678,7 +891,7 @@
         <!-- Сканер волатильности -->
         <div class="card div-scan-card">
             <div class="div-scan-header">
-                <span>Волатильность 30m</span>
+                <span id="volScanTitle">Волатильность 30m · Крипто</span>
                 <span class="vol-timer" id="volScanTimer"></span>
             </div>
             <div class="div-scan-info" id="volScanInfo"></div>
@@ -695,6 +908,145 @@
         <span id="wsStatus" class="disconnected">WebSocket: отключен</span>
         <span id="lastUpdate">Последнее обновление: --</span>
     </footer>
+
+    <!-- Калькулятор риска — модальное окно -->
+    <div class="modal-overlay" id="riskCalcModal">
+        <div class="rc-box">
+            <div class="rc-header">
+                <span>Калькулятор риска</span>
+                <button class="rc-close" onclick="closeRiskCalc()">×</button>
+            </div>
+            <div class="rc-body">
+
+                <!-- ═══ БЛОК А: Лимиты ═══ -->
+                <div class="rc-section">
+                    <div class="rc-section-num">А</div>
+                    <div>
+                        <div class="rc-section-title">Мои лимиты риска</div>
+                        <div class="rc-section-sub">Сначала узнайте, сколько можно потерять</div>
+                    </div>
+                </div>
+                <div>
+                    <div class="rc-label">Ваш капитал ($)</div>
+                    <input class="rc-input" id="rcCapital" type="number" min="0" placeholder="10 000">
+                </div>
+                <div>
+                    <div class="rc-label">Стиль торговли</div>
+                    <div class="rc-radio-group" id="rcStyleGroup">
+                        <button class="rc-radio-btn" data-val="0.5" onclick="setRcStyle(this)">Консерв. ×0.5</button>
+                        <button class="rc-radio-btn active" data-val="1" onclick="setRcStyle(this)">Сбаланс. ×1</button>
+                        <button class="rc-radio-btn" data-val="2" onclick="setRcStyle(this)">Агрессивный ×2</button>
+                    </div>
+                </div>
+                <div>
+                    <div class="rc-label">Горизонт сделки</div>
+                    <div class="rc-radio-group" id="rcCatGroup">
+                        <button class="rc-radio-btn" data-val="0.3" onclick="setRcCat(this)">Скальп ×0.3</button>
+                        <button class="rc-radio-btn active" data-val="1" onclick="setRcCat(this)">Интрадей ×1</button>
+                        <button class="rc-radio-btn" data-val="1.5" onclick="setRcCat(this)">Свинг ×1.5</button>
+                    </div>
+                </div>
+                <div class="rc-error" id="rcErrorA"></div>
+                <button class="rc-calc-btn" onclick="calcLimits()">Рассчитать лимиты</button>
+
+                <!-- Результаты блока А -->
+                <div id="rcResA" style="display:none">
+                    <div class="rc-cards">
+                        <div class="rc-card highlight">
+                            <div class="rc-card-label">Риск / 1 сделка</div>
+                            <div class="rc-card-val" id="rcA_tradeUsd">—</div>
+                            <div class="rc-card-sub" id="rcA_tradePct">—</div>
+                        </div>
+                        <div class="rc-card danger">
+                            <div class="rc-card-label">Лимит сессии (3 сд.)</div>
+                            <div class="rc-card-val" id="rcA_sessUsd">—</div>
+                            <div class="rc-card-sub" id="rcA_sessPct">—</div>
+                        </div>
+                    </div>
+                </div>
+
+                <hr class="rc-divider">
+
+                <!-- ═══ БЛОК Б: Позиция ═══ -->
+                <div class="rc-section">
+                    <div class="rc-section-num">Б</div>
+                    <div>
+                        <div class="rc-section-title">Где ставить стоп</div>
+                        <div class="rc-section-sub">Введите вход и объём — получите цену стопа</div>
+                    </div>
+                </div>
+                <div>
+                    <div class="rc-label">Направление</div>
+                    <div class="rc-dir-group">
+                        <button class="rc-dir-btn long active" id="rcDirLong" onclick="setRcDir('long')">ЛОНГ ▲</button>
+                        <button class="rc-dir-btn short" id="rcDirShort" onclick="setRcDir('short')">ШОРТ ▼</button>
+                    </div>
+                </div>
+                <div class="rc-2col">
+                    <div>
+                        <div class="rc-label">Цена входа</div>
+                        <input class="rc-input" id="rcEntry" type="number" min="0" placeholder="100">
+                    </div>
+                    <div>
+                        <div class="rc-label">Объём позиции ($)</div>
+                        <input class="rc-input" id="rcPosUsd" type="number" min="0" placeholder="500">
+                    </div>
+                </div>
+                <div class="rc-error" id="rcErrorB"></div>
+                <button class="rc-calc-btn" id="rcCalcBBtn" onclick="calcPosition()" disabled>Рассчитать стоп</button>
+
+                <!-- Результат блока Б -->
+                <div id="rcResB" style="display:none">
+                    <div class="rc-stop-result">
+                        <div>
+                            <div class="rc-card-label">Цена стоп-лосса</div>
+                            <div class="rc-stop-price" id="rcB_stopPrice">—</div>
+                            <div class="rc-card-sub" id="rcB_stopPct">—</div>
+                        </div>
+                        <div style="text-align:right">
+                            <div class="rc-card-label">Объём в монетах</div>
+                            <div style="font-size:14px;font-weight:600" id="rcB_coins">—</div>
+                            <div class="rc-card-sub" id="rcB_riskCheck">—</div>
+                        </div>
+                    </div>
+                </div>
+
+                <hr class="rc-divider">
+
+                <!-- ═══ БЛОК В: Счётчик сессии ═══ -->
+                <div class="rc-section">
+                    <div class="rc-section-num">В</div>
+                    <div>
+                        <div class="rc-section-title">Счётчик сессии</div>
+                        <div class="rc-section-sub">Введите фактический убыток по каждой сделке</div>
+                    </div>
+                </div>
+                <div class="rc-session-slots">
+                    <div class="rc-slot">
+                        <div class="rc-slot-label">Сделка 1</div>
+                        <input type="number" min="0" placeholder="$ убыток" id="rcSlot0" oninput="updateSession()">
+                        <div class="rc-slot-status" id="rcSlotSt0"></div>
+                    </div>
+                    <div class="rc-slot">
+                        <div class="rc-slot-label">Сделка 2</div>
+                        <input type="number" min="0" placeholder="$ убыток" id="rcSlot1" oninput="updateSession()">
+                        <div class="rc-slot-status" id="rcSlotSt1"></div>
+                    </div>
+                    <div class="rc-slot">
+                        <div class="rc-slot-label">Сделка 3</div>
+                        <input type="number" min="0" placeholder="$ убыток" id="rcSlot2" oninput="updateSession()">
+                        <div class="rc-slot-status" id="rcSlotSt2"></div>
+                    </div>
+                </div>
+                <div class="rc-session-remain">
+                    <span style="color:var(--text-secondary)">Остаток бюджета сессии</span>
+                    <span class="rc-remain-val ok" id="rcRemain">—</span>
+                </div>
+                <button class="rc-calc-btn" style="background:var(--bg-color);color:var(--text-secondary);border:1px solid var(--border-color)" onclick="resetSession()">Сбросить сессию</button>
+
+            </div>
+        </div>
+    </div>
 
 </div>
 
@@ -1020,13 +1372,20 @@
             applyAllMarkers();
             mainChart.timeScale().fitContent();
 
-            // Обновить цену в header для MOEX (нет live ticker)
+            // Обновить данные в header для MOEX (нет live ticker — берём из последней свечи)
             if (currentMarket === 'moex' && lastCandle) {
-                document.getElementById('livePrice').textContent = lastCandle.close.toLocaleString();
-                document.getElementById('liveChange').textContent = '';
-                document.getElementById('liveHigh').textContent = '--';
-                document.getElementById('liveLow').textContent = '--';
-                document.getElementById('liveVolume').textContent = '--';
+                const lastRaw = json.data[json.data.length - 1];
+                const change = ((lastRaw.Close - lastRaw.Open) / lastRaw.Open * 100).toFixed(2);
+                const changeEl = document.getElementById('liveChange');
+                document.getElementById('livePrice').textContent = lastRaw.Close.toLocaleString('ru-RU');
+                changeEl.textContent = `${change > 0 ? '+' : ''}${change}%`;
+                changeEl.className = `symbol-change ${change >= 0 ? 'positive' : 'negative'}`;
+                document.getElementById('liveHigh').textContent = lastRaw.High.toLocaleString('ru-RU');
+                document.getElementById('liveLow').textContent = lastRaw.Low.toLocaleString('ru-RU');
+                const vol = lastRaw.Volume >= 1_000_000
+                    ? `${(lastRaw.Volume / 1_000_000).toFixed(2)}M`
+                    : lastRaw.Volume.toLocaleString('ru-RU');
+                document.getElementById('liveVolume').textContent = vol;
             }
         } catch (e) {
             showError('mainChart', 'Сервер недоступен');
@@ -1135,18 +1494,34 @@
                     </div>
                     <div class="pair-values">
                         <div class="pair-price" data-price="${sym.symbol}">--</div>
+                        <div class="pair-change" data-change="${sym.symbol}">--</div>
                     </div>`;
                 div.addEventListener('click', () => selectPair(sym));
                 container.appendChild(div);
             });
             if (json.symbols.length > 0) selectPair(json.symbols[0]);
+            // Подгружаем текущие цены из MOEX ISS
+            try {
+                const tRes = await fetch(`${API_BASE}/moex/tickers?category=${category}`);
+                const tJson = await tRes.json();
+                const tickers = tJson.tickers || {};
+                for (const [secid, t] of Object.entries(tickers)) {
+                    const priceEl = container.querySelector(`[data-price="${secid}"]`);
+                    const changeEl = container.querySelector(`[data-change="${secid}"]`);
+                    if (priceEl && t.price != null) priceEl.textContent = t.price.toLocaleString('ru-RU');
+                    if (changeEl && t.change != null) {
+                        changeEl.textContent = `${t.change > 0 ? '+' : ''}${t.change}%`;
+                        changeEl.className = `pair-change ${t.change >= 0 ? 'positive' : 'negative'}`;
+                    }
+                }
+            } catch (e) { /* цены недоступны — оставляем прочерки */ }
         } catch(e) {
             container.innerHTML = '<div style="padding:16px;text-align:center;color:var(--text-secondary)">Ошибка загрузки</div>';
         }
     }
 
-    /** Показывает/скрывает кнопки таймфреймов для выбранного рынка */
-    function updateTimeframesForMarket(market) {
+    /** Показывает/скрывает кнопки таймфреймов для выбранного рынка и категории */
+    function updateTimeframesForMarket(market, category = 'stocks') {
         const tfContainer = document.getElementById('timeframes');
         // Добавить 10m и 1w кнопки если их нет
         ['10m', '1w'].forEach(tf => {
@@ -1164,13 +1539,23 @@
             const btn = tfContainer.querySelector(`[data-tf="${tf}"]`);
             if (btn) btn.style.display = market === 'crypto' ? '' : 'none';
         });
-        // Сбросить активный таймфрейм если он скрыт
+        // 1d: скрыть для фьючерсов и сырья (MOEX ISS forts не поддерживает дневные свечи)
+        const d1btn = tfContainer.querySelector('[data-tf="1d"]');
+        if (d1btn) {
+            d1btn.style.display = (market === 'crypto' || category === 'stocks') ? '' : 'none';
+        }
+        // 1m, 10m, 1h: скрыть для фьючерсов и сырья — API не поддерживает
+        ['1m', '10m', '1h'].forEach(tf => {
+            const btn = tfContainer.querySelector(`[data-tf="${tf}"]`);
+            if (btn) btn.style.display = (market === 'moex' && category !== 'stocks') ? 'none' : '';
+        });
+        // Сбросить активный таймфрейм если он скрыт — дефолт 1w для фьючерсов/сырья, 1h для остальных
         const activeTf = tfContainer.querySelector('button.active');
         if (activeTf && activeTf.style.display === 'none') {
-            currentTimeframe = '1d';
+            currentTimeframe = (market === 'moex' && category !== 'stocks') ? '1w' : '1h';
             tfContainer.querySelectorAll('button').forEach(b => b.classList.remove('active'));
-            const d1 = tfContainer.querySelector('[data-tf="1d"]');
-            if (d1) d1.classList.add('active');
+            const defaultBtn = tfContainer.querySelector(`[data-tf="${currentTimeframe}"]`);
+            if (defaultBtn) defaultBtn.classList.add('active');
         }
     }
 
@@ -1186,12 +1571,27 @@
             if (visibleTickerInterval) clearInterval(visibleTickerInterval);
             document.getElementById('wsStatus').textContent = 'MOEX: исторические данные';
             document.getElementById('wsStatus').className = '';
-            updateTimeframesForMarket('moex');
+            document.getElementById('divScanTitle').textContent = 'Дивергенции 1D · MOEX';
+            document.getElementById('divScanList').innerHTML = '<div class="div-scan-empty">Нажмите «Сканировать»</div>';
+            document.getElementById('divScanInfo').textContent = '';
+            document.getElementById('volScanTitle').textContent = 'Волатильность 30m · MOEX';
+            document.getElementById('volScanList').innerHTML = '<div class="div-scan-empty">Сканирование...</div>';
+            volNextRefresh = 0;
+            updateTimeframesForMarket('moex', currentMoexCategory);
             fetchMoexSymbols(currentMoexCategory);
+            fetchVolScan();
         } else {
             moexCats.style.display = 'none';
+            document.getElementById('divScanTitle').textContent = 'Дивергенции 1D · Крипто';
+            document.getElementById('divScanList').innerHTML = '<div class="div-scan-empty">Нажмите «Сканировать»</div>';
+            document.getElementById('divScanInfo').textContent = '';
+            document.getElementById('volScanTitle').textContent = 'Волатильность 30m · Крипто';
+            volNextRefresh = 0;
+            currentSymbol = 'BTCUSDT';
+            document.getElementById('chartSymbolName').textContent = 'BTC/USDT';
             updateTimeframesForMarket('crypto');
             fetchSymbolsList().then(() => { fetchAll(); startTicker(); });
+            fetchVolScan();
         }
     }
 
@@ -1317,6 +1717,7 @@
         document.querySelectorAll('.moex-cat').forEach(b => b.classList.remove('active'));
         btn.classList.add('active');
         currentMoexCategory = btn.dataset.cat;
+        updateTimeframesForMarket('moex', currentMoexCategory);
         fetchMoexSymbols(currentMoexCategory);
     });
 
@@ -1325,18 +1726,26 @@
     // Сканер волатильности
     // ============================================================
     let volNextRefresh = 0;
+    let _volGen = 0;   // счётчик поколений — защита от race condition при смене рынка
 
     async function fetchVolScan() {
+        const myGen = ++_volGen;
         const list = document.getElementById('volScanList');
         const info = document.getElementById('volScanInfo');
         list.innerHTML = '<div class="div-scan-empty">Сканирование...</div>';
+        const isMoex = currentMarket === 'moex';
         try {
-            const res = await fetch(`${API_BASE}/scan/volatile?threshold=3&top=20`);
+            const url = isMoex
+                ? `${API_BASE}/moex/scan/volatile?threshold=1.0&top=20`
+                : `${API_BASE}/scan/volatile?threshold=3&top=20`;
+            const res = await fetch(url);
             const json = await res.json();
+            // Если за время запроса пользователь сменил рынок — игнорируем ответ
+            if (myGen !== _volGen) return;
             if (!res.ok) throw new Error(json.detail || 'Ошибка');
-            const THRESHOLD = 3;
+            const THRESHOLD = isMoex ? 1.0 : 3;
             const filtered = (json.pairs ?? []).filter(p => Math.abs(p.change_30m ?? 0) >= THRESHOLD);
-            info.textContent = `Найдено: ${filtered.length} пар (скачок за 30м > ${THRESHOLD}%)`;
+            info.textContent = `Найдено: ${filtered.length} ${isMoex ? 'инструментов' : 'пар'} (скачок за 30м > ${THRESHOLD}%)`;
             list.innerHTML = filtered.length
                 ? filtered.map(p => {
                     const chg = p.change_30m ?? 0;
@@ -1350,6 +1759,7 @@
                 : '<div class="div-scan-empty">Нет пар выше порога</div>';
             volNextRefresh = Date.now() + 5 * 60 * 1000;
         } catch(e) {
+            if (myGen !== _volGen) return;
             list.innerHTML = `<div class="div-scan-empty" style="color:var(--red)">${e.message}</div>`;
         }
     }
@@ -1372,22 +1782,29 @@
         const info = document.getElementById('divScanInfo');
         btn.disabled = true;
         btn.textContent = '...';
-        list.innerHTML = '<div class="div-scan-empty">Сканирование всех пар...<br>Может занять 20–40 сек</div>';
+        const isMoex = currentMarket === 'moex';
+        list.innerHTML = `<div class="div-scan-empty">Сканирование${isMoex ? ' MOEX...' : ' всех пар...<br>Может занять 20–40 сек'}</div>`;
         info.textContent = '';
         try {
-            const res = await fetch(`${API_BASE}/scan/divergences?timeframe=1d&limit=50`);
+            const url = isMoex
+                ? `${API_BASE}/moex/scan/divergences?timeframe=1d`
+                : `${API_BASE}/scan/divergences?timeframe=1d&limit=50`;
+            const res = await fetch(url);
             const json = await res.json();
             if (!res.ok) throw new Error(json.detail || 'Ошибка');
-            info.textContent = `Найдено: ${json.count} из ${json.scanned} пар`;
+            info.textContent = `Найдено: ${json.count} из ${json.scanned}`;
             if (!json.divergences?.length) {
                 list.innerHTML = '<div class="div-scan-empty">Дивергенций не найдено</div>';
             } else {
-                list.innerHTML = json.divergences.map(d => `
-                    <div class="div-scan-item ${d.type}" onclick="selectPair({symbol:'${d.symbol}',name:'${d.name}',base:'${d.base}'})">
+                list.innerHTML = json.divergences.map(d => {
+                    const onclick = isMoex
+                        ? `currentMoexCategory='${d.cat}'; selectPair({symbol:'${d.symbol}',name:'${d.name}'})`
+                        : `selectPair({symbol:'${d.symbol}',name:'${d.name}',base:'${d.base}'})`;
+                    return `<div class="div-scan-item ${d.type}" onclick="${onclick}">
                         <span class="div-scan-badge">${d.type === 'bull' ? '▲' : '▼'}</span>
                         <span class="div-scan-name">${d.name}</span>
-                    </div>
-                `).join('');
+                    </div>`;
+                }).join('');
             }
         } catch(e) {
             list.innerHTML = `<div class="div-scan-empty" style="color:var(--red)">${e.message}</div>`;
@@ -1406,10 +1823,159 @@
             await fetchSymbolsList();
             fetchAll();
             startTicker();
-            fetchVolScan();
+            setTimeout(fetchVolScan, 5000);
             setInterval(tickVolTimer, 1000);
         });
     };
+
+    // ============================================================
+    // Калькулятор риска
+    // ============================================================
+    // ── Полный экран графика ──────────────────────────────────
+    function toggleFullscreen() {
+        const panel = document.querySelector('.center-panel');
+        const isFs  = panel.classList.toggle('fullscreen');
+        document.getElementById('fsBtn').textContent = isFs ? '✕' : '⛶';
+        document.getElementById('fsBtn').title = isFs ? 'Выйти из полного экрана (Esc)' : 'Полный экран (F)';
+        // Принудительно пересчитываем размеры графиков после смены layout
+        setTimeout(() => {
+            const w = getChartWidth();
+            const h = getChartHeights();
+            if (mainChart)   mainChart.resize(w, h.main);
+            if (volumeChart) volumeChart.resize(w, h.volume);
+            if (aoChart)     aoChart.resize(w, h.ao);
+        }, 30);
+    }
+    document.addEventListener('keydown', e => {
+        if (e.key === 'F' || e.key === 'f') {
+            // Не реагировать если фокус на поле ввода
+            if (['INPUT','TEXTAREA'].includes(document.activeElement.tagName)) return;
+            toggleFullscreen();
+        }
+        if (e.key === 'Escape' && document.querySelector('.center-panel.fullscreen')) {
+            toggleFullscreen();
+        }
+    });
+
+    // ── Калькулятор риска ─────────────────────────────────────
+    let _rcDir    = 'long';
+    let _rcStyle  = 1;
+    let _rcCat    = 1;
+    let _rcTradeRisk = 0;   // $ риск на 1 сделку (после блока А)
+    let _rcSessLimit = 0;   // $ лимит сессии (после блока А)
+
+    function openRiskCalc() {
+        document.getElementById('riskCalcModal').style.display = 'flex';
+    }
+    function closeRiskCalc() {
+        document.getElementById('riskCalcModal').style.display = 'none';
+    }
+    document.getElementById('riskCalcModal').addEventListener('click', function(e) {
+        if (e.target === this) closeRiskCalc();
+    });
+
+    function setRcDir(dir) {
+        _rcDir = dir;
+        document.getElementById('rcDirLong').classList.toggle('active', dir === 'long');
+        document.getElementById('rcDirShort').classList.toggle('active', dir === 'short');
+    }
+    function setRcStyle(btn) {
+        _rcStyle = parseFloat(btn.dataset.val);
+        document.querySelectorAll('#rcStyleGroup .rc-radio-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+    }
+    function setRcCat(btn) {
+        _rcCat = parseFloat(btn.dataset.val);
+        document.querySelectorAll('#rcCatGroup .rc-radio-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+    }
+
+    // ── БЛОК А: рассчитать лимиты ────────────────────────────
+    function calcLimits() {
+        const errEl = document.getElementById('rcErrorA');
+        errEl.textContent = '';
+        const capital = parseFloat(document.getElementById('rcCapital').value);
+        if (!capital || capital <= 0) { errEl.textContent = 'Введите капитал'; return; }
+
+        const baseRisk   = capital < 2500 ? 5 : capital <= 25000 ? 2 : 1;
+        const riskPct    = _rcStyle * baseRisk * _rcCat;
+        const tradeRisk  = capital * riskPct / 100;
+        const sessPct    = riskPct * 3;
+        const sessLimit  = capital * sessPct / 100;
+
+        _rcTradeRisk  = tradeRisk;
+        _rcSessLimit  = sessLimit;
+
+        document.getElementById('rcA_tradeUsd').textContent = '$' + tradeRisk.toFixed(2);
+        document.getElementById('rcA_tradePct').textContent = riskPct.toFixed(2) + '% от капитала';
+        document.getElementById('rcA_sessUsd').textContent  = '$' + sessLimit.toFixed(2);
+        document.getElementById('rcA_sessPct').textContent  = sessPct.toFixed(2) + '% от капитала';
+        document.getElementById('rcResA').style.display     = 'block';
+
+        // Разблокировать блок Б
+        document.getElementById('rcCalcBBtn').disabled = false;
+        // Обновить счётчик сессии
+        updateSession();
+    }
+
+    // ── БЛОК Б: рассчитать стоп ──────────────────────────────
+    function calcPosition() {
+        const errEl = document.getElementById('rcErrorB');
+        errEl.textContent = '';
+        document.getElementById('rcResB').style.display = 'none';
+
+        if (_rcTradeRisk <= 0) { errEl.textContent = 'Сначала рассчитайте лимиты (блок А)'; return; }
+
+        const entry  = parseFloat(document.getElementById('rcEntry').value);
+        const posUsd = parseFloat(document.getElementById('rcPosUsd').value);
+        if (!entry || entry <= 0)  { errEl.textContent = 'Введите цену входа'; return; }
+        if (!posUsd || posUsd <= 0) { errEl.textContent = 'Введите объём позиции в $'; return; }
+
+        // Сколько монет куплено
+        const coins = posUsd / entry;
+        // Допустимое расстояние до стопа на монету
+        const stopDist = _rcTradeRisk / coins;
+        // Цена стопа
+        const stopPrice = _rcDir === 'long' ? entry - stopDist : entry + stopDist;
+        const stopPct   = (stopDist / entry * 100).toFixed(2);
+
+        const stopEl = document.getElementById('rcB_stopPrice');
+        stopEl.textContent = stopPrice < 0.01 ? stopPrice.toFixed(8) : stopPrice.toFixed(4);
+        stopEl.className   = 'rc-stop-price ' + _rcDir;
+
+        document.getElementById('rcB_stopPct').textContent   = (_rcDir === 'long' ? '−' : '+') + stopPct + '% от входа';
+        document.getElementById('rcB_coins').textContent     = coins.toFixed(4) + ' монет';
+        document.getElementById('rcB_riskCheck').textContent = 'Риск: $' + _rcTradeRisk.toFixed(2);
+        document.getElementById('rcResB').style.display      = 'block';
+    }
+
+    // ── БЛОК В: счётчик сессии ────────────────────────────────
+    function updateSession() {
+        const budget = _rcSessLimit;
+        let spent = 0;
+        for (let i = 0; i < 3; i++) {
+            const v = parseFloat(document.getElementById('rcSlot' + i).value) || 0;
+            spent += v;
+            const stEl = document.getElementById('rcSlotSt' + i);
+            if (v <= 0) { stEl.textContent = ''; continue; }
+            const ok = v <= _rcTradeRisk;
+            stEl.textContent = ok ? '✓ ок' : '⚠ превышен';
+            stEl.className   = 'rc-slot-status ' + (ok ? 'ok' : 'over');
+        }
+        const remain  = budget - spent;
+        const remEl   = document.getElementById('rcRemain');
+        if (budget <= 0) { remEl.textContent = '—'; remEl.className = 'rc-remain-val ok'; return; }
+        remEl.textContent = (remain >= 0 ? '$' : '−$') + Math.abs(remain).toFixed(2);
+        remEl.className   = 'rc-remain-val ' + (remain >= 0 ? 'ok' : 'over');
+    }
+
+    function resetSession() {
+        for (let i = 0; i < 3; i++) {
+            document.getElementById('rcSlot' + i).value = '';
+            document.getElementById('rcSlotSt' + i).textContent = '';
+        }
+        updateSession();
+    }
 </script>
 </body>
 </html>
