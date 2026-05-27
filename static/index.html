@@ -515,6 +515,35 @@
         .vol-timer { font-size: 11px; color: var(--text-secondary); font-weight: 400; }
         .vol-pos { color: var(--green); }
         .vol-neg { color: var(--red); }
+        /* Журнал сделок */
+        .journal-add-form { display:flex; flex-direction:column; gap:6px; padding:6px 4px; border-bottom:1px solid var(--border-color); }
+        .journal-add-row { display:flex; gap:6px; align-items:center; }
+        .journal-sym-input { flex:1; background:var(--bg-color); border:1px solid var(--border-color); border-radius:6px; color:var(--text-primary); font-size:12px; padding:5px 8px; font-family:inherit; }
+        .journal-r-input { width:60px; background:var(--bg-color); border:1px solid var(--border-color); border-radius:6px; color:var(--text-primary); font-size:12px; padding:5px 8px; font-family:inherit; }
+        .journal-win-btn, .journal-loss-btn { flex:1; padding:5px; border:1px solid var(--border-color); border-radius:6px; cursor:pointer; font-size:12px; font-weight:600; font-family:inherit; transition:all 0.15s; background:var(--hover-bg); color:var(--text-secondary); }
+        .journal-win-btn.active { background:rgba(76,175,130,0.25); color:var(--green); border-color:var(--green); }
+        .journal-loss-btn.active { background:rgba(224,82,82,0.25); color:var(--red); border-color:var(--red); }
+        .journal-add-btn { background:var(--accent-color); border:none; border-radius:6px; color:#fff; font-size:12px; font-weight:600; padding:5px 10px; cursor:pointer; font-family:inherit; white-space:nowrap; }
+        .journal-progress { display:flex; gap:6px; align-items:center; padding:4px 4px 2px; font-size:11px; color:var(--text-secondary); }
+        .journal-progress-bar { flex:1; height:3px; background:var(--border-color); border-radius:2px; overflow:hidden; }
+        .journal-progress-fill { height:100%; background:var(--accent-color); border-radius:2px; transition:width 0.3s; }
+        .journal-item { display:flex; justify-content:space-between; align-items:center; padding:5px 8px; border-radius:6px; font-size:12px; }
+        .journal-item:hover { background:var(--hover-bg); }
+        .journal-item-left { display:flex; gap:8px; align-items:center; }
+        .journal-badge { font-weight:700; font-size:11px; }
+        .journal-badge.win { color:var(--green); }
+        .journal-badge.loss { color:var(--red); }
+        .journal-item-r { color:var(--text-secondary); font-size:11px; }
+        .journal-del { background:none; border:none; color:var(--text-secondary); cursor:pointer; font-size:13px; padding:0 2px; line-height:1; }
+        .journal-del:hover { color:var(--red); }
+
+        /* Watchlist */
+        .wl-item { display:inline-flex; align-items:center; gap:5px; background:var(--bg-color); border:1px solid var(--border-color); border-radius:6px; padding:5px 8px; cursor:pointer; font-size:12px; transition:border-color 0.15s,background 0.15s; }
+        .wl-item:hover { border-color:var(--accent-color); background:rgba(41,98,255,0.08); }
+        .wl-item.active { border-color:var(--accent-color); background:rgba(41,98,255,0.15); }
+        .wl-item-name { font-weight:600; color:var(--text-primary); }
+        .wl-del { background:none; border:none; color:var(--text-secondary); font-size:13px; line-height:1; padding:0 2px; cursor:pointer; }
+        .wl-del:hover { color:var(--red); }
 
         /* Скроллбар */
         ::-webkit-scrollbar { width: 6px; }
@@ -806,11 +835,16 @@
             </div>
         </div>
 
-        <!-- Placeholder -->
-        <div class="placeholder-card">
-            <span class="placeholder-icon">&#128202;</span>
-            <span class="placeholder-label">Маржин / Аналитика</span>
-            <span class="placeholder-sub">В разработке</span>
+        <!-- Сканер спреда 15m -->
+        <div class="card div-scan-card">
+            <div class="div-scan-header">
+                <span id="spreadScanTitle">Спред 15м · Крипто</span>
+                <span class="vol-timer" id="spreadScanTimer"></span>
+            </div>
+            <div class="div-scan-info" id="spreadScanInfo"></div>
+            <div class="div-scan-list" id="spreadScanList">
+                <div class="div-scan-empty">Загрузка...</div>
+            </div>
         </div>
     </aside>
 
@@ -865,11 +899,20 @@
             </div>
         </div>
 
-        <!-- Placeholder -->
-        <div class="placeholder-card" style="min-height:140px;">
-            <span class="placeholder-icon">&#128203;</span>
-            <span class="placeholder-label">Таблица активов</span>
-            <span class="placeholder-sub">All assets / Gainers / Losers — В разработке</span>
+        <!-- Список наблюдения -->
+        <div class="card" id="watchlistCard" style="padding:0">
+            <div class="div-scan-header" style="padding:10px 12px 8px">
+                <span>Список наблюдения</span>
+                <span id="watchlistCount" style="font-size:11px;color:var(--text-secondary)">0 пар</span>
+            </div>
+            <div style="display:flex;gap:6px;padding:0 10px 8px">
+                <input id="wlInput" class="rc-input" type="text" placeholder="Символ (напр. BTCUSDT)" style="flex:1;height:30px;font-size:12px" onkeydown="if(event.key==='Enter')wlAdd(this.value)">
+                <button class="div-scan-btn" onclick="wlAdd(document.getElementById('wlInput').value)" style="white-space:nowrap">+ Добавить</button>
+                <button class="div-scan-btn" onclick="wlAddCurrent()" title="Добавить текущую пару" style="padding:0 10px">&#9733; Текущую</button>
+            </div>
+            <div id="watchlistItems" style="display:flex;flex-wrap:wrap;gap:6px;padding:0 10px 10px;min-height:40px">
+                <div class="div-scan-empty" style="width:100%">Список пуст — добавьте пары</div>
+            </div>
         </div>
     </main>
 
@@ -897,6 +940,35 @@
             <div class="div-scan-info" id="volScanInfo"></div>
             <div class="div-scan-list" id="volScanList">
                 <div class="div-scan-empty">Загрузка...</div>
+            </div>
+        </div>
+        <!-- Журнал сделок -->
+        <div class="card div-scan-card">
+            <div class="div-scan-header">
+                <span>Журнал сделок</span>
+                <span id="journalCounter" style="font-size:11px;font-weight:400;color:var(--text-secondary)">0 / 30</span>
+            </div>
+            <div class="journal-add-form">
+                <div class="journal-add-row">
+                    <input class="journal-sym-input" id="jSym" type="text" placeholder="Символ (необяз.)" maxlength="12">
+                    <input class="journal-r-input" id="jR" type="number" min="0.1" step="any" placeholder="R&#xd7;">
+                </div>
+                <div class="journal-add-row">
+                    <button class="journal-win-btn active" id="jBtnWin" onclick="jSetResult('win')">Win &#x2713;</button>
+                    <button class="journal-loss-btn" id="jBtnLoss" onclick="jSetResult('loss')">Loss &#x2717;</button>
+                    <button class="journal-add-btn" onclick="jAddTrade()">+ Добавить</button>
+                </div>
+            </div>
+            <div class="journal-progress">
+                <div class="journal-progress-bar"><div class="journal-progress-fill" id="jProgressFill" style="width:0%"></div></div>
+                <span id="jProgressLabel">0 / 30</span>
+            </div>
+            <div class="div-scan-list" id="journalList" style="max-height:260px">
+                <div class="div-scan-empty">Добавьте первую сделку</div>
+            </div>
+            <div style="padding:4px 4px 0;display:flex;gap:6px">
+                <button class="div-scan-btn" onclick="showKellyModal(null)" style="flex:1">&#x25b6; Рассчитать Келли</button>
+                <button class="div-scan-btn" onclick="jSave([]);jRender()" style="color:var(--text-secondary)">&#x21ba; Сброс</button>
             </div>
         </div>
     </aside>
@@ -976,6 +1048,15 @@
                     </div>
                 </div>
                 <div>
+                    <div class="rc-label">Кредитное плечо</div>
+                    <div class="rc-radio-group" id="rcLevGroup">
+                        <button class="rc-radio-btn active" data-val="1"  onclick="setRcLeverage(this)">Без плеча</button>
+                        <button class="rc-radio-btn"        data-val="5"  onclick="setRcLeverage(this)">×5</button>
+                        <button class="rc-radio-btn"        data-val="10" onclick="setRcLeverage(this)">×10</button>
+                        <button class="rc-radio-btn"        data-val="20" onclick="setRcLeverage(this)">×20</button>
+                    </div>
+                </div>
+                <div>
                     <div class="rc-label">Направление</div>
                     <div class="rc-dir-group">
                         <button class="rc-dir-btn long active" id="rcDirLong" onclick="setRcDir('long')">ЛОНГ ▲</button>
@@ -988,12 +1069,16 @@
                         <input class="rc-input" id="rcEntry" type="number" min="0" placeholder="100">
                     </div>
                     <div>
-                        <div class="rc-label">Объём позиции ($)</div>
+                        <div class="rc-label" id="rcPosLabel">Объём позиции ($)</div>
                         <input class="rc-input" id="rcPosUsd" type="number" min="0" placeholder="500">
                     </div>
                 </div>
+                <div>
+                    <div class="rc-label">R:R (тейк / стоп)</div>
+                    <input class="rc-input" id="rcRRInput" type="number" min="0.1" step="0.1" placeholder="2.0" value="1.5" oninput="document.getElementById('rcResB').style.display='none'">
+                </div>
                 <div class="rc-error" id="rcErrorB"></div>
-                <button class="rc-calc-btn" id="rcCalcBBtn" onclick="calcPosition()" disabled>Рассчитать стоп</button>
+                <button class="rc-calc-btn" id="rcCalcBBtn" onclick="calcPosition()" disabled>Рассчитать стоп и тейк</button>
 
                 <!-- Результат блока Б -->
                 <div id="rcResB" style="display:none">
@@ -1004,9 +1089,41 @@
                             <div class="rc-card-sub" id="rcB_stopPct">—</div>
                         </div>
                         <div style="text-align:right">
+                            <div class="rc-card-label">Цена тейк-профита</div>
+                            <div style="font-size:18px;font-weight:700;color:#4caf82" id="rcB_tpPrice">—</div>
+                            <div class="rc-card-sub" id="rcB_tpPct">—</div>
+                        </div>
+                    </div>
+                    <div class="rc-stop-result" style="margin-top:6px">
+                        <div>
                             <div class="rc-card-label">Объём в монетах</div>
-                            <div style="font-size:14px;font-weight:600" id="rcB_coins">—</div>
+                            <div style="font-size:13px;font-weight:600" id="rcB_coins">—</div>
                             <div class="rc-card-sub" id="rcB_riskCheck">—</div>
+                        </div>
+                        <div style="text-align:right">
+                            <div class="rc-card-label">Потенциальная прибыль</div>
+                            <div style="font-size:13px;font-weight:600;color:#4caf82" id="rcB_tpProfit">—</div>
+                            <div class="rc-card-sub" id="rcB_rrLabel">—</div>
+                        </div>
+                    </div>
+                    <!-- Инфо о плече (видно только при leverage > 1) -->
+                    <div id="rcB_levInfo" style="display:none;margin-top:8px">
+                        <div class="rc-stop-result" style="margin-bottom:6px">
+                            <div>
+                                <div class="rc-card-label">Эффективная позиция</div>
+                                <div style="font-size:13px;font-weight:600" id="rcB_effPos">—</div>
+                                <div class="rc-card-sub" id="rcB_margin">—</div>
+                            </div>
+                            <div style="text-align:right">
+                                <div class="rc-card-label">~Цена ликвидации</div>
+                                <div style="font-size:13px;font-weight:600;color:#e05252" id="rcB_liqPrice">—</div>
+                                <div class="rc-card-sub" id="rcB_liqPct">—</div>
+                            </div>
+                        </div>
+                        <div id="rcB_liqLoss" style="color:var(--text-secondary);font-size:11px;padding:2px 0"></div>
+                        <div id="rcB_marginWarn" style="display:none;background:rgba(224,82,82,0.1);border:1px solid #e05252;border-radius:4px;padding:6px 8px;margin-top:6px;font-size:11px;color:#e05252;line-height:1.5"></div>
+                        <div id="rcB_liqWarn" style="display:none;color:#e05252;font-size:11px;padding:4px 0;margin-top:2px">
+                            &#9888; Стоп ниже цены ликвидации — позиция будет принудительно закрыта раньше стопа
                         </div>
                     </div>
                 </div>
@@ -1043,6 +1160,7 @@
                     <span class="rc-remain-val ok" id="rcRemain">—</span>
                 </div>
                 <button class="rc-calc-btn" style="background:var(--bg-color);color:var(--text-secondary);border:1px solid var(--border-color)" onclick="resetSession()">Сбросить сессию</button>
+
 
             </div>
         </div>
@@ -1188,9 +1306,9 @@
             borderUpColor: '#26a69a', borderDownColor: '#ef5350',
             wickUpColor: '#26a69a', wickDownColor: '#ef5350',
         });
-        jawSeries = mainChart.addLineSeries({ color: '#2962ff', lineWidth: 1, title: 'Jaw (13)' });
-        teethSeries = mainChart.addLineSeries({ color: '#ef5350', lineWidth: 1, title: 'Teeth (8)' });
-        lipsSeries = mainChart.addLineSeries({ color: '#26a69a', lineWidth: 1, title: 'Lips (5)' });
+        jawSeries = mainChart.addLineSeries({ color: '#2962ff', lineWidth: 1, title: '', lastValueVisible: false, priceLineVisible: false });
+        teethSeries = mainChart.addLineSeries({ color: '#ef5350', lineWidth: 1, title: '', lastValueVisible: false, priceLineVisible: false });
+        lipsSeries = mainChart.addLineSeries({ color: '#26a69a', lineWidth: 1, title: '', lastValueVisible: false, priceLineVisible: false });
 
 
         volumeChart = LightweightCharts.createChart(
@@ -1372,12 +1490,26 @@
             applyAllMarkers();
             mainChart.timeScale().fitContent();
 
+            // Применяем priceFormat ко всем сериям основного графика исходя из реальной цены
+            if (lastCandle) {
+                const fmt = getPriceFormat(lastCandle.close);
+                candleSeries.applyOptions({ priceFormat: fmt });
+                jawSeries.applyOptions({ priceFormat: fmt });
+                teethSeries.applyOptions({ priceFormat: fmt });
+                lipsSeries.applyOptions({ priceFormat: fmt });
+                bbUpperSeries.applyOptions({ priceFormat: fmt });
+                bbLowerSeries.applyOptions({ priceFormat: fmt });
+                // AO — разница SMA, точность по последнему реальному значению AO
+                const lastAoVal = json.ao?.length ? Math.abs(json.ao[json.ao.length - 1].AO) : 0;
+                aoSeries.applyOptions({ priceFormat: lastAoVal > 0 ? getPriceFormat(lastAoVal) : fmt });
+            }
+
             // Обновить данные в header для MOEX (нет live ticker — берём из последней свечи)
             if (currentMarket === 'moex' && lastCandle) {
                 const lastRaw = json.data[json.data.length - 1];
                 const change = ((lastRaw.Close - lastRaw.Open) / lastRaw.Open * 100).toFixed(2);
                 const changeEl = document.getElementById('liveChange');
-                document.getElementById('livePrice').textContent = lastRaw.Close.toLocaleString('ru-RU');
+                document.getElementById('livePrice').textContent = formatPrice(lastRaw.Close);
                 changeEl.textContent = `${change > 0 ? '+' : ''}${change}%`;
                 changeEl.className = `symbol-change ${change >= 0 ? 'positive' : 'negative'}`;
                 document.getElementById('liveHigh').textContent = lastRaw.High.toLocaleString('ru-RU');
@@ -1400,8 +1532,31 @@
     // ============================================================
     let tickerInterval = null;
 
+    // Адаптивное форматирование цены
+    function formatPrice(p) {
+        if (!p || p === 0) return '0';
+        if (p >= 10000) return p.toLocaleString('en-US', {maximumFractionDigits: 0});
+        if (p >= 1000)  return p.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+        if (p >= 1)     return p.toFixed(4).replace(/\.?0+$/, '') || p.toFixed(2);
+        if (p >= 0.1)   return p.toFixed(4);
+        if (p >= 0.01)  return p.toFixed(5);
+        if (p >= 0.001) return p.toFixed(6);
+        if (p >= 0.0001) return p.toFixed(7);
+        return p.toFixed(8);
+    }
+
+    function getPriceFormat(price) {
+        if (!price || price >= 1000) return { type: 'price', precision: 2, minMove: 0.01 };
+        if (price >= 1)     return { type: 'price', precision: 4, minMove: 0.0001 };
+        if (price >= 0.1)   return { type: 'price', precision: 4, minMove: 0.0001 };
+        if (price >= 0.01)  return { type: 'price', precision: 5, minMove: 0.00001 };
+        if (price >= 0.001) return { type: 'price', precision: 6, minMove: 0.000001 };
+        if (price >= 0.0001) return { type: 'price', precision: 7, minMove: 0.0000001 };
+        return { type: 'price', precision: 8, minMove: 0.00000001 };
+    }
+
     function updateTicker(data) {
-        document.getElementById('livePrice').textContent = data.price.toLocaleString();
+        document.getElementById('livePrice').textContent = formatPrice(data.price);
         const changeEl = document.getElementById('liveChange');
         changeEl.textContent = `${data.change24h > 0 ? '+' : ''}${data.change24h}%`;
         changeEl.className = `symbol-change ${data.change24h >= 0 ? 'positive' : 'negative'}`;
@@ -1580,6 +1735,10 @@
             updateTimeframesForMarket('moex', currentMoexCategory);
             fetchMoexSymbols(currentMoexCategory);
             fetchVolScan();
+            document.getElementById('spreadScanTitle').textContent = 'Спред 15м · MOEX';
+            spreadNextRefresh = 0;
+            fetchSpreadScan();
+            wlRender();
         } else {
             moexCats.style.display = 'none';
             document.getElementById('divScanTitle').textContent = 'Дивергенции 1D · Крипто';
@@ -1592,6 +1751,10 @@
             updateTimeframesForMarket('crypto');
             fetchSymbolsList().then(() => { fetchAll(); startTicker(); });
             fetchVolScan();
+            document.getElementById('spreadScanTitle').textContent = 'Спред 15м · Крипто';
+            spreadNextRefresh = 0;
+            fetchSpreadScan();
+            wlRender();
         }
     }
 
@@ -1615,7 +1778,7 @@
             // Обновляем цену в списке пар
             const priceEl = document.querySelector(`[data-price="${currentSymbol}"]`);
             const changeEl = document.querySelector(`[data-change="${currentSymbol}"]`);
-            if (priceEl) priceEl.textContent = `$${data.price.toLocaleString()}`;
+            if (priceEl) priceEl.textContent = `$${formatPrice(data.price)}`;
             if (changeEl) {
                 changeEl.textContent = `${data.change24h > 0 ? '+' : ''}${data.change24h}%`;
                 changeEl.className = `pair-change ${data.change24h >= 0 ? 'positive' : 'negative'}`;
@@ -1634,7 +1797,7 @@
             for (const [sym, data] of Object.entries(tickers)) {
                 const priceEl = document.querySelector(`[data-price="${sym}"]`);
                 const changeEl = document.querySelector(`[data-change="${sym}"]`);
-                if (priceEl) priceEl.textContent = `$${data.price.toLocaleString()}`;
+                if (priceEl) priceEl.textContent = `$${formatPrice(data.price)}`;
                 if (changeEl) {
                     changeEl.textContent = `${data.change24h > 0 ? '+' : ''}${data.change24h}%`;
                     changeEl.className = `pair-change ${data.change24h >= 0 ? 'positive' : 'negative'}`;
@@ -1727,6 +1890,8 @@
     // ============================================================
     let volNextRefresh = 0;
     let _volGen = 0;   // счётчик поколений — защита от race condition при смене рынка
+    let spreadNextRefresh = 0;
+    let _spreadGen = 0;
 
     async function fetchVolScan() {
         const myGen = ++_volGen;
@@ -1771,6 +1936,47 @@
         const m = Math.floor(left / 60), s = left % 60;
         el.textContent = left > 0 ? `↻ ${m}:${s.toString().padStart(2,'0')}` : '';
         if (left === 0 && volNextRefresh > 0) { volNextRefresh = 0; fetchVolScan(); }
+    }
+
+    // ============================================================
+    // Сканер спреда 15м
+    // ============================================================
+    async function fetchSpreadScan() {
+        const myGen = ++_spreadGen;
+        const list = document.getElementById('spreadScanList');
+        const info = document.getElementById('spreadScanInfo');
+        list.innerHTML = '<div class="div-scan-empty">Сканирование...</div>';
+        const isMoex = currentMarket === 'moex';
+        try {
+            const url = isMoex
+                ? `${API_BASE}/moex/scan/spread?threshold=1.0&top=20`
+                : `${API_BASE}/scan/spread?threshold=1.0&top=20`;
+            const res = await fetch(url);
+            const json = await res.json();
+            if (myGen !== _spreadGen) return;
+            if (!res.ok) throw new Error(json.detail || 'Ошибка');
+            const pairs = json.pairs ?? [];
+            info.textContent = `Найдено: ${pairs.length} ${isMoex ? 'инструментов' : 'пар'} (спред 15м > 1%)`;
+            list.innerHTML = pairs.length
+                ? pairs.map(p => `<div class="div-scan-item" onclick="selectPair({symbol:'${p.symbol}',name:'${p.name}',base:'${p.base}'})">
+                    <span class="div-scan-badge vol-pos">${p.spread}%</span>
+                    <span class="div-scan-name">${p.name}</span>
+                  </div>`).join('')
+                : '<div class="div-scan-empty">Нет пар выше порога</div>';
+            spreadNextRefresh = Date.now() + 15 * 60 * 1000;
+        } catch(e) {
+            if (myGen !== _spreadGen) return;
+            list.innerHTML = `<div class="div-scan-empty" style="color:var(--red)">${e.message}</div>`;
+        }
+    }
+
+    function tickSpreadTimer() {
+        const el = document.getElementById('spreadScanTimer');
+        if (!el) return;
+        const left = Math.max(0, Math.round((spreadNextRefresh - Date.now()) / 1000));
+        const m = Math.floor(left / 60), s = left % 60;
+        el.textContent = left > 0 ? `↻ ${m}:${s.toString().padStart(2,'0')}` : '';
+        if (left === 0 && spreadNextRefresh > 0) { spreadNextRefresh = 0; fetchSpreadScan(); }
     }
 
     // ============================================================
@@ -1825,6 +2031,8 @@
             startTicker();
             setTimeout(fetchVolScan, 5000);
             setInterval(tickVolTimer, 1000);
+            setTimeout(fetchSpreadScan, 6000);
+            setInterval(tickSpreadTimer, 1000);
         });
     };
 
@@ -1858,9 +2066,11 @@
     });
 
     // ── Калькулятор риска ─────────────────────────────────────
-    let _rcDir    = 'long';
-    let _rcStyle  = 1;
-    let _rcCat    = 1;
+    let _rcDir      = 'long';
+    let _rcStyle    = 1;
+    let _rcCat      = 1;
+    let _rcLeverage = 1;    // кредитное плечо (1 = без плеча)
+    let _rcRR       = 1.5;  // R:R для тейк-профита
     let _rcTradeRisk = 0;   // $ риск на 1 сделку (после блока А)
     let _rcSessLimit = 0;   // $ лимит сессии (после блока А)
 
@@ -1888,6 +2098,21 @@
         _rcCat = parseFloat(btn.dataset.val);
         document.querySelectorAll('#rcCatGroup .rc-radio-btn').forEach(b => b.classList.remove('active'));
         btn.classList.add('active');
+    }
+    function setRcLeverage(btn) {
+        _rcLeverage = parseInt(btn.dataset.val);
+        document.querySelectorAll('#rcLevGroup .rc-radio-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        // Менять лейбл поля объёма: без плеча — "Объём позиции", с плечом — "Маржа (залог)"
+        document.getElementById('rcPosLabel').textContent = _rcLeverage > 1 ? 'Маржа / залог ($)' : 'Объём позиции ($)';
+        // Сбросить результат при смене плеча
+        document.getElementById('rcResB').style.display = 'none';
+    }
+    function setRcRR(btn) {
+        _rcRR = parseFloat(btn.dataset.val);
+        document.querySelectorAll('#rcRRGroup .rc-radio-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        document.getElementById('rcResB').style.display = 'none';
     }
 
     // ── БЛОК А: рассчитать лимиты ────────────────────────────
@@ -1928,11 +2153,14 @@
 
         const entry  = parseFloat(document.getElementById('rcEntry').value);
         const posUsd = parseFloat(document.getElementById('rcPosUsd').value);
-        if (!entry || entry <= 0)  { errEl.textContent = 'Введите цену входа'; return; }
-        if (!posUsd || posUsd <= 0) { errEl.textContent = 'Введите объём позиции в $'; return; }
+        if (!entry || entry <= 0)   { errEl.textContent = 'Введите цену входа'; return; }
+        if (!posUsd || posUsd <= 0) { errEl.textContent = _rcLeverage > 1 ? 'Введите маржу в $' : 'Введите объём позиции в $'; return; }
 
-        // Сколько монет куплено
-        const coins = posUsd / entry;
+        const lev = _rcLeverage;
+        // При плече posUsd — это маржа; эффективная позиция = маржа × плечо
+        const effectivePosUsd = posUsd * lev;
+        // Сколько монет контролируем
+        const coins    = effectivePosUsd / entry;
         // Допустимое расстояние до стопа на монету
         const stopDist = _rcTradeRisk / coins;
         // Цена стопа
@@ -1946,7 +2174,66 @@
         document.getElementById('rcB_stopPct').textContent   = (_rcDir === 'long' ? '−' : '+') + stopPct + '% от входа';
         document.getElementById('rcB_coins').textContent     = coins.toFixed(4) + ' монет';
         document.getElementById('rcB_riskCheck').textContent = 'Риск: $' + _rcTradeRisk.toFixed(2);
-        document.getElementById('rcResB').style.display      = 'block';
+
+        // Инфо о плече
+        const levInfoEl = document.getElementById('rcB_levInfo');
+        if (lev > 1) {
+            // Цена ликвидации с учётом maintenance margin (~0.5%) — консервативная оценка
+            // Реальная цена зависит от биржи и размера позиции
+            const MMR = 0.005;
+            const liqPrice = _rcDir === 'long'
+                ? entry * (1 - 1 / lev + MMR)
+                : entry * (1 + 1 / lev - MMR);
+            const liqPct = (Math.abs(liqPrice - entry) / entry * 100).toFixed(2);
+
+            // Реальный убыток при ликвидации
+            const lossAtLiq = Math.abs(entry - liqPrice) * coins;
+
+            document.getElementById('rcB_effPos').textContent   = '$' + effectivePosUsd.toLocaleString('ru-RU', {maximumFractionDigits: 2});
+            document.getElementById('rcB_margin').textContent   = 'Маржа: $' + posUsd.toLocaleString('ru-RU', {maximumFractionDigits: 2}) + ' × ' + lev;
+            document.getElementById('rcB_liqPrice').textContent = liqPrice < 0.01 ? liqPrice.toFixed(8) : liqPrice.toFixed(4);
+            document.getElementById('rcB_liqPct').textContent   = (_rcDir === 'long' ? '−' : '+') + liqPct + '% от входа';
+            document.getElementById('rcB_liqLoss').textContent  = 'При ликвидации потеря: ~$' + lossAtLiq.toFixed(2);
+
+            // Предупреждение: маржа меньше лимита риска
+            const marginWarnEl = document.getElementById('rcB_marginWarn');
+            if (posUsd < _rcTradeRisk) {
+                marginWarnEl.style.display = 'block';
+                marginWarnEl.innerHTML = '⚠ Маржа ($' + posUsd.toFixed(2) + ') меньше лимита риска ($' + _rcTradeRisk.toFixed(2) + ').<br>'
+                    + 'Максимальная потеря ограничена маржой. Для риска $' + _rcTradeRisk.toFixed(2) + ' нужна маржа ≥ $' + _rcTradeRisk.toFixed(2) + '.';
+            } else {
+                marginWarnEl.style.display = 'none';
+            }
+
+            // Предупреждение: стоп за ликвидацией (стоп недостижим)
+            const stopBeyondLiq = _rcDir === 'long' ? stopPrice <= liqPrice : stopPrice >= liqPrice;
+            if (stopBeyondLiq) {
+                document.getElementById('rcB_stopPct').textContent = '⚠ недостижим — биржа ликвидирует раньше';
+                stopEl.style.color = '#e05252';
+            } else {
+                stopEl.style.color = '';
+            }
+            document.getElementById('rcB_liqWarn').style.display = stopBeyondLiq ? 'block' : 'none';
+
+            levInfoEl.style.display = 'block';
+        } else {
+            levInfoEl.style.display = 'none';
+        }
+
+        // Тейк-профит по R:R из поля ввода
+        const rr = parseFloat(document.getElementById('rcRRInput').value) || 1.5;
+        const tpDist  = stopDist * rr;
+        const tpPrice = _rcDir === 'long' ? entry + tpDist : entry - tpDist;
+        const tpPct   = (tpDist / entry * 100).toFixed(2);
+        const tpProfit = tpDist * coins;
+
+        const tpEl = document.getElementById('rcB_tpPrice');
+        tpEl.textContent = tpPrice < 0.01 ? tpPrice.toFixed(8) : tpPrice.toFixed(4);
+        document.getElementById('rcB_tpPct').textContent    = (_rcDir === 'long' ? '+' : '−') + tpPct + '% от входа';
+        document.getElementById('rcB_tpProfit').textContent = '+$' + tpProfit.toFixed(2);
+        document.getElementById('rcB_rrLabel').textContent  = 'R:R ' + rr + ':1';
+
+        document.getElementById('rcResB').style.display = 'block';
     }
 
     // ── БЛОК В: счётчик сессии ────────────────────────────────
@@ -1976,6 +2263,228 @@
         }
         updateSession();
     }
+
+    // ── Журнал сделок ──────────────────────────────────────────
+    let _jResult = 'win';
+
+    function jSetResult(r) {
+        _jResult = r;
+        document.getElementById('jBtnWin').classList.toggle('active', r === 'win');
+        document.getElementById('jBtnLoss').classList.toggle('active', r === 'loss');
+    }
+
+    function jLoad() {
+        return JSON.parse(localStorage.getItem('tradeJournal') || '[]');
+    }
+
+    function jSave(trades) {
+        localStorage.setItem('tradeJournal', JSON.stringify(trades));
+    }
+
+    function jAddTrade() {
+        const sym = document.getElementById('jSym').value.trim().toUpperCase() || '—';
+        const rVal = parseFloat(document.getElementById('jR').value);
+        const win = _jResult === 'win';
+        if (win && (!rVal || rVal <= 0)) {
+            alert('Введите R-множитель для прибыльной сделки (напр. 2.0)');
+            return;
+        }
+        const trades = jLoad();
+        trades.unshift({ sym, win, r: win ? rVal : 0, ts: Date.now() });
+        jSave(trades);
+        document.getElementById('jSym').value = '';
+        document.getElementById('jR').value = '';
+        jRender();
+        if (trades.length === 30) {
+            setTimeout(() => showKellyModal(trades), 400);
+        }
+        if (trades.length >= 60) {
+            jSave([]);
+            jRender();
+        }
+    }
+
+    function jRender() {
+        const trades = jLoad();
+        const total = trades.length;
+        const pct = Math.min(total / 30 * 100, 100);
+        document.getElementById('jProgressFill').style.width = pct + '%';
+        document.getElementById('jProgressLabel').textContent = total + ' / 30';
+        document.getElementById('journalCounter').textContent = total + ' / 30';
+        const list = document.getElementById('journalList');
+        if (!trades.length) {
+            list.innerHTML = '<div class="div-scan-empty">Добавьте первую сделку</div>';
+            return;
+        }
+        list.innerHTML = trades.map((t, i) => `
+            <div class="journal-item">
+                <div class="journal-item-left">
+                    <span class="journal-badge ${t.win ? 'win' : 'loss'}">${t.win ? 'WIN' : 'LOSS'}</span>
+                    <span style="color:var(--text-primary);font-weight:500">${t.sym}</span>
+                    ${t.win ? `<span class="journal-item-r">&times;${t.r}</span>` : ''}
+                </div>
+                <button class="journal-del" onclick="jDel(${i})">&#x2715;</button>
+            </div>
+        `).join('');
+    }
+
+    function jDel(idx) {
+        const trades = jLoad();
+        trades.splice(idx, 1);
+        jSave(trades);
+        jRender();
+    }
+
+    function showKellyModal(trades) {
+        if (!trades) trades = jLoad();
+        const total = trades.length;
+        if (total === 0) return;
+        const wins = trades.filter(t => t.win);
+        const losses = trades.filter(t => !t.win);
+        const p = wins.length / total;
+        const avgR = wins.length > 0 ? wins.reduce((s, t) => s + t.r, 0) / wins.length : 0;
+        const b = avgR;
+        const edge = b > 0 ? p * b - (1 - p) : -1;
+        const kelly = b > 0 ? (p * b - (1 - p)) / b : -1;
+        const halfKelly = kelly / 2;
+
+        function calcRoR(riskPct) {
+            if (riskPct <= 0 || edge <= 0) return edge <= 0 ? 1.0 : null;
+            return Math.pow((1 - edge) / (1 + edge), 100 / riskPct);
+        }
+
+        document.getElementById('kellyModalTitle').textContent = 'Анализ стратегии · ' + total + ' сделок';
+        document.getElementById('km_total').textContent = wins.length + 'W / ' + losses.length + 'L';
+        document.getElementById('km_winrate').textContent = (p * 100).toFixed(1) + '%';
+        document.getElementById('km_avgR').textContent = wins.length > 0 ? '\u00d7' + avgR.toFixed(2) : '—';
+        const edgeEl = document.getElementById('km_edge');
+        edgeEl.textContent = (edge * 100).toFixed(1) + '%';
+        edgeEl.style.color = edge > 0 ? 'var(--green)' : '#e05252';
+        const kellyEl = document.getElementById('km_kelly');
+        if (kelly <= 0) {
+            kellyEl.textContent = 'Нет преимущества';
+            kellyEl.style.color = '#e05252';
+            document.getElementById('km_kellySub').textContent = 'Стратегия убыточна';
+            document.getElementById('km_halfKelly').textContent = '—';
+        } else {
+            kellyEl.textContent = (kelly * 100).toFixed(1) + '% от капитала';
+            kellyEl.style.color = '';
+            document.getElementById('km_kellySub').textContent = '';
+            document.getElementById('km_halfKelly').textContent = (halfKelly * 100).toFixed(1) + '% от капитала';
+        }
+        const ror2 = calcRoR(2);
+        const rorHVal = kelly > 0 ? calcRoR(halfKelly * 100) : null;
+        const ror2El = document.getElementById('km_ror2');
+        ror2El.textContent = ror2 !== null ? (ror2 * 100).toFixed(1) + '%' : '—';
+        ror2El.style.color = ror2 > 0.20 ? '#e05252' : ror2 > 0.05 ? '#e8b84b' : '#4caf82';
+        const rorHEl = document.getElementById('km_rorHalf');
+        rorHEl.textContent = rorHVal !== null ? (rorHVal * 100).toFixed(1) + '%' : '—';
+        if (rorHVal !== null) rorHEl.style.color = rorHVal > 0.20 ? '#e05252' : rorHVal > 0.05 ? '#e8b84b' : '#4caf82';
+        let verdict = '';
+        if (kelly <= 0) {
+            verdict = '\u26a0 Стратегия убыточна за ' + total + ' сделок. Пересмотрите подход: увеличьте R:R или винрейт.';
+        } else {
+            const rorTxt = ror2 !== null ? ' RoR при риске 2%: ' + (ror2 * 100).toFixed(1) + '%.' : '';
+            verdict = '\u2713 Стратегия прибыльна. Оптимальный риск по Келли: ' + (kelly * 100).toFixed(1) + '%, рекомендован \u00bd Келли: ' + (halfKelly * 100).toFixed(1) + '%.' + rorTxt;
+        }
+        document.getElementById('km_verdict').textContent = verdict;
+        document.getElementById('kellyModal').style.display = 'flex';
+    }
+
+    jRender();
+
+    // ---- Watchlist (список наблюдения) ----
+    function wlLoad() { return JSON.parse(localStorage.getItem('watchlist_' + currentMarket) || '[]'); }
+    function wlSave(list) { localStorage.setItem('watchlist_' + currentMarket, JSON.stringify(list)); }
+
+    function wlAdd(raw) {
+        if (!raw) return;
+        const sym = raw.trim().toUpperCase().replace('/', '');
+        if (!sym) return;
+        const base = sym.endsWith('USDT') ? sym.slice(0, -4) : sym;
+        const name = sym.endsWith('USDT') ? base + '/USDT' : sym;
+        const list = wlLoad();
+        if (list.find(x => x.symbol === sym)) { document.getElementById('wlInput').value = ''; return; }
+        list.push({ symbol: sym, name, base });
+        wlSave(list);
+        document.getElementById('wlInput').value = '';
+        wlRender();
+    }
+
+    function wlAddCurrent() { wlAdd(currentSymbol); }
+
+    function wlRemove(symbol) {
+        wlSave(wlLoad().filter(x => x.symbol !== symbol));
+        wlRender();
+    }
+
+    function wlRender() {
+        const list = wlLoad();
+        const container = document.getElementById('watchlistItems');
+        const count = document.getElementById('watchlistCount');
+        if (!container) return;
+        count.textContent = list.length + ' пар';
+        if (!list.length) {
+            container.innerHTML = '<div class="div-scan-empty" style="width:100%">Список пуст — добавьте пары</div>';
+            return;
+        }
+        container.innerHTML = list.map(p => `<div class="wl-item${p.symbol === currentSymbol ? ' active' : ''}" onclick="selectPair({symbol:'${p.symbol}',name:'${p.name}',base:'${p.base}'});wlRender()"><span class="wl-item-name">${p.name}</span><button class="wl-del" onclick="event.stopPropagation();wlRemove('${p.symbol}')">&#x2715;</button></div>`).join('');
+    }
+
+    wlRender();
 </script>
+    <!-- Журнал: модал результатов Келли/RoR -->
+    <div class="modal-overlay" id="kellyModal" style="display:none" onclick="if(event.target===this)this.style.display='none'">
+        <div class="rc-box" style="width:420px">
+            <div class="rc-header">
+                <span id="kellyModalTitle">Анализ стратегии</span>
+                <button class="rc-close" onclick="document.getElementById('kellyModal').style.display='none'">&#x00d7;</button>
+            </div>
+            <div class="rc-body">
+                <div class="rc-cards">
+                    <div class="rc-card">
+                        <div class="rc-card-label">Итог сделок</div>
+                        <div class="rc-card-val" id="km_total">—</div>
+                    </div>
+                    <div class="rc-card">
+                        <div class="rc-card-label">Винрейт</div>
+                        <div class="rc-card-val" id="km_winrate">—</div>
+                    </div>
+                </div>
+                <div class="rc-cards" style="margin-top:8px">
+                    <div class="rc-card">
+                        <div class="rc-card-label">Средний R:R (Win)</div>
+                        <div class="rc-card-val" id="km_avgR">—</div>
+                    </div>
+                    <div class="rc-card">
+                        <div class="rc-card-label">Мат. ожидание</div>
+                        <div class="rc-card-val" id="km_edge">—</div>
+                    </div>
+                </div>
+                <div class="rc-cards" style="margin-top:8px">
+                    <div class="rc-card highlight">
+                        <div class="rc-card-label">Полный Келли</div>
+                        <div class="rc-card-val" id="km_kelly">—</div>
+                        <div class="rc-card-sub" id="km_kellySub"></div>
+                    </div>
+                    <div class="rc-card">
+                        <div class="rc-card-label">&#x00bd; Келли (рекоменд.)</div>
+                        <div class="rc-card-val" id="km_halfKelly">—</div>
+                    </div>
+                </div>
+                <div class="rc-cards" style="margin-top:8px">
+                    <div class="rc-card">
+                        <div class="rc-card-label">RoR при риске 2%</div>
+                        <div class="rc-card-val" id="km_ror2">—</div>
+                    </div>
+                    <div class="rc-card">
+                        <div class="rc-card-label">RoR при &#x00bd; Келли</div>
+                        <div class="rc-card-val" id="km_rorHalf">—</div>
+                    </div>
+                </div>
+                <div id="km_verdict" style="margin-top:10px;font-size:12px;padding:8px 10px;border-radius:8px;background:var(--hover-bg);line-height:1.6"></div>
+            </div>
+        </div>
+    </div>
 </body>
 </html>

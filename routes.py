@@ -374,6 +374,58 @@ async def scan_volatile(threshold: float = 1.5, top: int = 20):
     return response
 
 
+@router.get("/scan/spread")
+async def scan_spread(threshold: float = 1.0, top: int = 20):
+    """Пары с широким спредом свечи за 15 минут (High-Low)/Low >= threshold%."""
+    key = get_cache_key("", "15m", top, f"spread15_{threshold}")
+    cached = await get_cached_data(key)
+    if cached:
+        return cached
+
+    try:
+        all_tickers = await async_fetch_all_tickers()
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Tickers: {str(e)}")
+
+    sorted_tickers = sorted(all_tickers.values(), key=lambda t: t.get('volume24h', 0), reverse=True)
+    top_symbols = sorted_tickers[:50]
+
+    sem = asyncio.Semaphore(6)
+
+    async def scan_one(t_info):
+        async with sem:
+            try:
+                sym = t_info['symbol']
+                base = sym.replace('USDT', '')
+                df = await async_fetch_ohlcv_df(sym, '15m', 3)
+                if len(df) < 1:
+                    return None
+                high = float(df['High'].iloc[-1])
+                low = float(df['Low'].iloc[-1])
+                close = float(df['Close'].iloc[-1])
+                if low <= 0:
+                    return None
+                spread = (high - low) / low * 100
+                if spread < threshold:
+                    return None
+                return {
+                    "symbol": sym, "name": f"{base}/USDT", "base": base,
+                    "price": round(close, 8),
+                    "spread": round(spread, 2),
+                    "high": round(high, 8),
+                    "low": round(low, 8),
+                }
+            except Exception:
+                return None
+
+    results = await asyncio.gather(*[scan_one(t) for t in top_symbols])
+    pairs = [r for r in results if r]
+    pairs.sort(key=lambda x: x['spread'], reverse=True)
+    response = {"threshold": threshold, "count": len(pairs[:top]), "pairs": pairs[:top]}
+    await set_cached_data(key, response, ttl=300)
+    return response
+
+
 @router.get("/chart-data")
 async def get_chart_data(symbol: str = "BTCUSDT", timeframe: str = "1h", limit: int = 200):
     """Комбинированный endpoint: OHLCV + все индикаторы за один запрос к бирже."""
@@ -570,6 +622,55 @@ async def moex_scan_volatile(threshold: float = 1.0, top: int = 20):
             continue
 
     pairs.sort(key=lambda x: x["score"], reverse=True)
+    response = {"threshold": threshold, "count": len(pairs[:top]), "pairs": pairs[:top]}
+    await set_cached_data(key, response, ttl=300)
+    return response
+
+
+@router.get("/moex/scan/spread")
+async def moex_scan_spread(threshold: float = 1.0, top: int = 20):
+    """MOEX инструменты с широким спредом свечи за 10 минут (High-Low)/Low >= threshold%."""
+    key = get_cache_key("moex_spread", "10m", top, f"spread10_{threshold}")
+    cached = await get_cached_data(key)
+    if cached:
+        return cached
+
+    all_instruments = []
+    for sym, meta in MOEX_SYMBOLS.items():
+        all_instruments.append({"symbol": sym, "name": meta["name"], "base": meta["base"], "cat": "stocks"})
+    for sym, meta in MOEX_FUTURES.items():
+        all_instruments.append({"symbol": sym, "name": meta["name"], "base": sym, "cat": meta["cat"]})
+
+    pairs = []
+    for inst in all_instruments:
+        try:
+            if inst["cat"] == "stocks":
+                df = await fetch_ohlcv_moex(inst["symbol"], "10m", 3)
+            else:
+                df = await fetch_ohlcv_moex_futures(inst["symbol"], "10m", 3)
+            if len(df) < 1:
+                continue
+            high = float(df["High"].iloc[-1])
+            low = float(df["Low"].iloc[-1])
+            close = float(df["Close"].iloc[-1])
+            if low <= 0:
+                continue
+            spread = (high - low) / low * 100
+            if spread < threshold:
+                continue
+            pairs.append({
+                "symbol": inst["symbol"],
+                "name": inst["name"],
+                "base": inst["base"],
+                "price": round(close, 4),
+                "spread": round(spread, 2),
+                "high": round(high, 4),
+                "low": round(low, 4),
+            })
+        except Exception:
+            continue
+
+    pairs.sort(key=lambda x: x["spread"], reverse=True)
     response = {"threshold": threshold, "count": len(pairs[:top]), "pairs": pairs[:top]}
     await set_cached_data(key, response, ttl=300)
     return response

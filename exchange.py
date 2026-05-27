@@ -7,11 +7,12 @@
 
 import asyncio
 import ccxt
+import httpx
 import pandas as pd
 from config import EXCHANGE_ID, EXCHANGE_TIMEFRAMES
 
 # Создаем клиент биржи через ccxt (публичный доступ, без ключей)
-exchange = getattr(ccxt, EXCHANGE_ID)()
+exchange = getattr(ccxt, EXCHANGE_ID)({'options': {'defaultType': 'spot'}})
 
 
 def fetch_symbols() -> list:
@@ -76,22 +77,34 @@ def fetch_ohlcv_df(symbol: str, timeframe: str, limit: int) -> pd.DataFrame:
 
 
 def fetch_all_tickers() -> dict:
-    """Все USDT spot тикеры одним вызовом к бирже."""
-    tickers = exchange.fetch_tickers(params={'instType': 'SPOT'})
+    """Все USDT spot тикеры напрямую через OKX REST API (минуя CCXT safeMarket)."""
+    resp = httpx.get('https://www.okx.com/api/v5/market/tickers?instType=SPOT', timeout=15)
+    data = resp.json().get('data', [])
     result = {}
-    for sym, t in tickers.items():
-        if '/USDT' in sym:
-            base = sym.replace('/USDT', '')
-            if not base:
-                continue
+    for item in data:
+        inst_id = item.get('instId', '')   # формат: BTC-USDT
+        if not inst_id.endswith('-USDT'):
+            continue
+        base = inst_id[:-5]               # убираем '-USDT'
+        if not base:
+            continue
+        try:
+            last     = float(item.get('last',     0) or 0)
+            open24h  = float(item.get('open24h',  0) or 0)
+            high24h  = float(item.get('high24h',  0) or 0)
+            low24h   = float(item.get('low24h',   0) or 0)
+            vol_usdt = float(item.get('volCcy24h', 0) or 0)
+            change24h = round((last - open24h) / open24h * 100, 2) if open24h else 0
             result[base + 'USDT'] = {
-                "symbol": base + 'USDT',
-                "price": round(t['last'] or 0, 8),
-                "change24h": round(t.get('percentage') or 0, 2),
-                "high24h": round(t.get('high') or 0, 8),
-                "low24h": round(t.get('low') or 0, 8),
-                "volume24h": round((t.get('quoteVolume') or 0) / 1_000_000, 2),
+                "symbol":    base + 'USDT',
+                "price":     round(last, 8),
+                "change24h": change24h,
+                "high24h":   round(high24h, 8),
+                "low24h":    round(low24h, 8),
+                "volume24h": round(vol_usdt / 1_000_000, 2),
             }
+        except Exception:
+            continue
     return result
 
 
