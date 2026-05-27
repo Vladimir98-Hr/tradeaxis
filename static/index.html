@@ -216,28 +216,64 @@
             box-shadow: var(--shadow);
         }
 
-        /* Баланс */
-        .balance-card {
-            padding: 16px;
+        /* Мультиграфик оверлей */
+        .mc-overlay {
+            position: fixed; inset: 0; z-index: 200;
+            background: var(--bg-primary);
+            display: flex; flex-direction: column;
         }
-        .balance-label {
-            font-size: 12px;
-            color: var(--text-secondary);
+        .mc-topbar {
+            display: flex; align-items: center; gap: 12px;
+            padding: 8px 16px;
+            background: var(--bg-secondary);
+            border-bottom: 1px solid var(--border-color);
+            flex-shrink: 0; height: 44px;
+        }
+        .mc-title { font-weight: 600; font-size: 14px; margin-right: 8px; }
+        .mc-tf-btns { display: flex; gap: 4px; }
+        .mc-tf-btn {
+            padding: 3px 10px; border-radius: 4px; border: 1px solid var(--border-color);
+            background: transparent; color: var(--text-secondary);
+            cursor: pointer; font-size: 12px;
+        }
+        .mc-tf-btn.active { background: var(--accent-blue); color: #fff; border-color: var(--accent-blue); }
+        .mc-close-btn {
+            margin-left: auto; background: transparent; border: none;
+            color: var(--text-secondary); font-size: 18px; cursor: pointer;
+            width: 32px; height: 32px; border-radius: 6px;
+        }
+        .mc-close-btn:hover { background: var(--hover-bg); color: var(--text-primary); }
+        .mc-grid {
+            flex: 1; display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            grid-template-rows: repeat(3, 1fr);
+            gap: 1px; background: var(--border-color);
+            overflow: hidden;
+        }
+        .mc-cell { background: var(--bg-primary); display: flex; flex-direction: column; overflow: hidden; }
+        .mc-cell-header {
+            display: flex; align-items: center; gap: 8px;
+            padding: 4px 10px; flex-shrink: 0;
+            background: var(--bg-secondary);
+            border-bottom: 1px solid var(--border-color);
+        }
+        .mc-pair-btn {
+            background: transparent; border: none; cursor: pointer;
+            font-weight: 600; font-size: 13px; color: var(--text-primary);
+            padding: 2px 4px; border-radius: 4px;
+        }
+        .mc-pair-btn:hover { background: var(--hover-bg); }
+        .mc-pair-input {
+            background: var(--bg-primary); border: 1px solid var(--accent-blue);
+            color: var(--text-primary); font-size: 13px; font-weight: 600;
+            padding: 2px 6px; border-radius: 4px; width: 100px; outline: none;
             text-transform: uppercase;
-            letter-spacing: 0.5px;
-            margin-bottom: 6px;
         }
-        .balance-value {
-            font-size: 24px;
-            font-weight: 700;
-            color: var(--text-accent);
-        }
-        .balance-sub {
-            display: flex; gap: 16px; margin-top: 10px;
-            font-size: 12px; color: var(--text-secondary);
-        }
-        .balance-sub span { display: flex; flex-direction: column; gap: 2px; }
-        .balance-sub .val { color: var(--text-primary); font-weight: 500; }
+        .mc-price { font-size: 13px; color: var(--text-primary); font-weight: 500; }
+        .mc-change { font-size: 12px; }
+        .mc-change.positive { color: var(--positive); }
+        .mc-change.negative { color: var(--negative); }
+        .mc-chart-wrap { flex: 1; position: relative; min-height: 0; }
 
         /* Список пар */
         .pairs-card { padding: 8px; }
@@ -396,6 +432,7 @@
             flex-direction: column;
             overflow: hidden;
             min-height: 0;
+            position: relative;
         }
         .chart-container {
             width: 100%;
@@ -404,6 +441,22 @@
         .chart-container-main { flex: 6; min-height: 0; }
         .chart-container-volume { flex: 1.5; min-height: 0; }
         .chart-container-ao { flex: 2.5; min-height: 0; }
+        #candleTimer {
+            position: absolute;
+            right: 0;
+            background: rgba(22,26,37,0.92);
+            border: 1px solid rgba(38,166,154,0.45);
+            color: #9da8b5;
+            font-size: 11px;
+            font-family: monospace;
+            padding: 1px 7px;
+            pointer-events: none;
+            z-index: 20;
+            border-radius: 2px 0 0 2px;
+            display: none;
+            white-space: nowrap;
+            text-align: center;
+        }
 
         /* Fullscreen режим */
         .center-panel.fullscreen {
@@ -518,8 +571,8 @@
         /* Журнал сделок */
         .journal-add-form { display:flex; flex-direction:column; gap:6px; padding:6px 4px; border-bottom:1px solid var(--border-color); }
         .journal-add-row { display:flex; gap:6px; align-items:center; }
-        .journal-sym-input { flex:1; background:var(--bg-color); border:1px solid var(--border-color); border-radius:6px; color:var(--text-primary); font-size:12px; padding:5px 8px; font-family:inherit; }
-        .journal-r-input { width:60px; background:var(--bg-color); border:1px solid var(--border-color); border-radius:6px; color:var(--text-primary); font-size:12px; padding:5px 8px; font-family:inherit; }
+        .journal-sym-input { flex:1; min-width:0; background:var(--bg-color); border:1px solid var(--border-color); border-radius:6px; color:var(--text-primary); font-size:12px; padding:5px 8px; font-family:inherit; }
+        .journal-r-input { width:48px; box-sizing:border-box; background:var(--bg-color); border:1px solid var(--border-color); border-radius:6px; color:var(--text-primary); font-size:12px; padding:5px 6px; font-family:inherit; }
         .journal-win-btn, .journal-loss-btn { flex:1; padding:5px; border:1px solid var(--border-color); border-radius:6px; cursor:pointer; font-size:12px; font-weight:600; font-family:inherit; transition:all 0.15s; background:var(--hover-bg); color:var(--text-secondary); }
         .journal-win-btn.active { background:rgba(76,175,130,0.25); color:var(--green); border-color:var(--green); }
         .journal-loss-btn.active { background:rgba(224,82,82,0.25); color:var(--red); border-color:var(--red); }
@@ -761,7 +814,7 @@
             <svg viewBox="0 0 24 24"><path d="M3.5 18.49l6-6.01 4 4L22 6.92l-1.41-1.41-7.09 7.97-4-4L2 16.99z"/></svg>
         </div>
         <div class="sidebar-icons">
-            <button class="sidebar-btn active" title="Графики">
+            <button class="sidebar-btn active" title="Графики" onclick="openMultiChart()">
                 <svg viewBox="0 0 24 24"><path d="M3 13h2v-2H3v2zm0 4h2v-2H3v2zm0-8h2V7H3v2zm4 4h14v-2H7v2zm0 4h14v-2H7v2zM7 7v2h14V7H7z"/></svg>
             </button>
             <button class="sidebar-btn" title="Калькулятор риска" onclick="openRiskCalc()">
@@ -803,16 +856,6 @@
          Left Panel
          ============================================================ -->
     <aside class="left-panel">
-        <!-- Баланс -->
-        <div class="card balance-card">
-            <div class="balance-label">Портфель</div>
-            <div class="balance-value" id="balanceValue">--</div>
-            <div class="balance-sub">
-                <span>Объем 24ч<br><span class="val" id="balanceVolume">--</span></span>
-                <span>Изм. 24ч<br><span class="val" id="balanceChange">--</span></span>
-            </div>
-        </div>
-
         <!-- Категории MOEX (скрыты при крипто) -->
         <div class="moex-categories" id="moexCategories" style="display:none">
             <button class="moex-cat active" data-cat="stocks">Акции</button>
@@ -896,6 +939,7 @@
                 <div class="chart-container chart-container-main" id="mainChart"></div>
                 <div class="chart-container chart-container-volume" id="volumeChart"></div>
                 <div class="chart-container chart-container-ao" id="aoChart"></div>
+                <div id="candleTimer"></div>
             </div>
         </div>
 
@@ -1251,6 +1295,11 @@
         return body ? body.clientWidth : 800;
     }
 
+    function getTimeframeMs(tf) {
+        const map = { '1m':60000,'5m':300000,'10m':600000,'15m':900000,'30m':1800000,'1h':3600000,'4h':14400000,'1d':86400000,'1w':604800000 };
+        return map[tf] || 3600000;
+    }
+
     function getChartHeights() {
         const body = document.querySelector('.chart-body');
         if (!body) return { main: 300, volume: 80, ao: 120 };
@@ -1489,6 +1538,7 @@
 
             applyAllMarkers();
             mainChart.timeScale().fitContent();
+            startCandleTimer();
 
             // Применяем priceFormat ко всем сериям основного графика исходя из реальной цены
             if (lastCandle) {
@@ -1567,16 +1617,75 @@
         document.getElementById('wsStatus').className = 'connected';
 
         if (lastCandle && candleSeries) {
-            const updated = {
-                ...lastCandle,
-                close: data.price,
-                high: Math.max(lastCandle.high, data.price),
-                low: Math.min(lastCandle.low, data.price),
-            };
-            candleSeries.update(updated);
-            lastCandle = updated;
+            const tfSec = getTimeframeMs(currentTimeframe) / 1000;
+            const expectedTime = Math.floor(Date.now() / 1000 / tfSec) * tfSec;
+            if (expectedTime > lastCandle.time) {
+                // Новый бар
+                const newCandle = { time: expectedTime, open: data.price, high: data.price, low: data.price, close: data.price };
+                candleSeries.update(newCandle);
+                lastCandle = newCandle;
+            } else {
+                const updated = { ...lastCandle, close: data.price, high: Math.max(lastCandle.high, data.price), low: Math.min(lastCandle.low, data.price) };
+                candleSeries.update(updated);
+                lastCandle = updated;
+            }
         }
     }
+
+    let candleTimerInterval = null;
+    let _moexCandleReloading = false;
+
+    function updateCandleTimerPos() {
+        const el = document.getElementById('candleTimer');
+        if (!el || !lastCandle || !candleSeries || !mainChart) return;
+        const yCoord = candleSeries.priceToCoordinate(lastCandle.close);
+        if (yCoord !== null) {
+            el.style.top = `${Math.round(yCoord) + 10}px`;
+            try {
+                const psWidth = mainChart.priceScale('right').width();
+                if (psWidth > 0) el.style.width = `${psWidth}px`;
+            } catch(e) {}
+            el.style.display = 'block';
+        }
+    }
+
+    function startCandleTimer() {
+        if (candleTimerInterval) clearInterval(candleTimerInterval);
+        candleTimerInterval = setInterval(tickCandleTimer, 1000);
+        tickCandleTimer();
+        // Плавное обновление позиции при скролле/зуме
+        (function rafPos() {
+            updateCandleTimerPos();
+            if (candleTimerInterval) requestAnimationFrame(rafPos);
+        })();
+    }
+
+    function stopCandleTimer() {
+        if (candleTimerInterval) { clearInterval(candleTimerInterval); candleTimerInterval = null; }
+        const el = document.getElementById('candleTimer');
+        if (el) el.style.display = 'none';
+    }
+
+    function tickCandleTimer() {
+        if (!lastCandle || !candleSeries) return;
+        const el = document.getElementById('candleTimer');
+        if (!el) return;
+        // Чистый UTC-расчёт, без timezone offset
+        const tfSec = getTimeframeMs(currentTimeframe) / 1000;
+        const remaining = Math.max(0, Math.round(tfSec - (Date.now() / 1000 % tfSec)));
+        const h = Math.floor(remaining / 3600);
+        const m = Math.floor((remaining % 3600) / 60);
+        const s = remaining % 60;
+        el.textContent = h > 0
+            ? `${h}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`
+            : `${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+        // MOEX: при истечении свечи — перезагрузить данные с сервера
+        if (remaining === 0 && currentMarket === 'moex' && !_moexCandleReloading) {
+            _moexCandleReloading = true;
+            setTimeout(() => { fetchAll(); _moexCandleReloading = false; }, 2000);
+        }
+    }
+
 
     // ============================================================
     // Динамическая загрузка списка пар
@@ -1784,6 +1893,152 @@
                 changeEl.className = `pair-change ${data.change24h >= 0 ? 'positive' : 'negative'}`;
             }
         } catch (e) {}
+    }
+
+    // ============================================================
+    // Мультиграфик
+    // ============================================================
+    let mcOpen = false;
+    let mcInstances = [];
+    let mcSymbols = [];
+    let mcTf = '1h';
+    let mcPriceInterval = null;
+    const MC_DEFAULT_CRYPTO        = ['BTCUSDT','ETHUSDT','SOLUSDT','BNBUSDT','XRPUSDT','DOGEUSDT'];
+    const MC_DEFAULT_MOEX          = ['SBER','GAZP','YNDX','LKOH','GMKN','NVTK'];
+    const MC_DEFAULT_MOEX_FUTURES  = ['Si','Ri','GOLD','BR','NG','ED'];
+    const MC_TFS_CRYPTO = ['15m','1h','4h','1d'];
+    const MC_TFS_MOEX   = ['10m','1h','1d'];
+
+    function openMultiChart() {
+        mcOpen = true;
+        document.getElementById('multiChartOverlay').style.display = 'flex';
+        mcSymbols = currentMarket === 'moex'
+            ? ((currentMoexCategory === 'futures' || currentMoexCategory === 'commodities')
+                ? MC_DEFAULT_MOEX_FUTURES : MC_DEFAULT_MOEX).slice()
+            : MC_DEFAULT_CRYPTO.slice();
+        mcTf = '1h';
+        mcBuildGrid();
+        mcRenderTfBtns();
+        mcLoadAll();
+        if (currentMarket === 'crypto') mcPriceInterval = setInterval(mcUpdatePrices, 5000);
+    }
+
+    function closeMultiChart() {
+        mcOpen = false;
+        document.getElementById('multiChartOverlay').style.display = 'none';
+        clearInterval(mcPriceInterval); mcPriceInterval = null;
+        mcInstances.forEach(inst => { if (inst.ro) inst.ro.disconnect(); if (inst.chart) inst.chart.remove(); });
+        mcInstances = [];
+    }
+
+    function mcBuildGrid() {
+        const grid = document.getElementById('mcGrid');
+        grid.innerHTML = '';
+        mcInstances = [];
+        for (let i = 0; i < 6; i++) {
+            const cell = document.createElement('div');
+            cell.className = 'mc-cell';
+            cell.innerHTML = `
+              <div class="mc-cell-header" id="mc-hdr-${i}">
+                <button class="mc-pair-btn" id="mc-pair-${i}" onclick="mcStartEdit(${i})">${mcSymbols[i]}</button>
+                <span class="mc-price" id="mc-price-${i}">--</span>
+                <span class="mc-change" id="mc-change-${i}"></span>
+              </div>
+              <div class="mc-chart-wrap" id="mc-wrap-${i}"></div>`;
+            grid.appendChild(cell);
+            const c = getThemeColors();
+            const chart = LightweightCharts.createChart(document.getElementById(`mc-wrap-${i}`), {
+                layout: { background: { color: c.bg }, textColor: c.text },
+                grid: { vertLines: { color: c.grid }, horzLines: { color: c.grid } },
+                crosshair: { mode: LightweightCharts.CrosshairMode.Normal },
+                rightPriceScale: { borderColor: c.border },
+                timeScale: { borderColor: c.border, timeVisible: true },
+                handleScroll: true, handleScale: true,
+            });
+            const series = chart.addCandlestickSeries({
+                upColor: '#26a69a', downColor: '#ef5350',
+                borderUpColor: '#26a69a', borderDownColor: '#ef5350',
+                wickUpColor: '#26a69a', wickDownColor: '#ef5350',
+            });
+            const ro = new ResizeObserver(() => {
+                const wrap = document.getElementById(`mc-wrap-${i}`);
+                if (wrap) chart.applyOptions({ width: wrap.clientWidth, height: wrap.clientHeight });
+            });
+            ro.observe(document.getElementById(`mc-wrap-${i}`));
+            mcInstances.push({ chart, series, ro });
+        }
+    }
+
+    async function mcLoadCell(i) {
+        const sym = mcSymbols[i];
+        const url = currentMarket === 'moex'
+            ? `${API_BASE}/moex/chart-data?symbol=${sym}&timeframe=${mcTf}&limit=200&market=${currentMoexCategory}`
+            : `${API_BASE}/chart-data?symbol=${sym}&timeframe=${mcTf}&limit=200`;
+        try {
+            const res = await fetch(url);
+            if (!res.ok) return;
+            const json = await res.json();
+            const candles = (json.data || []).map(c => ({
+                time: toUnix(c.timestamp), open: c.Open, high: c.High, low: c.Low, close: c.Close
+            }));
+            if (!candles.length || !mcInstances[i]) return;
+            mcInstances[i].series.setData(candles);
+            const last = candles[candles.length - 1];
+            mcInstances[i].series.applyOptions({ priceFormat: getPriceFormat(last.close) });
+            document.getElementById(`mc-price-${i}`).textContent = (currentMarket === 'moex' ? '' : '$') + formatPrice(last.close);
+        } catch(e) {}
+    }
+
+    function mcLoadAll() { for (let i = 0; i < 6; i++) mcLoadCell(i); }
+
+    async function mcUpdatePrices() {
+        if (!mcOpen || currentMarket !== 'crypto') return;
+        try {
+            const res = await fetch(`${API_BASE}/tickers-all`);
+            if (!res.ok) return;
+            const tickers = (await res.json()).tickers || {};
+            mcSymbols.forEach((sym, i) => {
+                const d = tickers[sym]; if (!d) return;
+                document.getElementById(`mc-price-${i}`).textContent = `$${formatPrice(d.price)}`;
+                const el = document.getElementById(`mc-change-${i}`);
+                el.textContent = `${d.change24h > 0 ? '+' : ''}${d.change24h}%`;
+                el.className = `mc-change ${d.change24h >= 0 ? 'positive' : 'negative'}`;
+            });
+        } catch(e) {}
+    }
+
+    function mcStartEdit(i) {
+        const hdr = document.getElementById(`mc-hdr-${i}`);
+        const btn = document.getElementById(`mc-pair-${i}`);
+        const inp = document.createElement('input');
+        inp.className = 'mc-pair-input';
+        inp.value = mcSymbols[i];
+        hdr.replaceChild(inp, btn);
+        inp.focus(); inp.select();
+        const commit = () => {
+            const val = inp.value.trim().toUpperCase();
+            if (val) mcSymbols[i] = val;
+            const newBtn = document.createElement('button');
+            newBtn.className = 'mc-pair-btn'; newBtn.id = `mc-pair-${i}`;
+            newBtn.textContent = mcSymbols[i]; newBtn.onclick = () => mcStartEdit(i);
+            hdr.replaceChild(newBtn, inp);
+            if (val) mcLoadCell(i);
+        };
+        inp.addEventListener('blur', commit);
+        inp.addEventListener('keydown', e => { if (e.key === 'Enter') inp.blur(); if (e.key === 'Escape') { inp.value = mcSymbols[i]; inp.blur(); } });
+    }
+
+    function mcRenderTfBtns() {
+        const tfs = currentMarket === 'moex' ? MC_TFS_MOEX : MC_TFS_CRYPTO;
+        const c = document.getElementById('mcTfBtns');
+        c.innerHTML = '';
+        tfs.forEach(tf => {
+            const btn = document.createElement('button');
+            btn.className = `mc-tf-btn${tf === mcTf ? ' active' : ''}`;
+            btn.textContent = tf;
+            btn.onclick = () => { mcTf = tf; mcRenderTfBtns(); mcLoadAll(); };
+            c.appendChild(btn);
+        });
     }
 
     // Обновление цен ВСЕХ пар одним batch-запросом к /tickers
@@ -2486,5 +2741,16 @@
             </div>
         </div>
     </div>
+
+    <!-- Мультиграфик оверлей -->
+    <div id="multiChartOverlay" class="mc-overlay" style="display:none">
+        <div class="mc-topbar">
+            <span class="mc-title">Мультиграфик</span>
+            <div class="mc-tf-btns" id="mcTfBtns"></div>
+            <button class="mc-close-btn" onclick="closeMultiChart()">&#10005;</button>
+        </div>
+        <div class="mc-grid" id="mcGrid"></div>
+    </div>
+
 </body>
 </html>
