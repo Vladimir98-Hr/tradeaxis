@@ -847,6 +847,30 @@
             border-radius: 8px; padding: 2px 4px;
         }
         .mc-draw-toolbar.visible { display: flex; }
+
+        /* Settings Modal */
+        .settings-tabs { display: flex; gap: 4px; padding: 0 4px 12px; border-bottom: 1px solid var(--border-color); }
+        .stab-btn { flex: 1; padding: 6px 0; border-radius: 8px; border: 1px solid var(--border-color); background: var(--bg-color); color: var(--text-secondary); font-size: 12px; cursor: pointer; transition: all .15s; }
+        .stab-btn.active { border-color: var(--accent-color); color: var(--accent-color); background: rgba(41,98,255,.1); }
+        .settings-panel { display: none; flex-direction: column; gap: 12px; padding-top: 12px; }
+        .settings-panel.active { display: flex; }
+        .settings-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+        .settings-label { font-size: 13px; color: var(--text-primary); }
+        .settings-sub { font-size: 11px; color: var(--text-secondary); }
+        .settings-group { display: flex; flex-direction: column; gap: 6px; }
+        .settings-group-title { font-size: 11px; font-weight: 600; color: var(--text-secondary); text-transform: uppercase; letter-spacing: .5px; }
+        .settings-color-row { display: flex; align-items: center; gap: 8px; }
+        .settings-color-row label { font-size: 12px; color: var(--text-secondary); flex: 1; }
+        .settings-color-row input[type=color] { width: 36px; height: 28px; border: 1px solid var(--border-color); border-radius: 6px; background: var(--bg-color); padding: 2px; cursor: pointer; }
+        .settings-toggle { position: relative; display: inline-block; width: 36px; height: 20px; }
+        .settings-toggle input { opacity: 0; width: 0; height: 0; }
+        .settings-slider { position: absolute; cursor: pointer; inset: 0; background: var(--border-color); border-radius: 20px; transition: .2s; }
+        .settings-slider:before { content: ""; position: absolute; width: 14px; height: 14px; left: 3px; bottom: 3px; background: white; border-radius: 50%; transition: .2s; }
+        .settings-toggle input:checked + .settings-slider { background: var(--accent-color); }
+        .settings-toggle input:checked + .settings-slider:before { transform: translateX(16px); }
+        .settings-select { background: var(--bg-color); border: 1px solid var(--border-color); border-radius: 6px; color: var(--text-primary); font-size: 12px; padding: 4px 8px; cursor: pointer; outline: none; }
+        .settings-input-num { background: var(--bg-color); border: 1px solid var(--border-color); border-radius: 6px; color: var(--text-primary); font-size: 13px; padding: 4px 8px; width: 70px; outline: none; text-align: center; }
+        .settings-footer { display: flex; gap: 8px; padding-top: 12px; border-top: 1px solid var(--border-color); }
     </style>
 </head>
 <body data-theme="dark">
@@ -1489,6 +1513,7 @@
                 isSyncing = false;
             });
         });
+        applySettings(loadSettings());
 
     }
 
@@ -1554,9 +1579,10 @@
     /** Один запрос к /chart-data (или /moex/chart-data) — все данные за раз */
     async function fetchAll() {
         try {
+            const { chartLimit } = loadSettings();
             const url = currentMarket === 'moex'
-                ? `${API_BASE}/moex/chart-data?symbol=${currentSymbol}&timeframe=${currentTimeframe}&limit=200&market=${currentMoexCategory}`
-                : `${API_BASE}/chart-data?symbol=${currentSymbol}&timeframe=${currentTimeframe}&limit=200`;
+                ? `${API_BASE}/moex/chart-data?symbol=${currentSymbol}&timeframe=${currentTimeframe}&limit=${chartLimit}&market=${currentMoexCategory}`
+                : `${API_BASE}/chart-data?symbol=${currentSymbol}&timeframe=${currentTimeframe}&limit=${chartLimit}`;
             const res = await fetch(url);
             const json = await res.json();
             if (!res.ok || !json.data) {
@@ -1600,10 +1626,11 @@
 
             // AO
             if (json.ao) {
+                const _as = loadSettings();
                 const aoData = json.ao.map((d, i, arr) => ({
                     time: toUnix(d.timestamp),
                     value: d.AO,
-                    color: (i > 0 && d.AO >= arr[i - 1].AO) ? '#26a69a' : '#ef5350'
+                    color: (i > 0 && d.AO >= arr[i - 1].AO) ? _as.aoUp : _as.aoDown
                 }));
                 aoSeries.setData(aoData);
             }
@@ -2319,6 +2346,7 @@
     // ============================================================
     let volNextRefresh = 0;
     let _volGen = 0;   // счётчик поколений — защита от race condition при смене рынка
+    let volScanInterval = null;
     let spreadNextRefresh = 0;
     let _spreadGen = 0;
 
@@ -2329,15 +2357,16 @@
         list.innerHTML = '<div class="div-scan-empty">Сканирование...</div>';
         const isMoex = currentMarket === 'moex';
         try {
+            const _vs = loadSettings();
             const url = isMoex
-                ? `${API_BASE}/moex/scan/volatile?threshold=1.0&top=20`
-                : `${API_BASE}/scan/volatile?threshold=3&top=20`;
+                ? `${API_BASE}/moex/scan/volatile?threshold=${_vs.volThresholdMoex}&top=20`
+                : `${API_BASE}/scan/volatile?threshold=${_vs.volThresholdCrypto}&top=20`;
             const res = await fetch(url);
             const json = await res.json();
             // Если за время запроса пользователь сменил рынок — игнорируем ответ
             if (myGen !== _volGen) return;
             if (!res.ok) throw new Error(json.detail || 'Ошибка');
-            const THRESHOLD = isMoex ? 1.0 : 3;
+            const THRESHOLD = isMoex ? _vs.volThresholdMoex : _vs.volThresholdCrypto;
             const filtered = (json.pairs ?? []).filter(p => Math.abs(p.change_30m ?? 0) >= THRESHOLD);
             info.textContent = `Найдено: ${filtered.length} ${isMoex ? 'инструментов' : 'пар'} (скачок за 30м > ${THRESHOLD}%)`;
             list.innerHTML = filtered.length
@@ -3196,6 +3225,124 @@
         container.innerHTML = list.map(p => `<div class="wl-item${p.symbol === currentSymbol ? ' active' : ''}" onclick="selectPair({symbol:'${p.symbol}',name:'${p.name}',base:'${p.base}'});wlRender()"><span class="wl-item-name">${p.name}</span><button class="wl-del" onclick="event.stopPropagation();wlRemove('${p.symbol}')">&#x2715;</button></div>`).join('');
     }
 
+
+    // ============================================================
+    // Настройки
+    // ============================================================
+    const SETTINGS_DEFAULTS = {
+        candleUp: '#26a69a', candleDown: '#ef5350', chartLimit: 200,
+        showAlligator: true, jawColor: '#2962ff', teethColor: '#ef5350', lipsColor: '#26a69a',
+        showBB: true, bbColor: '#2196f3',
+        showAO: true, aoUp: '#26a69a', aoDown: '#ef5350',
+        volThresholdCrypto: 3, volThresholdMoex: 1.0,
+        volAutoRefresh: false, volRefreshInterval: 60
+    };
+
+    function loadSettings() {
+        try {
+            const stored = JSON.parse(localStorage.getItem('cryptoSettings') || '{}');
+            return Object.assign({}, SETTINGS_DEFAULTS, stored);
+        } catch { return Object.assign({}, SETTINGS_DEFAULTS); }
+    }
+
+    function applySettings(s) {
+        if (candleSeries) {
+            candleSeries.applyOptions({
+                upColor: s.candleUp, downColor: s.candleDown,
+                borderUpColor: s.candleUp, borderDownColor: s.candleDown,
+                wickUpColor: s.candleUp, wickDownColor: s.candleDown,
+            });
+        }
+        if (jawSeries)     jawSeries.applyOptions({ color: s.jawColor,    visible: s.showAlligator });
+        if (teethSeries)   teethSeries.applyOptions({ color: s.teethColor, visible: s.showAlligator });
+        if (lipsSeries)    lipsSeries.applyOptions({ color: s.lipsColor,   visible: s.showAlligator });
+        if (bbUpperSeries) {
+            bbUpperSeries.applyOptions({ color: s.bbColor, visible: s.showBB });
+            bbLowerSeries.applyOptions({ color: s.bbColor, visible: s.showBB });
+        }
+        if (aoSeries) aoSeries.applyOptions({ visible: s.showAO });
+        if (volScanInterval) clearInterval(volScanInterval);
+        if (s.volAutoRefresh) {
+            volScanInterval = setInterval(fetchVolScan, s.volRefreshInterval * 1000);
+        }
+    }
+
+    function openSettings() {
+        const s = loadSettings();
+        document.getElementById('s_candleUp').value         = s.candleUp;
+        document.getElementById('s_candleDown').value       = s.candleDown;
+        document.getElementById('s_chartLimit').value       = s.chartLimit;
+        document.getElementById('s_showAlligator').checked  = s.showAlligator;
+        document.getElementById('s_jawColor').value         = s.jawColor;
+        document.getElementById('s_teethColor').value       = s.teethColor;
+        document.getElementById('s_lipsColor').value        = s.lipsColor;
+        document.getElementById('s_showBB').checked         = s.showBB;
+        document.getElementById('s_bbColor').value          = s.bbColor;
+        document.getElementById('s_showAO').checked         = s.showAO;
+        document.getElementById('s_aoUp').value             = s.aoUp;
+        document.getElementById('s_aoDown').value           = s.aoDown;
+        document.getElementById('s_volCrypto').value        = s.volThresholdCrypto;
+        document.getElementById('s_volMoex').value          = s.volThresholdMoex;
+        document.getElementById('s_volAutoRefresh').checked = s.volAutoRefresh;
+        document.getElementById('s_volInterval').value      = s.volRefreshInterval;
+        switchSettingsTab('charts');
+        document.getElementById('settingsModal').style.display = 'flex';
+    }
+
+    function closeSettings() { document.getElementById('settingsModal').style.display = 'none'; }
+
+    function saveSettings() {
+        const s = {
+            candleUp:           document.getElementById('s_candleUp').value,
+            candleDown:         document.getElementById('s_candleDown').value,
+            chartLimit:         parseInt(document.getElementById('s_chartLimit').value),
+            showAlligator:      document.getElementById('s_showAlligator').checked,
+            jawColor:           document.getElementById('s_jawColor').value,
+            teethColor:         document.getElementById('s_teethColor').value,
+            lipsColor:          document.getElementById('s_lipsColor').value,
+            showBB:             document.getElementById('s_showBB').checked,
+            bbColor:            document.getElementById('s_bbColor').value,
+            showAO:             document.getElementById('s_showAO').checked,
+            aoUp:               document.getElementById('s_aoUp').value,
+            aoDown:             document.getElementById('s_aoDown').value,
+            volThresholdCrypto: parseFloat(document.getElementById('s_volCrypto').value),
+            volThresholdMoex:   parseFloat(document.getElementById('s_volMoex').value),
+            volAutoRefresh:     document.getElementById('s_volAutoRefresh').checked,
+            volRefreshInterval: parseInt(document.getElementById('s_volInterval').value),
+        };
+        localStorage.setItem('cryptoSettings', JSON.stringify(s));
+        applySettings(s);
+        closeSettings();
+    }
+
+    function resetSettings() {
+        localStorage.removeItem('cryptoSettings');
+        const s = SETTINGS_DEFAULTS;
+        document.getElementById('s_candleUp').value         = s.candleUp;
+        document.getElementById('s_candleDown').value       = s.candleDown;
+        document.getElementById('s_chartLimit').value       = s.chartLimit;
+        document.getElementById('s_showAlligator').checked  = s.showAlligator;
+        document.getElementById('s_jawColor').value         = s.jawColor;
+        document.getElementById('s_teethColor').value       = s.teethColor;
+        document.getElementById('s_lipsColor').value        = s.lipsColor;
+        document.getElementById('s_showBB').checked         = s.showBB;
+        document.getElementById('s_bbColor').value          = s.bbColor;
+        document.getElementById('s_showAO').checked         = s.showAO;
+        document.getElementById('s_aoUp').value             = s.aoUp;
+        document.getElementById('s_aoDown').value           = s.aoDown;
+        document.getElementById('s_volCrypto').value        = s.volThresholdCrypto;
+        document.getElementById('s_volMoex').value          = s.volThresholdMoex;
+        document.getElementById('s_volAutoRefresh').checked = s.volAutoRefresh;
+        document.getElementById('s_volInterval').value      = s.volRefreshInterval;
+    }
+
+    function switchSettingsTab(tab) {
+        const tabs = ['charts', 'indicators', 'scanners'];
+        document.querySelectorAll('.stab-btn').forEach((b, i) => b.classList.toggle('active', tabs[i] === tab));
+        document.querySelectorAll('.settings-panel').forEach(p => p.classList.remove('active'));
+        document.getElementById('stab-' + tab).classList.add('active');
+    }
+
     wlRender();
 </script>
     <!-- Журнал: модал результатов Келли/RoR -->
@@ -3248,6 +3395,84 @@
                     </div>
                 </div>
                 <div id="km_verdict" style="margin-top:10px;font-size:12px;padding:8px 10px;border-radius:8px;background:var(--hover-bg);line-height:1.6"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Настройки -->
+    <div class="modal-overlay" id="settingsModal" style="display:none" onclick="if(event.target===this)closeSettings()">
+        <div class="rc-box" style="width:440px">
+            <div class="rc-header">
+                <span>Настройки</span>
+                <button class="rc-close" onclick="closeSettings()">&#x00d7;</button>
+            </div>
+            <div class="rc-body">
+                <div class="settings-tabs">
+                    <button class="stab-btn active" onclick="switchSettingsTab('charts')">Графики</button>
+                    <button class="stab-btn" onclick="switchSettingsTab('indicators')">Индикаторы</button>
+                    <button class="stab-btn" onclick="switchSettingsTab('scanners')">Сканеры</button>
+                </div>
+                <div class="settings-panel active" id="stab-charts">
+                    <div class="settings-group">
+                        <div class="settings-group-title">Цвета свечей</div>
+                        <div class="settings-color-row"><label>Бычья (рост)</label><input type="color" id="s_candleUp" value="#26a69a"></div>
+                        <div class="settings-color-row"><label>Медвежья (падение)</label><input type="color" id="s_candleDown" value="#ef5350"></div>
+                    </div>
+                    <div class="settings-row">
+                        <div>
+                            <div class="settings-label">Количество свечей</div>
+                            <div class="settings-sub">История загружаемая за один запрос</div>
+                        </div>
+                        <select class="settings-select" id="s_chartLimit">
+                            <option value="50">50</option>
+                            <option value="100">100</option>
+                            <option value="200" selected>200</option>
+                            <option value="500">500</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="settings-panel" id="stab-indicators">
+                    <div class="settings-group">
+                        <div class="settings-row">
+                            <div class="settings-group-title">Alligator</div>
+                            <label class="settings-toggle"><input type="checkbox" id="s_showAlligator" checked><span class="settings-slider"></span></label>
+                        </div>
+                        <div class="settings-color-row"><label>Jaw (синяя)</label><input type="color" id="s_jawColor" value="#2962ff"></div>
+                        <div class="settings-color-row"><label>Teeth (красная)</label><input type="color" id="s_teethColor" value="#ef5350"></div>
+                        <div class="settings-color-row"><label>Lips (зелёная)</label><input type="color" id="s_lipsColor" value="#26a69a"></div>
+                    </div>
+                    <div class="settings-group">
+                        <div class="settings-row">
+                            <div class="settings-group-title">Bollinger Bands</div>
+                            <label class="settings-toggle"><input type="checkbox" id="s_showBB" checked><span class="settings-slider"></span></label>
+                        </div>
+                        <div class="settings-color-row"><label>Цвет полос</label><input type="color" id="s_bbColor" value="#2196f3"></div>
+                    </div>
+                    <div class="settings-group">
+                        <div class="settings-row">
+                            <div class="settings-group-title">Awesome Oscillator</div>
+                            <label class="settings-toggle"><input type="checkbox" id="s_showAO" checked><span class="settings-slider"></span></label>
+                        </div>
+                        <div class="settings-color-row"><label>Цвет роста</label><input type="color" id="s_aoUp" value="#26a69a"></div>
+                        <div class="settings-color-row"><label>Цвет падения</label><input type="color" id="s_aoDown" value="#ef5350"></div>
+                    </div>
+                </div>
+                <div class="settings-panel" id="stab-scanners">
+                    <div class="settings-group">
+                        <div class="settings-group-title">Сканер волатильности</div>
+                        <div class="settings-row"><div class="settings-label">Порог крипто (%)</div><input type="number" class="settings-input-num" id="s_volCrypto" value="3" min="0.1" max="50" step="0.5"></div>
+                        <div class="settings-row"><div class="settings-label">Порог MOEX (%)</div><input type="number" class="settings-input-num" id="s_volMoex" value="1" min="0.1" max="50" step="0.5"></div>
+                    </div>
+                    <div class="settings-group">
+                        <div class="settings-group-title">Автообновление</div>
+                        <div class="settings-row"><div class="settings-label">Автообновлять сканер</div><label class="settings-toggle"><input type="checkbox" id="s_volAutoRefresh"><span class="settings-slider"></span></label></div>
+                        <div class="settings-row"><div class="settings-label">Интервал</div><select class="settings-select" id="s_volInterval"><option value="30">30 сек</option><option value="60" selected>1 мин</option><option value="300">5 мин</option></select></div>
+                    </div>
+                </div>
+                <div class="settings-footer">
+                    <button class="rc-calc-btn" style="flex:1" onclick="saveSettings()">Сохранить</button>
+                    <button class="rc-calc-btn" style="flex:0 0 auto;background:var(--bg-color);color:var(--text-secondary);border:1px solid var(--border-color)" onclick="resetSettings()">Сбросить</button>
+                </div>
             </div>
         </div>
     </div>
