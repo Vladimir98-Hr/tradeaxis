@@ -800,6 +800,53 @@
             text-align: center;
             min-height: 14px;
         }
+
+        /* ============================================================
+           Drawing Tools Panel
+           ============================================================ */
+        .drawing-toolbar {
+            position: absolute;
+            left: 6px; top: 8px;
+            z-index: 20;
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            flex-direction: column;
+            padding: 4px; gap: 2px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+            max-height: calc(100% - 16px);
+            overflow-y: auto;
+        }
+        .dt-btn {
+            width: 32px; height: 32px;
+            background: transparent; border: none; border-radius: 6px;
+            color: var(--text-secondary); cursor: pointer; font-size: 13px;
+            display: flex; align-items: center; justify-content: center;
+            transition: all 0.15s;
+        }
+        .dt-btn svg { width: 16px; height: 16px; fill: currentColor; }
+        .dt-btn:hover { background: var(--hover-bg); color: var(--text-primary); }
+        .dt-btn.active { background: var(--accent-blue); color: #fff; }
+        .dt-sep { height: 1px; background: var(--border-color); margin: 2px 4px; }
+        .drawing-canvas {
+            position: absolute; top: 0; left: 0;
+            pointer-events: none; z-index: 10;
+        }
+        .drawing-canvas.draw-active { pointer-events: auto; cursor: crosshair; }
+        .mc-draw-btn {
+            background: transparent; border: 1px solid var(--border-color);
+            border-radius: 6px; padding: 4px 10px; color: var(--text-secondary);
+            cursor: pointer; font-size: 12px; display: flex; align-items: center; gap: 4px;
+        }
+        .mc-draw-btn.active { background: var(--accent-blue); color: #fff; border-color: var(--accent-blue); }
+        /* Мини-тулбар рисования в мультиграфике */
+        .mc-draw-toolbar {
+            display: none; align-items: center; gap: 2px;
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 8px; padding: 2px 4px;
+        }
+        .mc-draw-toolbar.visible { display: flex; }
     </style>
 </head>
 <body data-theme="dark">
@@ -820,8 +867,8 @@
             <button class="sidebar-btn" title="Калькулятор риска" onclick="openRiskCalc()">
                 <svg viewBox="0 0 24 24"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-7 3c1.93 0 3.5 1.57 3.5 3.5S13.93 13 12 13s-3.5-1.57-3.5-3.5S10.07 6 12 6zm7 13H5v-.23c0-.62.28-1.2.76-1.58C7.47 15.82 9.64 15 12 15s4.53.82 6.24 2.19c.48.38.76.97.76 1.58V19z"/></svg>
             </button>
-            <button class="sidebar-btn" title="Торговля">
-                <svg viewBox="0 0 24 24"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zM9 17H7v-7h2v7zm4 0h-2V7h2v10zm4 0h-2v-4h2v4z"/></svg>
+            <button class="sidebar-btn" id="drawPanelBtn" title="Инструменты рисования" onclick="toggleDrawingPanel()">
+                <svg viewBox="0 0 24 24"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04a1 1 0 000-1.41l-2.34-2.34a1 1 0 00-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>
             </button>
             <button class="sidebar-btn" title="Настройки">
                 <svg viewBox="0 0 24 24"><path d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58c.18-.14.23-.41.12-.61l-1.92-3.32c-.12-.22-.37-.29-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54c-.04-.24-.24-.41-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.07.62-.07.94s.02.64.07.94l-2.03 1.58c-.18.14-.23.41-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"/></svg>
@@ -936,6 +983,41 @@
 
             <!-- Графики -->
             <div class="chart-body">
+                <!-- Панель инструментов рисования -->
+                <div id="drawingToolbar" class="drawing-toolbar" style="display:none">
+                    <button class="dt-btn active" data-tool="cursor" title="Курсор" onclick="setDrawTool('cursor')">
+                        <svg viewBox="0 0 24 24"><path d="M4 0l16 12.3-6.4 1.4 3.9 7.3-1.8 1-4-7.4L8 17.6z"/></svg>
+                    </button>
+                    <div class="dt-sep"></div>
+                    <button class="dt-btn" data-tool="trendline" title="Трендовая линия" onclick="setDrawTool('trendline')">
+                        <svg viewBox="0 0 24 24"><path d="M20 4L4 20" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round"/><circle cx="4" cy="20" r="2"/><circle cx="20" cy="4" r="2"/></svg>
+                    </button>
+                    <button class="dt-btn" data-tool="hline" title="Горизонтальная линия" onclick="setDrawTool('hline')">
+                        <svg viewBox="0 0 24 24"><line x1="2" y1="12" x2="22" y2="12" stroke="currentColor" stroke-width="2"/><circle cx="2" cy="12" r="2" fill="currentColor"/><circle cx="22" cy="12" r="2" fill="currentColor"/></svg>
+                    </button>
+                    <button class="dt-btn" data-tool="vline" title="Вертикальная линия" onclick="setDrawTool('vline')">
+                        <svg viewBox="0 0 24 24"><line x1="12" y1="2" x2="12" y2="22" stroke="currentColor" stroke-width="2"/><circle cx="12" cy="2" r="2" fill="currentColor"/><circle cx="12" cy="22" r="2" fill="currentColor"/></svg>
+                    </button>
+                    <button class="dt-btn" data-tool="ruler" title="Линейка" onclick="setDrawTool('ruler')">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 12h18M3 12l3-3M3 12l3 3M21 12l-3-3M21 12l-3 3"/></svg>
+                    </button>
+                    <button class="dt-btn" data-tool="rect" title="Прямоугольник" onclick="setDrawTool('rect')">
+                        <svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="1" stroke="currentColor" stroke-width="2" fill="none"/></svg>
+                    </button>
+                    <button class="dt-btn" data-tool="fib" title="Фибоначчи" onclick="setDrawTool('fib')" style="font-size:15px;font-weight:700;">φ</button>
+                    <button class="dt-btn" data-tool="text" title="Текст" onclick="setDrawTool('text')" style="font-size:15px;font-weight:700;">T</button>
+                    <div class="dt-sep"></div>
+                    <button class="dt-btn" data-tool="eraser" title="Ластик" onclick="setDrawTool('eraser')">
+                        <svg viewBox="0 0 24 24"><path d="M20.71 7.04a1 1 0 000-1.41l-2.34-2.34a1 1 0 00-1.41 0L4 16.25V20h3.75L20.71 7.04zM3 20h18v2H3v-2z"/></svg>
+                    </button>
+                    <div class="dt-sep"></div>
+                    <button class="dt-btn" title="Отменить" onclick="undoDrawing()">
+                        <svg viewBox="0 0 24 24"><path d="M12.5 8c-2.65 0-5.05.99-6.9 2.6L2 7v9h9l-3.62-3.62c1.39-1.16 3.16-1.88 5.12-1.88 3.54 0 6.55 2.31 7.6 5.5l2.37-.78C21.08 11.03 17.15 8 12.5 8z"/></svg>
+                    </button>
+                    <button class="dt-btn" title="Очистить всё" onclick="clearDrawings()">
+                        <svg viewBox="0 0 24 24"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+                    </button>
+                </div>
                 <div class="chart-container chart-container-main" id="mainChart"></div>
                 <div class="chart-container chart-container-volume" id="volumeChart"></div>
                 <div class="chart-container chart-container-ao" id="aoChart"></div>
@@ -1233,6 +1315,21 @@
     let fractalLows = [];
     let divergenceBearish = [];
     let divergenceBullish = [];
+
+    // ============================================================
+    // Drawing tools — состояние рисования
+    // ============================================================
+    let drawingPanelOpen = false;
+    let activeTool = 'cursor';
+    let drawings = [];       // [{type, p1:{time,price}, p2, color, text}, ...]
+    let currentDraw = null;  // рисунок в процессе drag
+    let drawCanvas = null;
+    let drawCtx = null;
+    let drawIsDown = false;
+    const FIB_LEVELS = [0, 0.236, 0.382, 0.5, 0.618, 0.786, 1.0];
+    // Мультиграфик — рисование
+    let mcDrawActive = false;
+    let mcActiveTool = 'cursor';
 
     // Динамический список символов (загружается с API)
     let allSymbols = []; // [{symbol: 'BTCUSDT', name: 'BTC/USDT', base: 'BTC'}, ...]
@@ -1909,18 +2006,28 @@
     const MC_TFS_CRYPTO = ['15m','1h','4h','1d'];
     const MC_TFS_MOEX   = ['10m','1h','1d'];
 
+    function mcSaveSymbols() {
+        localStorage.setItem(`mc_syms_${currentMarket}_${currentMoexCategory}`, JSON.stringify(mcSymbols));
+    }
+
     function openMultiChart() {
         mcOpen = true;
         document.getElementById('multiChartOverlay').style.display = 'flex';
+        // Дефолтные символы для текущего рынка
         mcSymbols = currentMarket === 'moex'
             ? ((currentMoexCategory === 'futures' || currentMoexCategory === 'commodities')
                 ? MC_DEFAULT_MOEX_FUTURES : MC_DEFAULT_MOEX).slice()
             : MC_DEFAULT_CRYPTO.slice();
+        // Восстановить сохранённые символы из localStorage
+        try {
+            const saved = localStorage.getItem(`mc_syms_${currentMarket}_${currentMoexCategory}`);
+            if (saved) mcSymbols = JSON.parse(saved);
+        } catch(e) {}
         mcTf = '1h';
         mcBuildGrid();
         mcRenderTfBtns();
         mcLoadAll();
-        if (currentMarket === 'crypto') mcPriceInterval = setInterval(mcUpdatePrices, 5000);
+        if (currentMarket === 'crypto') mcPriceInterval = setInterval(mcUpdatePrices, 3000);
     }
 
     function closeMultiChart() {
@@ -1960,13 +2067,21 @@
                 borderUpColor: '#26a69a', borderDownColor: '#ef5350',
                 wickUpColor: '#26a69a', wickDownColor: '#ef5350',
             });
+            // Bollinger Bands — добавляем ПЕРВЫМИ (рендер за свечами)
+            const bbUpper = chart.addLineSeries({ color: 'rgba(33,150,243,0.7)', lineWidth: 1, priceLineVisible: false, lastValueVisible: false });
+            const bbLower = chart.addLineSeries({ color: 'rgba(33,150,243,0.7)', lineWidth: 1, priceLineVisible: false, lastValueVisible: false });
+            const jaw   = chart.addLineSeries({ color: '#2962ff', lineWidth: 1, lastValueVisible: false, priceLineVisible: false });
+            const teeth = chart.addLineSeries({ color: '#ef5350', lineWidth: 1, lastValueVisible: false, priceLineVisible: false });
+            const lips  = chart.addLineSeries({ color: '#26a69a', lineWidth: 1, lastValueVisible: false, priceLineVisible: false });
             const ro = new ResizeObserver(() => {
                 const wrap = document.getElementById(`mc-wrap-${i}`);
                 if (wrap) chart.applyOptions({ width: wrap.clientWidth, height: wrap.clientHeight });
             });
             ro.observe(document.getElementById(`mc-wrap-${i}`));
-            mcInstances.push({ chart, series, ro });
+            mcInstances.push({ chart, series, jaw, teeth, lips, bbUpper, bbLower, ro, lastCandle: null });
         }
+        // Инициализация canvas-оверлеев для рисования
+        for (let i = 0; i < 6; i++) mcInitCellCanvas(i);
     }
 
     async function mcLoadCell(i) {
@@ -1978,13 +2093,46 @@
             const res = await fetch(url);
             if (!res.ok) return;
             const json = await res.json();
+            const inst = mcInstances[i];
+            if (!inst) return;
             const candles = (json.data || []).map(c => ({
                 time: toUnix(c.timestamp), open: c.Open, high: c.High, low: c.Low, close: c.Close
             }));
-            if (!candles.length || !mcInstances[i]) return;
-            mcInstances[i].series.setData(candles);
+            if (!candles.length) return;
+            inst.series.setData(candles);
             const last = candles[candles.length - 1];
-            mcInstances[i].series.applyOptions({ priceFormat: getPriceFormat(last.close) });
+            const fmt = getPriceFormat(last.close);
+            inst.series.applyOptions({ priceFormat: fmt });
+
+            // Аллигатор
+            if (json.alligator) {
+                inst.jaw.setData(json.alligator.filter(d => d.Jaw > 0).map(d => ({ time: toUnix(d.timestamp), value: d.Jaw })));
+                inst.teeth.setData(json.alligator.filter(d => d.Teeth > 0).map(d => ({ time: toUnix(d.timestamp), value: d.Teeth })));
+                inst.lips.setData(json.alligator.filter(d => d.Lips > 0).map(d => ({ time: toUnix(d.timestamp), value: d.Lips })));
+                inst.jaw.applyOptions({ priceFormat: fmt });
+                inst.teeth.applyOptions({ priceFormat: fmt });
+                inst.lips.applyOptions({ priceFormat: fmt });
+            }
+
+            // Bollinger Bands — расчёт на клиенте
+            const bbData = calcBB(candles);
+            inst.bbUpper.setData(bbData.map(b => ({ time: b.time, value: b.upper })));
+            inst.bbLower.setData(bbData.map(b => ({ time: b.time, value: b.lower })));
+            inst.bbUpper.applyOptions({ priceFormat: fmt });
+            inst.bbLower.applyOptions({ priceFormat: fmt });
+
+            // Сохраняем последнюю свечу для live-обновления
+            inst.lastCandle = candles[candles.length - 1];
+
+            // Маркеры дивергенций + фракталов
+            const markers = [
+                ...(json.fractal_highs || []).map(d => ({ time: toUnix(d.timestamp), position: 'aboveBar', color: '#26a69a', shape: 'arrowDown', text: '' })),
+                ...(json.fractal_lows  || []).map(d => ({ time: toUnix(d.timestamp), position: 'belowBar', color: '#ef5350', shape: 'arrowUp',   text: '' })),
+                ...(json.bearish || []).map(d => ({ time: toUnix(d.timestamp), position: 'aboveBar', color: '#e040fb', shape: 'circle', text: '+', size: 1 })),
+                ...(json.bullish || []).map(d => ({ time: toUnix(d.timestamp), position: 'belowBar', color: '#29b6f6', shape: 'circle', text: '+', size: 1 })),
+            ].sort((a, b) => a.time - b.time);
+            inst.series.setMarkers(markers);
+
             document.getElementById(`mc-price-${i}`).textContent = (currentMarket === 'moex' ? '' : '$') + formatPrice(last.close);
         } catch(e) {}
     }
@@ -1999,10 +2147,29 @@
             const tickers = (await res.json()).tickers || {};
             mcSymbols.forEach((sym, i) => {
                 const d = tickers[sym]; if (!d) return;
+                // Обновить текст цены/изменения
                 document.getElementById(`mc-price-${i}`).textContent = `$${formatPrice(d.price)}`;
                 const el = document.getElementById(`mc-change-${i}`);
                 el.textContent = `${d.change24h > 0 ? '+' : ''}${d.change24h}%`;
                 el.className = `mc-change ${d.change24h >= 0 ? 'positive' : 'negative'}`;
+                // Обновить последнюю свечу в реальном времени
+                const inst = mcInstances[i];
+                if (!inst || !inst.lastCandle || !inst.series) return;
+                const tfSec = getTimeframeMs(mcTf) / 1000;
+                const expectedTime = Math.floor(Date.now() / 1000 / tfSec) * tfSec;
+                if (expectedTime > inst.lastCandle.time) {
+                    // Новый бар
+                    const newC = { time: expectedTime, open: d.price, high: d.price, low: d.price, close: d.price };
+                    inst.series.update(newC);
+                    inst.lastCandle = newC;
+                } else {
+                    // Обновляем текущий бар
+                    const upd = { ...inst.lastCandle, close: d.price,
+                        high: Math.max(inst.lastCandle.high, d.price),
+                        low:  Math.min(inst.lastCandle.low,  d.price) };
+                    inst.series.update(upd);
+                    inst.lastCandle = upd;
+                }
             });
         } catch(e) {}
     }
@@ -2010,22 +2177,29 @@
     function mcStartEdit(i) {
         const hdr = document.getElementById(`mc-hdr-${i}`);
         const btn = document.getElementById(`mc-pair-${i}`);
+        if (!btn) return;
         const inp = document.createElement('input');
         inp.className = 'mc-pair-input';
         inp.value = mcSymbols[i];
         hdr.replaceChild(inp, btn);
         inp.focus(); inp.select();
+        let committed = false;
         const commit = () => {
+            if (committed) return;
+            committed = true;
             const val = inp.value.trim().toUpperCase();
-            if (val) mcSymbols[i] = val;
+            if (val) { mcSymbols[i] = val; mcSaveSymbols(); }
             const newBtn = document.createElement('button');
             newBtn.className = 'mc-pair-btn'; newBtn.id = `mc-pair-${i}`;
             newBtn.textContent = mcSymbols[i]; newBtn.onclick = () => mcStartEdit(i);
-            hdr.replaceChild(newBtn, inp);
+            if (inp.parentNode === hdr) hdr.replaceChild(newBtn, inp);
             if (val) mcLoadCell(i);
         };
         inp.addEventListener('blur', commit);
-        inp.addEventListener('keydown', e => { if (e.key === 'Enter') inp.blur(); if (e.key === 'Escape') { inp.value = mcSymbols[i]; inp.blur(); } });
+        inp.addEventListener('keydown', e => {
+            if (e.key === 'Enter') { e.preventDefault(); inp.blur(); }
+            if (e.key === 'Escape') { inp.value = mcSymbols[i]; inp.blur(); }
+        });
     }
 
     function mcRenderTfBtns() {
@@ -2275,11 +2449,347 @@
     }
 
     // ============================================================
+    // Инструменты рисования
+    // ============================================================
+
+    function toggleDrawingPanel() {
+        drawingPanelOpen = !drawingPanelOpen;
+        document.getElementById('drawingToolbar').style.display = drawingPanelOpen ? 'flex' : 'none';
+        document.getElementById('drawPanelBtn').classList.toggle('active', drawingPanelOpen);
+        if (!drawingPanelOpen) setDrawTool('cursor');
+    }
+
+    function setDrawTool(tool) {
+        activeTool = tool;
+        document.querySelectorAll('#drawingToolbar .dt-btn[data-tool]').forEach(b =>
+            b.classList.toggle('active', b.dataset.tool === tool));
+        if (drawCanvas) drawCanvas.classList.toggle('draw-active', tool !== 'cursor');
+    }
+
+    function pixToCoord(lx, ly) {
+        return {
+            time: mainChart.timeScale().coordinateToTime(lx),
+            price: candleSeries.coordinateToPrice(ly)
+        };
+    }
+    function coordToPix(time, price) {
+        return {
+            x: mainChart.timeScale().timeToCoordinate(time),
+            y: candleSeries.priceToCoordinate(price)
+        };
+    }
+
+    function initDrawingOverlay() {
+        const container = document.getElementById('mainChart');
+        container.style.position = 'relative';
+        drawCanvas = document.createElement('canvas');
+        drawCanvas.className = 'drawing-canvas';
+        drawCanvas.width = container.offsetWidth;
+        drawCanvas.height = container.offsetHeight;
+        container.appendChild(drawCanvas);
+        drawCtx = drawCanvas.getContext('2d');
+        new ResizeObserver(() => {
+            drawCanvas.width = container.offsetWidth;
+            drawCanvas.height = container.offsetHeight;
+            redrawCanvas();
+        }).observe(container);
+        mainChart.timeScale().subscribeVisibleLogicalRangeChange(redrawCanvas);
+        drawCanvas.addEventListener('mousedown', onDrawMouseDown);
+        drawCanvas.addEventListener('mousemove', onDrawMouseMove);
+        drawCanvas.addEventListener('mouseup', onDrawMouseUp);
+        // Ctrl+Z
+        document.addEventListener('keydown', e => {
+            if ((e.ctrlKey || e.metaKey) && e.key === 'z' && drawingPanelOpen) {
+                e.preventDefault(); undoDrawing();
+            }
+        });
+    }
+
+    function onDrawMouseDown(e) {
+        const lx = e.offsetX, ly = e.offsetY;
+        const coord = pixToCoord(lx, ly);
+        if (!coord.time || coord.price == null) return;
+        const color = '#ef5350';
+        if (activeTool === 'eraser') { eraseAt(lx, ly, drawings, candleSeries, mainChart); return; }
+        if (activeTool === 'hline') { drawings.push({ type: 'hline', price: coord.price, color }); redrawCanvas(); return; }
+        if (activeTool === 'vline') { drawings.push({ type: 'vline', time: coord.time, color }); redrawCanvas(); return; }
+        if (activeTool === 'text') {
+            const txt = prompt('Текст:');
+            if (txt) drawings.push({ type: 'text', p1: coord, text: txt, color });
+            redrawCanvas(); return;
+        }
+        drawIsDown = true;
+        currentDraw = { type: activeTool, p1: coord, p2: { ...coord }, color };
+    }
+    function onDrawMouseMove(e) {
+        if (!drawIsDown || !currentDraw) return;
+        const coord = pixToCoord(e.offsetX, e.offsetY);
+        if (!coord.time || coord.price == null) return;
+        currentDraw.p2 = coord;
+        redrawCanvas();
+    }
+    function onDrawMouseUp(e) {
+        if (!drawIsDown || !currentDraw) return;
+        drawIsDown = false;
+        const coord = pixToCoord(e.offsetX, e.offsetY);
+        if (coord.time && coord.price != null) currentDraw.p2 = coord;
+        drawings.push({ ...currentDraw });
+        currentDraw = null;
+        redrawCanvas();
+    }
+
+    function redrawCanvas() {
+        if (!drawCtx) return;
+        drawCtx.clearRect(0, 0, drawCanvas.width, drawCanvas.height);
+        const all = currentDraw ? [...drawings, currentDraw] : drawings;
+        for (const d of all) renderDrawing(drawCtx, d, drawCanvas.width, drawCanvas.height, candleSeries, mainChart);
+    }
+
+    function renderDrawing(ctx, d, W, H, priceSeries, timechart) {
+        ctx.save();
+        ctx.strokeStyle = d.color;
+        ctx.fillStyle = d.color;
+        ctx.lineWidth = 1.5;
+        ctx.font = '11px sans-serif';
+        if (d.type === 'hline') {
+            const y = priceSeries.priceToCoordinate(d.price);
+            if (y == null) { ctx.restore(); return; }
+            ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke();
+            const label = d.price >= 1 ? d.price.toFixed(2) : d.price.toPrecision(4);
+            ctx.fillText(label, W - 62, y - 3);
+        } else if (d.type === 'vline') {
+            const x = timechart.timeScale().timeToCoordinate(d.time);
+            if (x == null) { ctx.restore(); return; }
+            ctx.setLineDash([4, 4]);
+            ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, H); ctx.stroke();
+            ctx.setLineDash([]);
+        } else if (d.type === 'trendline') {
+            const a = { x: timechart.timeScale().timeToCoordinate(d.p1.time), y: priceSeries.priceToCoordinate(d.p1.price) };
+            const b = { x: timechart.timeScale().timeToCoordinate(d.p2.time), y: priceSeries.priceToCoordinate(d.p2.price) };
+            if (a.x == null || b.x == null) { ctx.restore(); return; }
+            ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
+            // точки на концах
+            ctx.beginPath(); ctx.arc(a.x, a.y, 3, 0, Math.PI * 2); ctx.fill();
+            ctx.beginPath(); ctx.arc(b.x, b.y, 3, 0, Math.PI * 2); ctx.fill();
+        } else if (d.type === 'rect') {
+            const a = { x: timechart.timeScale().timeToCoordinate(d.p1.time), y: priceSeries.priceToCoordinate(d.p1.price) };
+            const b = { x: timechart.timeScale().timeToCoordinate(d.p2.time), y: priceSeries.priceToCoordinate(d.p2.price) };
+            if (a.x == null || b.x == null) { ctx.restore(); return; }
+            const rw = b.x - a.x, rh = b.y - a.y;
+            ctx.globalAlpha = 0.12; ctx.fillRect(a.x, a.y, rw, rh);
+            ctx.globalAlpha = 1; ctx.strokeRect(a.x, a.y, rw, rh);
+        } else if (d.type === 'fib') {
+            const a = { x: timechart.timeScale().timeToCoordinate(d.p1.time), y: priceSeries.priceToCoordinate(d.p1.price) };
+            const b = { x: timechart.timeScale().timeToCoordinate(d.p2.time), y: priceSeries.priceToCoordinate(d.p2.price) };
+            if (a.x == null || b.x == null) { ctx.restore(); return; }
+            const x1 = Math.min(a.x, b.x), x2 = Math.max(a.x, b.x);
+            const pDiff = d.p2.price - d.p1.price;
+            const fibColors = ['#ef5350','#ff9800','#ffeb3b','#26a69a','#2962ff','#9c27b0','#ef5350'];
+            FIB_LEVELS.forEach((lvl, idx) => {
+                const pr = d.p1.price + pDiff * lvl;
+                const y = priceSeries.priceToCoordinate(pr);
+                if (y == null) return;
+                ctx.strokeStyle = fibColors[idx];
+                ctx.fillStyle = fibColors[idx];
+                ctx.beginPath(); ctx.moveTo(x1, y); ctx.lineTo(x2, y); ctx.stroke();
+                const label = pr >= 1 ? pr.toFixed(2) : pr.toPrecision(4);
+                ctx.fillText(`${(lvl * 100).toFixed(1)}%  ${label}`, x2 + 4, y + 4);
+            });
+        } else if (d.type === 'text') {
+            const p = { x: timechart.timeScale().timeToCoordinate(d.p1.time), y: priceSeries.priceToCoordinate(d.p1.price) };
+            if (p.x == null) { ctx.restore(); return; }
+            ctx.font = 'bold 13px sans-serif';
+            ctx.fillText(d.text, p.x, p.y);
+        } else if (d.type === 'ruler') {
+            const a = { x: timechart.timeScale().timeToCoordinate(d.p1.time), y: priceSeries.priceToCoordinate(d.p1.price) };
+            const b = { x: timechart.timeScale().timeToCoordinate(d.p2.time), y: priceSeries.priceToCoordinate(d.p2.price) };
+            if (a.x == null || b.x == null) { ctx.restore(); return; }
+            const up = d.p2.price >= d.p1.price;
+            const fillColor = up ? 'rgba(38,166,154,0.15)' : 'rgba(239,83,80,0.15)';
+            const lineColor = up ? '#26a69a' : '#ef5350';
+            // заливка прямоугольника
+            ctx.fillStyle = fillColor;
+            ctx.fillRect(a.x, a.y, b.x - a.x, b.y - a.y);
+            // горизонтальные линии
+            ctx.strokeStyle = lineColor; ctx.lineWidth = 1; ctx.setLineDash([]);
+            ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, a.y); ctx.stroke();
+            ctx.beginPath(); ctx.moveTo(a.x, b.y); ctx.lineTo(b.x, b.y); ctx.stroke();
+            // вертикальные пунктирные
+            ctx.setLineDash([4, 4]);
+            ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(a.x, b.y); ctx.stroke();
+            ctx.beginPath(); ctx.moveTo(b.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
+            ctx.setLineDash([]);
+            // инфо-бокс
+            const priceDiff = d.p2.price - d.p1.price;
+            const pct = d.p1.price !== 0 ? (priceDiff / d.p1.price * 100) : 0;
+            const sign = priceDiff >= 0 ? '+' : '';
+            const absTxt = Math.abs(priceDiff) >= 1 ? priceDiff.toFixed(2) : priceDiff.toPrecision(3);
+            const tfSec = getTimeframeMs(currentTf) / 1000;
+            const bars = Math.round(Math.abs(d.p2.time - d.p1.time) / tfSec);
+            const line1 = `${sign}${absTxt}  ${sign}${pct.toFixed(2)}%`;
+            const line2 = `${bars} баров`;
+            ctx.font = 'bold 12px sans-serif';
+            const w1 = ctx.measureText(line1).width, w2 = ctx.measureText(line2).width;
+            const bw = Math.max(w1, w2) + 14, bh = 36;
+            let bx = b.x + 8, by = b.y - bh / 2;
+            if (bx + bw > W) bx = b.x - bw - 8;
+            if (by < 0) by = 0;
+            if (by + bh > H) by = H - bh;
+            ctx.fillStyle = 'rgba(26,30,46,0.92)';
+            ctx.beginPath(); ctx.roundRect(bx, by, bw, bh, 4); ctx.fill();
+            ctx.strokeStyle = lineColor; ctx.lineWidth = 1;
+            ctx.beginPath(); ctx.roundRect(bx, by, bw, bh, 4); ctx.stroke();
+            ctx.fillStyle = lineColor;
+            ctx.fillText(line1, bx + 7, by + 15);
+            ctx.fillStyle = 'rgba(200,200,200,0.85)';
+            ctx.fillText(line2, bx + 7, by + 29);
+        }
+        ctx.restore();
+    }
+
+    function pointToSegmentDist(px, py, ax, ay, bx, by) {
+        const dx = bx - ax, dy = by - ay, len2 = dx * dx + dy * dy;
+        if (len2 === 0) return Math.hypot(px - ax, py - ay);
+        const t = Math.max(0, Math.min(1, ((px - ax) * dx + (py - ay) * dy) / len2));
+        return Math.hypot(px - (ax + t * dx), py - (ay + t * dy));
+    }
+
+    function eraseAt(lx, ly, drawArr, priceSeries, timechart) {
+        const THRESH = 10;
+        let closest = -1, minDist = Infinity;
+        drawArr.forEach((d, i) => {
+            let dist = Infinity;
+            if (d.type === 'hline') {
+                const y = priceSeries.priceToCoordinate(d.price);
+                if (y != null) dist = Math.abs(ly - y);
+            } else if (d.type === 'vline') {
+                const x = timechart.timeScale().timeToCoordinate(d.time);
+                if (x != null) dist = Math.abs(lx - x);
+            } else if (d.type === 'trendline') {
+                const a = { x: timechart.timeScale().timeToCoordinate(d.p1.time), y: priceSeries.priceToCoordinate(d.p1.price) };
+                const b = { x: timechart.timeScale().timeToCoordinate(d.p2.time), y: priceSeries.priceToCoordinate(d.p2.price) };
+                if (a.x != null && b.x != null) dist = pointToSegmentDist(lx, ly, a.x, a.y, b.x, b.y);
+            } else if (d.p1) {
+                const p = { x: timechart.timeScale().timeToCoordinate(d.p1.time), y: priceSeries.priceToCoordinate(d.p1.price) };
+                if (p.x != null) dist = Math.hypot(lx - p.x, ly - p.y);
+            }
+            if (dist < minDist) { minDist = dist; closest = i; }
+        });
+        if (closest >= 0 && minDist < THRESH) { drawArr.splice(closest, 1); return true; }
+        return false;
+    }
+
+    function undoDrawing() { drawings.pop(); redrawCanvas(); }
+    function clearDrawings() { drawings = []; redrawCanvas(); }
+
+    // ============================================================
+    // Рисование в мультиграфике
+    // ============================================================
+
+    function toggleMcDrawing() {
+        mcDrawActive = !mcDrawActive;
+        document.getElementById('mcDrawBtn').classList.toggle('active', mcDrawActive);
+        document.getElementById('mcDrawToolbar').classList.toggle('visible', mcDrawActive);
+        mcInstances.forEach(inst => {
+            if (!inst.canvas) return;
+            inst.canvas.classList.toggle('draw-active', mcDrawActive && mcActiveTool !== 'cursor');
+        });
+    }
+
+    function setMcDrawTool(tool) {
+        mcActiveTool = tool;
+        document.querySelectorAll('#mcDrawToolbar .dt-btn[data-mctool]').forEach(b =>
+            b.classList.toggle('active', b.dataset.mctool === tool));
+        mcInstances.forEach(inst => {
+            if (!inst.canvas) return;
+            inst.canvas.classList.toggle('draw-active', tool !== 'cursor');
+        });
+    }
+
+    function mcClearActiveDrawings() {
+        // определяем какой cell активен по последнему клику
+        mcInstances.forEach(inst => { inst.drawings = []; if (inst.ctx) { inst.ctx.clearRect(0, 0, inst.canvas.width, inst.canvas.height); } });
+    }
+
+    function mcInitCellCanvas(i) {
+        const inst = mcInstances[i];
+        if (!inst) return;
+        const wrap = document.getElementById(`mc-wrap-${i}`);
+        if (!wrap) return;
+        const canvas = document.createElement('canvas');
+        canvas.className = 'drawing-canvas';
+        canvas.width = wrap.offsetWidth;
+        canvas.height = wrap.offsetHeight;
+        wrap.appendChild(canvas);
+        const ctx = canvas.getContext('2d');
+        inst.canvas = canvas;
+        inst.ctx = ctx;
+        inst.drawings = [];
+        inst.currentDraw = null;
+        inst.isDown = false;
+
+        new ResizeObserver(() => {
+            canvas.width = wrap.offsetWidth;
+            canvas.height = wrap.offsetHeight;
+            mcRedrawCell(i);
+        }).observe(wrap);
+
+        inst.chart.timeScale().subscribeVisibleLogicalRangeChange(() => mcRedrawCell(i));
+
+        canvas.addEventListener('mousedown', e => mcOnDown(e, i));
+        canvas.addEventListener('mousemove', e => mcOnMove(e, i));
+        canvas.addEventListener('mouseup', e => mcOnUp(e, i));
+    }
+
+    function mcRedrawCell(i) {
+        const inst = mcInstances[i];
+        if (!inst || !inst.ctx) return;
+        inst.ctx.clearRect(0, 0, inst.canvas.width, inst.canvas.height);
+        const all = inst.currentDraw ? [...inst.drawings, inst.currentDraw] : inst.drawings;
+        for (const d of all) renderDrawing(inst.ctx, d, inst.canvas.width, inst.canvas.height, inst.series, inst.chart);
+    }
+
+    function mcOnDown(e, i) {
+        if (!mcDrawActive) return;
+        const inst = mcInstances[i];
+        const lx = e.offsetX, ly = e.offsetY;
+        const time = inst.chart.timeScale().coordinateToTime(lx);
+        const price = inst.series.coordinateToPrice(ly);
+        if (!time || price == null) return;
+        const color = document.getElementById('mcDrawColor').value;
+        if (mcActiveTool === 'eraser') { eraseAt(lx, ly, inst.drawings, inst.series, inst.chart); mcRedrawCell(i); return; }
+        if (mcActiveTool === 'hline') { inst.drawings.push({ type: 'hline', price, color }); mcRedrawCell(i); return; }
+        inst.isDown = true;
+        inst.currentDraw = { type: mcActiveTool, p1: { time, price }, p2: { time, price }, color };
+    }
+    function mcOnMove(e, i) {
+        const inst = mcInstances[i];
+        if (!inst.isDown || !inst.currentDraw) return;
+        const time = inst.chart.timeScale().coordinateToTime(e.offsetX);
+        const price = inst.series.coordinateToPrice(e.offsetY);
+        if (!time || price == null) return;
+        inst.currentDraw.p2 = { time, price };
+        mcRedrawCell(i);
+    }
+    function mcOnUp(e, i) {
+        const inst = mcInstances[i];
+        if (!inst.isDown || !inst.currentDraw) return;
+        inst.isDown = false;
+        const time = inst.chart.timeScale().coordinateToTime(e.offsetX);
+        const price = inst.series.coordinateToPrice(e.offsetY);
+        if (time && price != null) inst.currentDraw.p2 = { time, price };
+        inst.drawings.push({ ...inst.currentDraw });
+        inst.currentDraw = null;
+        mcRedrawCell(i);
+    }
+
+    // ============================================================
     // Запуск
     // ============================================================
     window.onload = async () => {
         requestAnimationFrame(async () => {
             initCharts();
+            initDrawingOverlay();
             setupResizeObserver();
             await fetchSymbolsList();
             fetchAll();
@@ -2747,6 +3257,32 @@
         <div class="mc-topbar">
             <span class="mc-title">Мультиграфик</span>
             <div class="mc-tf-btns" id="mcTfBtns"></div>
+            <button id="mcDrawBtn" class="mc-draw-btn" onclick="toggleMcDrawing()">
+                <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04a1 1 0 000-1.41l-2.34-2.34a1 1 0 00-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>
+                Рисование
+            </button>
+            <!-- Мини-тулбар рисования для мультиграфика -->
+            <div id="mcDrawToolbar" class="mc-draw-toolbar">
+                <button class="dt-btn active" data-mctool="cursor" title="Курсор" onclick="setMcDrawTool('cursor')" style="width:28px;height:28px">
+                    <svg viewBox="0 0 24 24"><path d="M4 0l16 12.3-6.4 1.4 3.9 7.3-1.8 1-4-7.4L8 17.6z"/></svg>
+                </button>
+                <button class="dt-btn" data-mctool="trendline" title="Трендовая" onclick="setMcDrawTool('trendline')" style="width:28px;height:28px">
+                    <svg viewBox="0 0 24 24"><path d="M20 4L4 20" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round"/><circle cx="4" cy="20" r="2"/><circle cx="20" cy="4" r="2"/></svg>
+                </button>
+                <button class="dt-btn" data-mctool="hline" title="Горизонталь" onclick="setMcDrawTool('hline')" style="width:28px;height:28px">
+                    <svg viewBox="0 0 24 24"><line x1="2" y1="12" x2="22" y2="12" stroke="currentColor" stroke-width="2"/><circle cx="2" cy="12" r="2" fill="currentColor"/><circle cx="22" cy="12" r="2" fill="currentColor"/></svg>
+                </button>
+                <button class="dt-btn" data-mctool="rect" title="Прямоугольник" onclick="setMcDrawTool('rect')" style="width:28px;height:28px">
+                    <svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="1" stroke="currentColor" stroke-width="2" fill="none"/></svg>
+                </button>
+                <button class="dt-btn" data-mctool="eraser" title="Ластик" onclick="setMcDrawTool('eraser')" style="width:28px;height:28px">
+                    <svg viewBox="0 0 24 24"><path d="M20.71 7.04a1 1 0 000-1.41l-2.34-2.34a1 1 0 00-1.41 0L4 16.25V20h3.75L20.71 7.04zM3 20h18v2H3v-2z"/></svg>
+                </button>
+                <button class="dt-btn" title="Очистить" onclick="mcClearActiveDrawings()" style="width:28px;height:28px">
+                    <svg viewBox="0 0 24 24"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+                </button>
+                <input type="color" id="mcDrawColor" value="#ef5350" title="Цвет" style="width:24px;height:24px;border:none;background:none;cursor:pointer;padding:2px;">
+            </div>
             <button class="mc-close-btn" onclick="closeMultiChart()">&#10005;</button>
         </div>
         <div class="mc-grid" id="mcGrid"></div>

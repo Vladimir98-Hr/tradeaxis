@@ -25,3 +25,9 @@ Desktop.ini
 
 # Logs
 *.log
+
+# Local scripts
+backtest.py
+
+# Pip artifacts
+=*
