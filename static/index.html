@@ -935,6 +935,9 @@
                 <svg viewBox="0 0 24 24"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04a1 1 0 000-1.41l-2.34-2.34a1 1 0 00-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>
             </button>
             <button class="sidebar-btn" id="indicatorsBtn" title="Индикаторы" onclick="openIndicatorPanel()" style="font-size:13px;font-weight:700;letter-spacing:-.5px">fx</button>
+            <button class="sidebar-btn" id="authorIndBtn" title="Авторские индикаторы" onclick="toggleAuthorIndicators()">
+                <svg viewBox="0 0 24 24"><path d="M11.99 18.54l-7.37-5.73L3 14.07l9 7 9-7-1.63-1.27-7.38 5.74zm.01-2.83l7.36-5.73L21 8.69l-9-7-9 7 1.63 1.27L12 15.71z"/></svg>
+            </button>
             <button class="sidebar-btn" id="settingsBtn" title="Настройки" onclick="openSettings()">
                 <svg viewBox="0 0 24 24"><path d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58c.18-.14.23-.41.12-.61l-1.92-3.32c-.12-.22-.37-.29-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54c-.04-.24-.24-.41-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.07.62-.07.94s.02.64.07.94l-2.03 1.58c-.18.14-.23.41-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"/></svg>
             </button>
@@ -1381,6 +1384,7 @@
     let fractalLows = [];
     let divergenceBearish = [];
     let divergenceBullish = [];
+    let authorIndicatorsVisible = true;
 
     // ============================================================
     // Drawing tools — состояние рисования
@@ -1467,6 +1471,7 @@
         const body = document.querySelector('.chart-body');
         if (!body) return { main: 300, volume: 80, ao: 120 };
         const h = body.clientHeight;
+        if (!authorIndicatorsVisible) return { main: h, volume: 0, ao: 0 };
         return {
             main: Math.floor(h * 0.6),
             volume: Math.floor(h * 0.15),
@@ -1607,6 +1612,27 @@
             bb.push({ time: candles[i].time, upper: mean + mult * std, lower: mean - mult * std });
         }
         return bb;
+    }
+
+    function toggleAuthorIndicators() {
+        authorIndicatorsVisible = !authorIndicatorsVisible;
+        const vis = authorIndicatorsVisible;
+        document.getElementById('authorIndBtn').classList.toggle('active', !vis);
+        document.getElementById('volumeChart').style.display = vis ? '' : 'none';
+        document.getElementById('aoChart').style.display = vis ? '' : 'none';
+        const w = getChartWidth(), h = getChartHeights();
+        if (mainChart)   mainChart.resize(w, h.main);
+        if (volumeChart) volumeChart.resize(w, vis ? h.volume : 0);
+        if (aoChart)     aoChart.resize(w, vis ? h.ao : 0);
+        const s = loadSettings();
+        if (jawSeries)     jawSeries.applyOptions({ visible: vis && s.showAlligator });
+        if (teethSeries)   teethSeries.applyOptions({ visible: vis && s.showAlligator });
+        if (lipsSeries)    lipsSeries.applyOptions({ visible: vis && s.showAlligator });
+        if (bbUpperSeries) bbUpperSeries.applyOptions({ visible: vis && s.showBB });
+        if (bbLowerSeries) bbLowerSeries.applyOptions({ visible: vis && s.showBB });
+        if (aoSeries)      aoSeries.applyOptions({ visible: vis && s.showAO });
+        if (vis) applyAllMarkers();
+        else if (candleSeries) candleSeries.setMarkers([]);
     }
 
     function applyAllMarkers() {
@@ -3389,14 +3415,14 @@
                 wickUpColor: s.candleUp, wickDownColor: s.candleDown,
             });
         }
-        if (jawSeries)     jawSeries.applyOptions({ color: s.jawColor,    visible: s.showAlligator });
-        if (teethSeries)   teethSeries.applyOptions({ color: s.teethColor, visible: s.showAlligator });
-        if (lipsSeries)    lipsSeries.applyOptions({ color: s.lipsColor,   visible: s.showAlligator });
+        if (jawSeries)     jawSeries.applyOptions({ color: s.jawColor,    visible: authorIndicatorsVisible && s.showAlligator });
+        if (teethSeries)   teethSeries.applyOptions({ color: s.teethColor, visible: authorIndicatorsVisible && s.showAlligator });
+        if (lipsSeries)    lipsSeries.applyOptions({ color: s.lipsColor,   visible: authorIndicatorsVisible && s.showAlligator });
         if (bbUpperSeries) {
-            bbUpperSeries.applyOptions({ color: s.bbColor, visible: s.showBB });
-            bbLowerSeries.applyOptions({ color: s.bbColor, visible: s.showBB });
+            bbUpperSeries.applyOptions({ color: s.bbColor, visible: authorIndicatorsVisible && s.showBB });
+            bbLowerSeries.applyOptions({ color: s.bbColor, visible: authorIndicatorsVisible && s.showBB });
         }
-        if (aoSeries) aoSeries.applyOptions({ visible: s.showAO });
+        if (aoSeries) aoSeries.applyOptions({ visible: authorIndicatorsVisible && s.showAO });
         if (volScanInterval) clearInterval(volScanInterval);
         if (s.volAutoRefresh) {
             volScanInterval = setInterval(fetchVolScan, s.volRefreshInterval * 1000);
