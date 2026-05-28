@@ -894,7 +894,7 @@
             <button class="sidebar-btn" id="drawPanelBtn" title="Инструменты рисования" onclick="toggleDrawingPanel()">
                 <svg viewBox="0 0 24 24"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04a1 1 0 000-1.41l-2.34-2.34a1 1 0 00-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>
             </button>
-            <button class="sidebar-btn" title="Настройки">
+            <button class="sidebar-btn" id="settingsBtn" title="Настройки" onclick="openSettings()">
                 <svg viewBox="0 0 24 24"><path d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58c.18-.14.23-.41.12-.61l-1.92-3.32c-.12-.22-.37-.29-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54c-.04-.24-.24-.41-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.07.62-.07.94s.02.64.07.94l-2.03 1.58c-.18.14-.23.41-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"/></svg>
             </button>
             <button class="sidebar-btn" title="Информация">
@@ -2347,6 +2347,8 @@
     let volNextRefresh = 0;
     let _volGen = 0;   // счётчик поколений — защита от race condition при смене рынка
     let volScanInterval = null;
+    let rulerPending = false;   // ждём второй клик для линейки
+    let hoveredRulerIdx = -1;   // индекс линейки под курсором
     let spreadNextRefresh = 0;
     let _spreadGen = 0;
 
@@ -2531,6 +2533,11 @@
             if ((e.ctrlKey || e.metaKey) && e.key === 'z' && drawingPanelOpen) {
                 e.preventDefault(); undoDrawing();
             }
+            if (e.key === 'Delete' && hoveredRulerIdx >= 0 && drawingPanelOpen) {
+                drawings.splice(hoveredRulerIdx, 1);
+                hoveredRulerIdx = -1;
+                redrawCanvas();
+            }
         });
     }
 
@@ -2538,6 +2545,21 @@
         const lx = e.offsetX, ly = e.offsetY;
         const coord = pixToCoord(lx, ly);
         if (!coord.time || coord.price == null) return;
+        // Линейка: click-click вместо drag
+        if (activeTool === 'ruler') {
+            if (!rulerPending) {
+                rulerPending = true;
+                currentDraw = { type: 'ruler', p1: coord, p2: { ...coord }, color: '#2196f3' };
+                redrawCanvas();
+            } else {
+                rulerPending = false;
+                currentDraw.p2 = coord;
+                drawings.push({ ...currentDraw });
+                currentDraw = null;
+                redrawCanvas();
+            }
+            return;
+        }
         const color = '#ef5350';
         if (activeTool === 'eraser') { eraseAt(lx, ly, drawings, candleSeries, mainChart); return; }
         if (activeTool === 'hline') { drawings.push({ type: 'hline', price: coord.price, color }); redrawCanvas(); return; }
@@ -2551,6 +2573,24 @@
         currentDraw = { type: activeTool, p1: coord, p2: { ...coord }, color };
     }
     function onDrawMouseMove(e) {
+        // Линейка: предпросмотр + hover-детектор
+        if (activeTool === 'ruler') {
+            if (rulerPending && currentDraw) {
+                const coord = pixToCoord(e.offsetX, e.offsetY);
+                if (coord.time && coord.price != null) { currentDraw.p2 = coord; redrawCanvas(); }
+            } else {
+                let found = -1;
+                drawings.forEach((d, i) => {
+                    if (d.type !== 'ruler') return;
+                    const a = coordToPix(d.p1.time, d.p1.price);
+                    const b = coordToPix(d.p2.time, d.p2.price);
+                    if (a.x == null || b.x == null) return;
+                    if (pointToSegmentDist(e.offsetX, e.offsetY, a.x, a.y, b.x, b.y) < 8) found = i;
+                });
+                if (found !== hoveredRulerIdx) { hoveredRulerIdx = found; redrawCanvas(); }
+            }
+            return;
+        }
         if (!drawIsDown || !currentDraw) return;
         const coord = pixToCoord(e.offsetX, e.offsetY);
         if (!coord.time || coord.price == null) return;
@@ -2558,6 +2598,7 @@
         redrawCanvas();
     }
     function onDrawMouseUp(e) {
+        if (activeTool === 'ruler') return;
         if (!drawIsDown || !currentDraw) return;
         drawIsDown = false;
         const coord = pixToCoord(e.offsetX, e.offsetY);
@@ -2572,6 +2613,15 @@
         drawCtx.clearRect(0, 0, drawCanvas.width, drawCanvas.height);
         const all = currentDraw ? [...drawings, currentDraw] : drawings;
         for (const d of all) renderDrawing(drawCtx, d, drawCanvas.width, drawCanvas.height, candleSeries, mainChart);
+    }
+
+    function formatTimeDiff(ms) {
+        const totalMin = Math.round(ms / 60000);
+        const totalHr  = Math.floor(totalMin / 60);
+        const day      = Math.floor(totalHr / 24);
+        if (day >= 1) return `${day}д ${totalHr % 24}ч`;
+        if (totalHr >= 1) return `${totalHr}ч ${String(totalMin % 60).padStart(2, '0')}м`;
+        return `${totalMin}м`;
     }
 
     function renderDrawing(ctx, d, W, H, priceSeries, timechart) {
@@ -2633,45 +2683,80 @@
             const a = { x: timechart.timeScale().timeToCoordinate(d.p1.time), y: priceSeries.priceToCoordinate(d.p1.price) };
             const b = { x: timechart.timeScale().timeToCoordinate(d.p2.time), y: priceSeries.priceToCoordinate(d.p2.price) };
             if (a.x == null || b.x == null) { ctx.restore(); return; }
-            const up = d.p2.price >= d.p1.price;
-            const fillColor = up ? 'rgba(38,166,154,0.15)' : 'rgba(239,83,80,0.15)';
-            const lineColor = up ? '#26a69a' : '#ef5350';
-            // заливка прямоугольника
-            ctx.fillStyle = fillColor;
-            ctx.fillRect(a.x, a.y, b.x - a.x, b.y - a.y);
-            // горизонтальные линии
-            ctx.strokeStyle = lineColor; ctx.lineWidth = 1; ctx.setLineDash([]);
+
+            const up        = d.p2.price >= d.p1.price;
+            const accent    = up ? '#26a69a' : '#ef5350';
+            const isHovered = drawings.indexOf(d) === hoveredRulerIdx;
+
+            // полупрозрачный треугольник
+            ctx.globalAlpha = 0.10;
+            ctx.fillStyle = accent;
+            ctx.beginPath();
+            ctx.moveTo(a.x, a.y);
+            ctx.lineTo(b.x, a.y);
+            ctx.lineTo(b.x, b.y);
+            ctx.closePath();
+            ctx.fill();
+            ctx.globalAlpha = 1;
+
+            // пунктирные вспомогательные линии
+            ctx.strokeStyle = accent;
+            ctx.lineWidth = 1;
+            ctx.setLineDash([5, 4]);
+            ctx.globalAlpha = 0.5;
             ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, a.y); ctx.stroke();
-            ctx.beginPath(); ctx.moveTo(a.x, b.y); ctx.lineTo(b.x, b.y); ctx.stroke();
-            // вертикальные пунктирные
-            ctx.setLineDash([4, 4]);
-            ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(a.x, b.y); ctx.stroke();
             ctx.beginPath(); ctx.moveTo(b.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
+            ctx.globalAlpha = 1;
             ctx.setLineDash([]);
-            // инфо-бокс
+
+            // главная диагональная линия
+            ctx.strokeStyle = accent;
+            ctx.lineWidth = isHovered ? 2.5 : 1.8;
+            ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
+
+            // маркеры на концах
+            const r = isHovered ? 5 : 3.5;
+            [a, b].forEach(pt => {
+                ctx.fillStyle = accent;
+                ctx.beginPath(); ctx.arc(pt.x, pt.y, r, 0, Math.PI * 2); ctx.fill();
+                ctx.strokeStyle = '#1a1e2e'; ctx.lineWidth = 1.5;
+                ctx.beginPath(); ctx.arc(pt.x, pt.y, r, 0, Math.PI * 2); ctx.stroke();
+            });
+
+            // расчёт метрик
             const priceDiff = d.p2.price - d.p1.price;
-            const pct = d.p1.price !== 0 ? (priceDiff / d.p1.price * 100) : 0;
-            const sign = priceDiff >= 0 ? '+' : '';
-            const absTxt = Math.abs(priceDiff) >= 1 ? priceDiff.toFixed(2) : priceDiff.toPrecision(3);
-            const tfSec = getTimeframeMs(currentTf) / 1000;
-            const bars = Math.round(Math.abs(d.p2.time - d.p1.time) / tfSec);
-            const line1 = `${sign}${absTxt}  ${sign}${pct.toFixed(2)}%`;
-            const line2 = `${bars} баров`;
+            const pct       = d.p1.price !== 0 ? (priceDiff / d.p1.price * 100) : 0;
+            const sign      = priceDiff >= 0 ? '+' : '';
+            const prFmt     = Math.abs(priceDiff) >= 1 ? Math.abs(priceDiff).toFixed(2) : Math.abs(priceDiff).toPrecision(3);
+            const tfSec     = getTimeframeMs(currentTimeframe) / 1000;
+            const bars      = Math.round(Math.abs(d.p2.time - d.p1.time) / tfSec);
+            const timeTxt   = formatTimeDiff(Math.abs(d.p2.time - d.p1.time) * 1000);
+            const line1 = `${sign}${prFmt}  (${sign}${pct.toFixed(2)}%)`;            const line2 = `${bars} баров · ${timeTxt}`;
+
+            // лейбл-бокс по центру линии
             ctx.font = 'bold 12px sans-serif';
-            const w1 = ctx.measureText(line1).width, w2 = ctx.measureText(line2).width;
-            const bw = Math.max(w1, w2) + 14, bh = 36;
-            let bx = b.x + 8, by = b.y - bh / 2;
-            if (bx + bw > W) bx = b.x - bw - 8;
-            if (by < 0) by = 0;
-            if (by + bh > H) by = H - bh;
-            ctx.fillStyle = 'rgba(26,30,46,0.92)';
-            ctx.beginPath(); ctx.roundRect(bx, by, bw, bh, 4); ctx.fill();
-            ctx.strokeStyle = lineColor; ctx.lineWidth = 1;
-            ctx.beginPath(); ctx.roundRect(bx, by, bw, bh, 4); ctx.stroke();
-            ctx.fillStyle = lineColor;
-            ctx.fillText(line1, bx + 7, by + 15);
-            ctx.fillStyle = 'rgba(200,200,200,0.85)';
-            ctx.fillText(line2, bx + 7, by + 29);
+            const w1 = ctx.measureText(line1).width;
+            ctx.font = '11px sans-serif';
+            const w2 = ctx.measureText(line2).width;
+            const bw = Math.max(w1, w2) + 16, bh = 38;
+            const mx = (a.x + b.x) / 2, my = (a.y + b.y) / 2;
+            let bx = mx + 10, by = my - bh / 2;
+            if (bx + bw > W) bx = mx - bw - 10;
+            if (by < 2) by = 2;
+            if (by + bh > H - 2) by = H - bh - 2;
+
+            ctx.fillStyle = 'rgba(19,23,34,0.93)';
+            ctx.beginPath(); ctx.roundRect(bx, by, bw, bh, 5); ctx.fill();
+            ctx.strokeStyle = isHovered ? accent : 'rgba(128,128,128,0.4)';
+            ctx.lineWidth = isHovered ? 1.5 : 1;
+            ctx.beginPath(); ctx.roundRect(bx, by, bw, bh, 5); ctx.stroke();
+
+            ctx.font = 'bold 12px sans-serif';
+            ctx.fillStyle = accent;
+            ctx.fillText(line1, bx + 8, by + 15);
+            ctx.font = '11px sans-serif';
+            ctx.fillStyle = 'rgba(200,200,200,0.8)';
+            ctx.fillText(line2, bx + 8, by + 30);
         }
         ctx.restore();
     }
