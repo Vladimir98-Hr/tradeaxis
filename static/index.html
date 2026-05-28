@@ -871,6 +871,46 @@
         .settings-select { background: var(--bg-color); border: 1px solid var(--border-color); border-radius: 6px; color: var(--text-primary); font-size: 12px; padding: 4px 8px; cursor: pointer; outline: none; }
         .settings-input-num { background: var(--bg-color); border: 1px solid var(--border-color); border-radius: 6px; color: var(--text-primary); font-size: 13px; padding: 4px 8px; width: 70px; outline: none; text-align: center; }
         .settings-footer { display: flex; gap: 8px; padding-top: 12px; border-top: 1px solid var(--border-color); }
+
+        /* ── Панель индикаторов ──────────────────────────────────── */
+        .indicator-panel { width:420px; max-height:82vh; background:var(--card-bg); border:1px solid var(--border-color); border-radius:12px; display:flex; flex-direction:column; overflow:hidden; box-shadow:0 20px 60px rgba(0,0,0,.55); }
+        .ip-header { display:flex; align-items:center; justify-content:space-between; padding:14px 16px 10px; border-bottom:1px solid var(--border-color); flex-shrink:0; }
+        .ip-header span { font-size:15px; font-weight:600; }
+        .ip-close { background:none; border:none; color:var(--text-secondary); font-size:18px; cursor:pointer; padding:2px 7px; border-radius:4px; }
+        .ip-close:hover { background:var(--hover-bg); color:var(--text-primary); }
+        .ip-search-wrap { padding:10px 12px; border-bottom:1px solid var(--border-color); flex-shrink:0; }
+        .ip-search { width:100%; padding:7px 12px; background:var(--bg-color); border:1px solid var(--border-color); border-radius:8px; color:var(--text-primary); font-size:13px; outline:none; box-sizing:border-box; }
+        .ip-search:focus { border-color:var(--accent-color); }
+        .ip-body { flex:1; overflow-y:auto; padding:6px 0 10px; }
+        .ip-section-title { font-size:11px; font-weight:700; color:var(--text-secondary); text-transform:uppercase; letter-spacing:.06em; padding:10px 14px 4px; }
+        .ip-grid { display:flex; flex-wrap:wrap; gap:6px; padding:4px 14px 10px; }
+        .ip-pop-item { padding:6px 10px; background:var(--bg-color); border:1px solid var(--border-color); border-radius:8px; cursor:pointer; min-width:64px; text-align:center; transition:.15s; }
+        .ip-pop-item:hover { border-color:var(--accent-color); color:var(--accent-color); }
+        .ip-pop-name { font-size:12px; font-weight:700; }
+        .ip-pop-cat { font-size:10px; color:var(--text-secondary); margin-top:1px; }
+        .ip-item { display:flex; align-items:center; justify-content:space-between; padding:7px 14px; transition:.1s; }
+        .ip-item:hover { background:var(--hover-bg); }
+        .ip-item-info { display:flex; flex-direction:column; gap:1px; flex:1; min-width:0; }
+        .ip-item-name { font-size:13px; font-weight:500; }
+        .ip-item-desc { font-size:11px; color:var(--text-secondary); }
+        .ip-item-actions { display:flex; align-items:center; gap:6px; flex-shrink:0; margin-left:8px; }
+        .ip-fav-btn { background:none; border:none; color:var(--text-secondary); font-size:15px; cursor:pointer; padding:1px 4px; line-height:1; }
+        .ip-fav-btn.active, .ip-fav-btn:hover { color:#ffc107; }
+        .ip-add-btn { padding:4px 11px; background:var(--accent-color); border:none; border-radius:6px; color:#fff; font-size:12px; cursor:pointer; white-space:nowrap; }
+        .ip-add-btn:hover { opacity:.85; }
+        .ip-active-item { display:flex; align-items:center; padding:5px 14px; gap:8px; }
+        .ip-dot { width:8px; height:8px; border-radius:50%; flex-shrink:0; }
+        .ip-active-name { font-size:13px; font-weight:500; flex:1; }
+        .ip-active-params { font-size:11px; color:var(--text-secondary); }
+        .ip-remove-btn { background:none; border:none; color:var(--text-secondary); font-size:13px; cursor:pointer; padding:2px 6px; border-radius:4px; }
+        .ip-remove-btn:hover { background:rgba(239,83,80,.15); color:#ef5350; }
+        .ip-empty { font-size:12px; color:var(--text-secondary); padding:6px 14px; font-style:italic; }
+        .ip-stub-tag { font-size:10px; color:var(--text-secondary); background:rgba(128,128,128,.15); border-radius:3px; padding:1px 5px; margin-left:5px; }
+        /* Осциллятор-панели */
+        .osc-pane { position:relative; border-top:1px solid var(--border-color); flex-shrink:0; }
+        .osc-pane-hdr { position:absolute; top:0; left:0; right:0; z-index:3; display:flex; align-items:center; justify-content:space-between; padding:1px 8px; background:rgba(19,23,34,.75); font-size:11px; color:var(--text-secondary); pointer-events:none; }
+        .osc-pane-hdr button { pointer-events:all; background:none; border:none; color:var(--text-secondary); font-size:11px; cursor:pointer; padding:0 4px; }
+        .osc-pane-hdr button:hover { color:var(--text-primary); }
     </style>
 </head>
 <body data-theme="dark">
@@ -894,6 +934,7 @@
             <button class="sidebar-btn" id="drawPanelBtn" title="Инструменты рисования" onclick="toggleDrawingPanel()">
                 <svg viewBox="0 0 24 24"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04a1 1 0 000-1.41l-2.34-2.34a1 1 0 00-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>
             </button>
+            <button class="sidebar-btn" id="indicatorsBtn" title="Индикаторы" onclick="openIndicatorPanel()" style="font-size:13px;font-weight:700;letter-spacing:-.5px">fx</button>
             <button class="sidebar-btn" id="settingsBtn" title="Настройки" onclick="openSettings()">
                 <svg viewBox="0 0 24 24"><path d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58c.18-.14.23-.41.12-.61l-1.92-3.32c-.12-.22-.37-.29-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54c-.04-.24-.24-.41-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.07.62-.07.94s.02.64.07.94l-2.03 1.58c-.18.14-.23.41-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"/></svg>
             </button>
@@ -1047,6 +1088,7 @@
                 <div class="chart-container chart-container-ao" id="aoChart"></div>
                 <div id="candleTimer"></div>
             </div>
+            <div id="indicatorPanesContainer" style="display:flex;flex-direction:column;"></div>
         </div>
 
         <!-- Список наблюдения -->
@@ -1660,6 +1702,14 @@
             bbUpperSeries.setData(bbData.map(d => ({ time: d.time, value: d.upper })));
             bbLowerSeries.setData(bbData.map(d => ({ time: d.time, value: d.lower })));
 
+            // Сохраняем OHLCV для индикаторов
+            lastChartData = json.data.map(d => ({
+                timestamp: d.timestamp,
+                open: d.Open ?? d.open, high: d.High ?? d.high,
+                low: d.Low ?? d.low, close: d.Close ?? d.close,
+                volume: d.Volume ?? d.volume ?? 0
+            }));
+            if (activeIndicators.length) renderAllActiveIndicators(lastChartData);
             applyAllMarkers();
             mainChart.timeScale().fitContent();
             startCandleTimer();
@@ -1971,7 +2021,471 @@
             document.getElementById('spreadScanTitle').textContent = 'Спред 15м · MOEX';
             spreadNextRefresh = 0;
             fetchSpreadScan();
-            wlRender();
+        
+    // ============================================================
+    // Система индикаторов
+    // ============================================================
+
+    let activeIndicators  = [];
+    let indicatorPanes    = [];
+    let lastChartData     = null;
+
+    // ── Вспомогательные вычисления ──────────────────────────────
+    const IND = {};
+
+    IND._sma = function(arr, len) {
+        const r = new Array(arr.length).fill(null);
+        for (let i = len - 1; i < arr.length; i++) {
+            let s = 0; for (let j = i - len + 1; j <= i; j++) s += arr[j];
+            r[i] = s / len;
+        }
+        return r;
+    };
+
+    IND._ema = function(arr, len) {
+        const k = 2 / (len + 1), r = new Array(arr.length).fill(null);
+        let ema = null;
+        for (let i = 0; i < arr.length; i++) {
+            if (i < len - 1) continue;
+            if (ema === null) { let s = 0; for (let j = 0; j < len; j++) s += arr[j]; ema = s / len; }
+            else ema = arr[i] * k + ema * (1 - k);
+            r[i] = ema;
+        }
+        return r;
+    };
+
+    IND._ts = function(d) {
+        if (!d) return 0;
+        const t = d.timestamp;
+        if (typeof t === 'number') return t > 1e12 ? Math.floor(t / 1000) : t;
+        return Math.floor(new Date(t).getTime() / 1000);
+    };
+
+    IND.calcSMA = function(data, p) {
+        const src = data.map(d => d[p.source] ?? d.close);
+        const v = IND._sma(src, p.length);
+        return data.map((d, i) => v[i] == null ? null : { time: IND._ts(d), value: v[i] }).filter(Boolean);
+    };
+
+    IND.calcEMA = function(data, p) {
+        const src = data.map(d => d[p.source] ?? d.close);
+        const v = IND._ema(src, p.length);
+        return data.map((d, i) => v[i] == null ? null : { time: IND._ts(d), value: v[i] }).filter(Boolean);
+    };
+
+    IND.calcVWMA = function(data, p) {
+        const len = p.length;
+        return data.map((d, i) => {
+            if (i < len - 1) return null;
+            let sp = 0, sv = 0;
+            for (let j = i - len + 1; j <= i; j++) { sp += data[j].close * data[j].volume; sv += data[j].volume; }
+            return sv > 0 ? { time: IND._ts(d), value: sp / sv } : null;
+        }).filter(Boolean);
+    };
+
+    IND.calcRSI = function(data, p) {
+        const len = p.length, closes = data.map(d => d.close);
+        let ag = 0, al = 0;
+        for (let i = 1; i <= len; i++) {
+            const diff = closes[i] - closes[i - 1];
+            if (diff > 0) ag += diff; else al -= diff;
+        }
+        ag /= len; al /= len;
+        const result = [];
+        if (len < data.length) {
+            const rs0 = al === 0 ? Infinity : ag / al;
+            result.push({ time: IND._ts(data[len]), value: al === 0 ? 100 : 100 - 100 / (1 + rs0) });
+        }
+        for (let i = len + 1; i < data.length; i++) {
+            const diff = closes[i] - closes[i - 1];
+            ag = (ag * (len - 1) + Math.max(0, diff)) / len;
+            al = (al * (len - 1) + Math.max(0, -diff)) / len;
+            result.push({ time: IND._ts(data[i]), value: al === 0 ? 100 : 100 - 100 / (1 + ag / al) });
+        }
+        return result;
+    };
+
+    IND.calcMACD = function(data, p) {
+        const { fast = 12, slow = 26, signal = 9 } = p;
+        const closes = data.map(d => d.close);
+        const fEMA = IND._ema(closes, fast), sEMA = IND._ema(closes, slow);
+        const macdLine = closes.map((_, i) => fEMA[i] != null && sEMA[i] != null ? fEMA[i] - sEMA[i] : null);
+        const macdVals = macdLine.filter(v => v != null);
+        const sigArr = IND._ema(macdVals, signal);
+        let si = 0;
+        const fullSig = macdLine.map(v => v != null ? (sigArr[si++] ?? null) : null);
+        return {
+            macd:   data.map((d, i) => macdLine[i] != null ? { time: IND._ts(d), value: macdLine[i] } : null).filter(Boolean),
+            signal: data.map((d, i) => fullSig[i] != null ? { time: IND._ts(d), value: fullSig[i] } : null).filter(Boolean),
+            hist:   data.map((d, i) => (macdLine[i] != null && fullSig[i] != null) ? { time: IND._ts(d), value: macdLine[i] - fullSig[i] } : null).filter(Boolean),
+        };
+    };
+
+    IND.calcBollingerBands = function(data, p) {
+        const { length: len = 20, mult = 2 } = p;
+        const closes = data.map(d => d.close);
+        const sma = IND._sma(closes, len);
+        return {
+            upper: data.map((d, i) => { if (sma[i] == null) return null; const sl = closes.slice(i - len + 1, i + 1); const std = Math.sqrt(sl.reduce((s, v) => s + (v - sma[i]) ** 2, 0) / len); return { time: IND._ts(d), value: sma[i] + mult * std }; }).filter(Boolean),
+            mid:   data.map((d, i) => sma[i] != null ? { time: IND._ts(d), value: sma[i] } : null).filter(Boolean),
+            lower: data.map((d, i) => { if (sma[i] == null) return null; const sl = closes.slice(i - len + 1, i + 1); const std = Math.sqrt(sl.reduce((s, v) => s + (v - sma[i]) ** 2, 0) / len); return { time: IND._ts(d), value: sma[i] - mult * std }; }).filter(Boolean),
+        };
+    };
+
+    IND.calcATR = function(data, p) {
+        const len = p.length;
+        const trs = data.map((d, i) => i === 0 ? d.high - d.low : Math.max(d.high - d.low, Math.abs(d.high - data[i-1].close), Math.abs(d.low - data[i-1].close)));
+        let atr = trs.slice(0, len).reduce((s, v) => s + v, 0) / len;
+        const result = [];
+        for (let i = len; i < data.length; i++) {
+            atr = (atr * (len - 1) + trs[i]) / len;
+            result.push({ time: IND._ts(data[i]), value: atr });
+        }
+        return result;
+    };
+
+    IND.calcVWAP = function(data) {
+        let sp = 0, sv = 0, lastDate = null;
+        return data.map(d => {
+            const ts = IND._ts(d), dt = new Date(ts * 1000);
+            const key = `${dt.getUTCFullYear()}-${dt.getUTCMonth()}-${dt.getUTCDate()}`;
+            if (key !== lastDate) { sp = 0; sv = 0; lastDate = key; }
+            const tp = (d.high + d.low + d.close) / 3;
+            sp += tp * d.volume; sv += d.volume;
+            return { time: ts, value: sv > 0 ? sp / sv : d.close };
+        });
+    };
+
+    IND.calcStoch = function(data, p) {
+        const { kLength = 14, dLength = 3, smooth = 3 } = p;
+        const rawK = data.map((d, i) => {
+            if (i < kLength - 1) return null;
+            const sl = data.slice(i - kLength + 1, i + 1);
+            const hi = Math.max(...sl.map(x => x.high)), lo = Math.min(...sl.map(x => x.low));
+            return hi === lo ? 50 : 100 * (d.close - lo) / (hi - lo);
+        });
+        const fillK = rawK.map(v => v ?? 0);
+        const smK = IND._sma(fillK, smooth), smD = IND._sma(smK.map(v => v ?? 0), dLength);
+        return {
+            k: data.map((d, i) => rawK[i] != null && smK[i] != null ? { time: IND._ts(d), value: smK[i] } : null).filter(Boolean),
+            d: data.map((d, i) => rawK[i] != null && smD[i] != null ? { time: IND._ts(d), value: smD[i] } : null).filter(Boolean),
+        };
+    };
+
+    IND.calcOBV = function(data) {
+        let obv = 0;
+        return data.map((d, i) => {
+            if (i > 0) { if (d.close > data[i-1].close) obv += d.volume; else if (d.close < data[i-1].close) obv -= d.volume; }
+            return { time: IND._ts(d), value: obv };
+        });
+    };
+
+    IND.calcVolume = function(data) {
+        return data.map(d => ({ time: IND._ts(d), value: d.volume, color: d.close >= d.open ? 'rgba(38,166,154,.7)' : 'rgba(239,83,80,.7)' }));
+    };
+
+    // ── Реестр индикаторов ───────────────────────────────────────
+    const INDICATOR_POPULAR = ['ema', 'sma', 'rsi', 'macd', 'vwap', 'bb2', 'atr', 'stoch'];
+    const INDICATOR_CATEGORIES = ['Trend', 'Momentum', 'Volatility', 'Volume', 'Levels', 'My Indicators'];
+
+    const INDICATOR_REGISTRY = {
+        sma: {
+            id: 'sma', name: 'SMA', category: 'Trend', overlay: true,
+            description: '\u041f\u0440\u043e\u0441\u0442\u0430\u044f \u0441\u043a\u043e\u043b\u044c\u0437\u044f\u0449\u0430\u044f \u0441\u0440\u0435\u0434\u043d\u044f\u044f',
+            defaultParams: { length: 20, source: 'close', color: '#2196f3' },
+            calculate: (d, p) => IND.calcSMA(d, p),
+            createSeries(chart, p) { return [chart.addLineSeries({ color: p.color, lineWidth: 1.5, title: 'SMA ' + p.length, lastValueVisible: true, priceLineVisible: false })]; },
+            render(s, r) { s[0].setData(r); }
+        },
+        ema: {
+            id: 'ema', name: 'EMA', category: 'Trend', overlay: true,
+            description: '\u042d\u043a\u0441\u043f\u043e\u043d\u0435\u043d\u0446\u0438\u0430\u043b\u044c\u043d\u0430\u044f \u0421\u041c\u0410',
+            defaultParams: { length: 20, source: 'close', color: '#ff9800' },
+            calculate: (d, p) => IND.calcEMA(d, p),
+            createSeries(chart, p) { return [chart.addLineSeries({ color: p.color, lineWidth: 1.5, title: 'EMA ' + p.length, lastValueVisible: true, priceLineVisible: false })]; },
+            render(s, r) { s[0].setData(r); }
+        },
+        vwma: {
+            id: 'vwma', name: 'VWMA', category: 'Trend', overlay: true,
+            description: '\u0412\u0437\u0432\u0435\u0448\u0435\u043d\u043d\u0430\u044f \u043f\u043e \u043e\u0431\u044a\u0451\u043c\u0443 \u0421\u041c\u0410',
+            defaultParams: { length: 20, color: '#9c27b0' },
+            calculate: (d, p) => IND.calcVWMA(d, p),
+            createSeries(chart, p) { return [chart.addLineSeries({ color: p.color, lineWidth: 1.5, title: 'VWMA ' + p.length, lastValueVisible: true, priceLineVisible: false })]; },
+            render(s, r) { s[0].setData(r); }
+        },
+        supertrend: { id: 'supertrend', name: 'Supertrend', category: 'Trend', overlay: true, description: '\u0422\u0440\u0435\u043d\u0434\u043e\u0432\u044b\u0439 \u0438\u043d\u0434\u0438\u043a\u0430\u0442\u043e\u0440', stub: true, defaultParams: { atr: 10, mult: 3, color: '#26a69a' }, calculate: () => [], createSeries: () => [], render: () => {} },
+        ichimoku: { id: 'ichimoku', name: 'Ichimoku Cloud', category: 'Trend', overlay: true, description: '\u041e\u0431\u043b\u0430\u043a\u043e \u0418\u0448\u0438\u043c\u043e\u043a\u0443', stub: true, defaultParams: {}, calculate: () => [], createSeries: () => [], render: () => {} },
+        rsi: {
+            id: 'rsi', name: 'RSI', category: 'Momentum', overlay: false,
+            description: '\u0418\u043d\u0434\u0435\u043a\u0441 \u043e\u0442\u043d\u043e\u0441\u0438\u0442\u0435\u043b\u044c\u043d\u043e\u0439 \u0441\u0438\u043b\u044b',
+            defaultParams: { length: 14, overbought: 70, oversold: 30 },
+            calculate: (d, p) => IND.calcRSI(d, p),
+            createSeries(chart, p) {
+                const s = chart.addLineSeries({ color: '#2196f3', lineWidth: 1.5, title: 'RSI ' + p.length, priceLineVisible: false });
+                s.createPriceLine({ price: p.overbought, color: 'rgba(239,83,80,.45)', lineWidth: 1, lineStyle: 2, title: '' });
+                s.createPriceLine({ price: p.oversold,   color: 'rgba(38,166,154,.45)', lineWidth: 1, lineStyle: 2, title: '' });
+                s.createPriceLine({ price: 50, color: 'rgba(128,128,128,.25)', lineWidth: 1, lineStyle: 2, title: '' });
+                return [s];
+            },
+            render(s, r) { s[0].setData(r); }
+        },
+        macd: {
+            id: 'macd', name: 'MACD', category: 'Momentum', overlay: false,
+            description: 'Moving Average Convergence / Divergence',
+            defaultParams: { fast: 12, slow: 26, signal: 9 },
+            calculate: (d, p) => IND.calcMACD(d, p),
+            createSeries(chart, p) {
+                const ml = chart.addLineSeries({ color: '#2196f3', lineWidth: 1.5, title: 'MACD', priceLineVisible: false });
+                const sl = chart.addLineSeries({ color: '#ef5350', lineWidth: 1.5, title: 'Signal', priceLineVisible: false });
+                const hl = chart.addHistogramSeries({ priceLineVisible: false, lastValueVisible: false });
+                return [ml, sl, hl];
+            },
+            render(s, r) {
+                s[0].setData(r.macd);
+                s[1].setData(r.signal);
+                s[2].setData(r.hist.map(d => ({ ...d, color: d.value >= 0 ? 'rgba(38,166,154,.7)' : 'rgba(239,83,80,.7)' })));
+            }
+        },
+        stoch: {
+            id: 'stoch', name: 'Stochastic', category: 'Momentum', overlay: false,
+            description: '\u0421\u0442\u043e\u0445\u0430\u0441\u0442\u0438\u0447\u0435\u0441\u043a\u0438\u0439 \u043e\u0441\u0446\u0438\u043b\u043b\u044f\u0442\u043e\u0440',
+            defaultParams: { kLength: 14, dLength: 3, smooth: 3 },
+            calculate: (d, p) => IND.calcStoch(d, p),
+            createSeries(chart, p) {
+                const k = chart.addLineSeries({ color: '#2196f3', lineWidth: 1.5, title: '%K', priceLineVisible: false });
+                const d = chart.addLineSeries({ color: '#ef5350', lineWidth: 1.5, title: '%D', priceLineVisible: false });
+                k.createPriceLine({ price: 80, color: 'rgba(239,83,80,.35)', lineWidth: 1, lineStyle: 2, title: '' });
+                k.createPriceLine({ price: 20, color: 'rgba(38,166,154,.35)', lineWidth: 1, lineStyle: 2, title: '' });
+                return [k, d];
+            },
+            render(s, r) { s[0].setData(r.k); s[1].setData(r.d); }
+        },
+        stochrsi: { id: 'stochrsi', name: 'Stochastic RSI', category: 'Momentum', overlay: false, description: '\u0421\u0442\u043e\u0445\u0430\u0441\u0442\u0438\u0447\u0435\u0441\u043a\u0438\u0439 RSI', stub: true, defaultParams: { length: 14 }, calculate: () => ({ k: [], d: [] }), createSeries: () => [], render: () => {} },
+        cci: { id: 'cci', name: 'CCI', category: 'Momentum', overlay: false, description: 'Commodity Channel Index', stub: true, defaultParams: { length: 20 }, calculate: () => [], createSeries: () => [], render: () => {} },
+        bb2: {
+            id: 'bb2', name: 'Bollinger Bands', category: 'Volatility', overlay: true,
+            description: '\u041f\u043e\u043b\u043e\u0441\u044b \u0411\u043e\u043b\u043b\u0438\u043d\u0434\u0436\u0435\u0440\u0430',
+            defaultParams: { length: 20, mult: 2, color: '#ab47bc' },
+            calculate: (d, p) => IND.calcBollingerBands(d, p),
+            createSeries(chart, p) {
+                const u = chart.addLineSeries({ color: p.color, lineWidth: 1, lineStyle: 0, title: 'BB+', priceLineVisible: false, lastValueVisible: false });
+                const m = chart.addLineSeries({ color: p.color, lineWidth: 1, lineStyle: 1, title: 'BB', priceLineVisible: false, lastValueVisible: false });
+                const l = chart.addLineSeries({ color: p.color, lineWidth: 1, lineStyle: 0, title: 'BB-', priceLineVisible: false, lastValueVisible: false });
+                return [u, m, l];
+            },
+            render(s, r) { s[0].setData(r.upper); s[1].setData(r.mid); s[2].setData(r.lower); }
+        },
+        atr: {
+            id: 'atr', name: 'ATR', category: 'Volatility', overlay: false,
+            description: '\u0421\u0440\u0435\u0434\u043d\u0438\u0439 \u0438\u0441\u0442\u0438\u043d\u043d\u044b\u0439 \u0434\u0438\u0430\u043f\u0430\u0437\u043e\u043d',
+            defaultParams: { length: 14 },
+            calculate: (d, p) => IND.calcATR(d, p),
+            createSeries(chart, p) { return [chart.addLineSeries({ color: '#ff9800', lineWidth: 1.5, title: 'ATR ' + p.length, priceLineVisible: false })]; },
+            render(s, r) { s[0].setData(r); }
+        },
+        keltner: { id: 'keltner', name: 'Keltner Channels', category: 'Volatility', overlay: true, description: '\u041a\u0430\u043d\u0430\u043b\u044b \u041a\u0435\u043b\u0442\u043d\u0435\u0440\u0430', stub: true, defaultParams: { length: 20, atrMult: 2, color: '#9c27b0' }, calculate: () => ({ upper: [], mid: [], lower: [] }), createSeries: () => [], render: () => {} },
+        donchian: { id: 'donchian', name: 'Donchian Channels', category: 'Volatility', overlay: true, description: '\u041a\u0430\u043d\u0430\u043b\u044b \u0414\u043e\u043d\u0447\u0438\u0430\u043d\u0430', stub: true, defaultParams: { length: 20, color: '#00bcd4' }, calculate: () => [], createSeries: () => [], render: () => {} },
+        vwap: {
+            id: 'vwap', name: 'VWAP', category: 'Volume', overlay: true,
+            description: '\u0421\u0440\u0435\u0434\u043d\u0435\u0432\u0437\u0432\u0435\u0448\u0435\u043d\u043d\u0430\u044f \u043f\u043e \u043e\u0431\u044a\u0451\u043c\u0443 \u0446\u0435\u043d\u0430',
+            defaultParams: { color: '#00bcd4' },
+            calculate: (d) => IND.calcVWAP(d),
+            createSeries(chart, p) { return [chart.addLineSeries({ color: p.color, lineWidth: 1.5, lineStyle: 0, title: 'VWAP', priceLineVisible: false })]; },
+            render(s, r) { s[0].setData(r); }
+        },
+        obv: {
+            id: 'obv', name: 'OBV', category: 'Volume', overlay: false,
+            description: 'On-Balance Volume',
+            defaultParams: { color: '#2196f3' },
+            calculate: (d) => IND.calcOBV(d),
+            createSeries(chart, p) { return [chart.addLineSeries({ color: p.color, lineWidth: 1.5, title: 'OBV', priceLineVisible: false })]; },
+            render(s, r) { s[0].setData(r); }
+        },
+        volume2: {
+            id: 'volume2', name: 'Volume', category: 'Volume', overlay: false,
+            description: '\u041e\u0431\u044a\u0451\u043c \u0442\u043e\u0440\u0433\u043e\u0432',
+            defaultParams: {},
+            calculate: (d) => IND.calcVolume(d),
+            createSeries(chart) { return [chart.addHistogramSeries({ priceLineVisible: false, lastValueVisible: true })]; },
+            render(s, r) { s[0].setData(r); }
+        },
+        vprofile: { id: 'vprofile', name: 'Volume Profile', category: 'Volume', overlay: true, description: '\u041f\u0440\u043e\u0444\u0438\u043b\u044c \u043e\u0431\u044a\u0451\u043c\u0430', stub: true, defaultParams: {}, calculate: () => [], createSeries: () => [], render: () => {} },
+        pivots: { id: 'pivots', name: 'Pivot Points', category: 'Levels', overlay: true, description: '\u0423\u0440\u043e\u0432\u043d\u0438 \u0440\u0430\u0437\u0432\u043e\u0440\u043e\u0442\u0430', stub: true, defaultParams: {}, calculate: () => [], createSeries: () => [], render: () => {} },
+        avwap: { id: 'avwap', name: 'Anchored VWAP', category: 'Levels', overlay: true, description: '\u0417\u0430\u043a\u0440\u0435\u043f\u043b\u0451\u043d\u043d\u044b\u0439 VWAP', stub: true, defaultParams: { color: '#ff5722' }, calculate: () => [], createSeries: () => [], render: () => {} },
+    };
+
+    // ── Осциллятор-панели ────────────────────────────────────────
+    function createOscillatorPane(iid, title) {
+        const wrap = document.createElement('div');
+        wrap.id = 'oscWrap_' + iid;
+        wrap.className = 'osc-pane';
+        const CHART_H = 90;
+        wrap.style.height = (CHART_H + 18) + 'px';
+
+        const hdr = document.createElement('div');
+        hdr.className = 'osc-pane-hdr';
+        hdr.innerHTML = '<span>' + title + '</span><button onclick="removeIndicator(\'' + iid + '\')">\u2715</button>';
+        wrap.appendChild(hdr);
+
+        const chartDiv = document.createElement('div');
+        chartDiv.id = 'oscChartDiv_' + iid;
+        chartDiv.style.cssText = 'height:' + CHART_H + 'px;margin-top:18px;';
+        wrap.appendChild(chartDiv);
+
+        document.getElementById('indicatorPanesContainer').appendChild(wrap);
+
+        const c = getThemeColors();
+        const chart = LightweightCharts.createChart(chartDiv, {
+            width: chartDiv.offsetWidth,
+            height: CHART_H,
+            layout: { background: { color: c.bg }, textColor: c.text },
+            grid: { vertLines: { color: c.grid }, horzLines: { color: c.grid } },
+            timeScale: { visible: true, timeVisible: true, secondsVisible: false },
+            rightPriceScale: { borderColor: c.border, minimumWidth: 60 },
+            crosshair: { mode: LightweightCharts.CrosshairMode.Normal },
+            handleScroll: false, handleScale: false,
+        });
+
+        mainChart.timeScale().subscribeVisibleLogicalRangeChange(r => { try { if (r) chart.timeScale().setVisibleLogicalRange(r); } catch(e){} });
+        chart.timeScale().subscribeVisibleLogicalRangeChange(r => { try { if (r) mainChart.timeScale().setVisibleLogicalRange(r); } catch(e){} });
+        new ResizeObserver(() => { try { chart.applyOptions({ width: chartDiv.offsetWidth }); } catch(e){} }).observe(chartDiv);
+
+        return { chart, wrap, iid };
+    }
+
+    function removeOscillatorPane(iid) {
+        const pane = indicatorPanes.find(p => p.iid === iid);
+        if (!pane) return;
+        try { pane.chart.remove(); } catch(e){}
+        pane.wrap.remove();
+        indicatorPanes = indicatorPanes.filter(p => p.iid !== iid);
+    }
+
+    // ── Добавление / удаление индикаторов ───────────────────────
+    function addIndicator(id, extra = {}) {
+        const def = INDICATOR_REGISTRY[id];
+        if (!def) return;
+        const iid = id + '_' + Date.now();
+        const params = { ...def.defaultParams, ...extra };
+        let series = [], pane = null;
+
+        if (def.overlay) {
+            series = def.createSeries(mainChart, params);
+        } else {
+            pane = createOscillatorPane(iid, def.name);
+            indicatorPanes.push(pane);
+            series = def.createSeries(pane.chart, params);
+        }
+
+        const inst = { iid, id, def, params, series, pane };
+        activeIndicators.push(inst);
+        if (lastChartData && lastChartData.length) renderIndicatorInstance(inst, lastChartData);
+        ipAddToRecent(id);
+        renderIPActiveList();
+        closeIndicatorPanel();
+    }
+
+    function removeIndicator(iid) {
+        const idx = activeIndicators.findIndex(x => x.iid === iid);
+        if (idx < 0) return;
+        const inst = activeIndicators[idx];
+        inst.series.forEach(s => { try { (inst.pane ? inst.pane.chart : mainChart).removeSeries(s); } catch(e){} });
+        if (inst.pane) removeOscillatorPane(iid);
+        activeIndicators.splice(idx, 1);
+        renderIPActiveList();
+    }
+
+    function renderIndicatorInstance(inst, data) {
+        try {
+            const result = inst.def.calculate(data, inst.params);
+            if (result !== undefined && inst.series.length > 0) inst.def.render(inst.series, result);
+        } catch(e) { console.warn('[IND] render error', inst.id, e); }
+    }
+
+    function renderAllActiveIndicators(data) {
+        lastChartData = data;
+        activeIndicators.forEach(inst => renderIndicatorInstance(inst, data));
+    }
+
+    // ── Избранное / Недавние ────────────────────────────────────
+    function _ipLoadFav() { try { return new Set(JSON.parse(localStorage.getItem('ipFavorites') || '[]')); } catch { return new Set(); } }
+    function _ipLoadRec() { try { return JSON.parse(localStorage.getItem('ipRecent') || '[]'); } catch { return []; } }
+    let ipFavorites = _ipLoadFav();
+    let ipRecent = _ipLoadRec();
+
+    function ipToggleFav(id) {
+        if (ipFavorites.has(id)) ipFavorites.delete(id); else ipFavorites.add(id);
+        localStorage.setItem('ipFavorites', JSON.stringify([...ipFavorites]));
+        ipFilter(document.getElementById('ipSearch')?.value || '');
+    }
+    function ipAddToRecent(id) {
+        ipRecent = [id, ...ipRecent.filter(x => x !== id)].slice(0, 8);
+        localStorage.setItem('ipRecent', JSON.stringify(ipRecent));
+    }
+
+    // ── UI панели ────────────────────────────────────────────────
+    function openIndicatorPanel() {
+        document.getElementById('indicatorPanelOverlay').style.display = 'flex';
+        ipFilter('');
+        renderIPActiveList();
+        setTimeout(() => document.getElementById('ipSearch')?.focus(), 50);
+    }
+
+    function closeIndicatorPanel() {
+        document.getElementById('indicatorPanelOverlay').style.display = 'none';
+    }
+
+    function renderIPActiveList() {
+        const el = document.getElementById('ipActiveList');
+        if (!el) return;
+        if (!activeIndicators.length) { el.innerHTML = '<div class="ip-empty">\u041d\u0435\u0442 \u0430\u043a\u0442\u0438\u0432\u043d\u044b\u0445 \u0438\u043d\u0434\u0438\u043a\u0430\u0442\u043e\u0440\u043e\u0432</div>'; return; }
+        el.innerHTML = activeIndicators.map(inst => {
+            const pKeys = ['length','fast','slow','signal','kLength','dLength','mult','atr'];
+            const pStr = Object.entries(inst.params).filter(([k]) => pKeys.includes(k)).map(([,v]) => v).join(', ');
+            const dotColor = inst.params.color || '#888';
+            return '<div class="ip-active-item"><span class="ip-dot" style="background:' + dotColor + '"></span><span class="ip-active-name">' + inst.def.name + '</span><span class="ip-active-params">' + pStr + '</span><button class="ip-remove-btn" onclick="removeIndicator(\'' + inst.iid + '\')">\u2715</button></div>';
+        }).join('');
+    }
+
+    function ipFilter(query) {
+        const q = query.toLowerCase().trim();
+        const el = document.getElementById('ipCategoryList');
+        if (!el) return;
+        let html = '';
+
+        if (!q) {
+            // Популярные
+            const pop = INDICATOR_POPULAR.map(id => INDICATOR_REGISTRY[id]).filter(Boolean);
+            html += '<div class="ip-section-title">\u26a1 \u041f\u043e\u043f\u0443\u043b\u044f\u0440\u043d\u044b\u0435</div><div class="ip-grid">';
+            html += pop.map(d => '<div class="ip-pop-item" onclick="addIndicator(\'' + d.id + '\')"><div class="ip-pop-name">' + d.name + '</div><div class="ip-pop-cat">' + d.category + '</div></div>').join('');
+            html += '</div>';
+            // Избранные
+            const favs = [...ipFavorites].map(id => INDICATOR_REGISTRY[id]).filter(Boolean);
+            if (favs.length) { html += '<div class="ip-section-title">\u2605 \u0418\u0437\u0431\u0440\u0430\u043d\u043d\u044b\u0435</div>'; html += favs.map(d => _ipItemHtml(d)).join(''); }
+            // Недавние
+            const recs = ipRecent.map(id => INDICATOR_REGISTRY[id]).filter(Boolean);
+            if (recs.length) { html += '<div class="ip-section-title">\u23f3 \u041d\u0435\u0434\u0430\u0432\u043d\u0438\u0435</div>'; html += recs.map(d => _ipItemHtml(d)).join(''); }
+        }
+
+        // Категории (с фильтром или без)
+        INDICATOR_CATEGORIES.forEach(cat => {
+            const defs = Object.values(INDICATOR_REGISTRY).filter(d => d.category === cat && (!q || d.name.toLowerCase().includes(q) || d.description.toLowerCase().includes(q)));
+            if (!defs.length) return;
+            html += '<div class="ip-section-title">' + cat + '</div>';
+            html += defs.map(d => _ipItemHtml(d)).join('');
+        });
+
+        el.innerHTML = html;
+    }
+
+    function _ipItemHtml(def) {
+        const fav = ipFavorites.has(def.id) ? ' active' : '';
+        const stub = def.stub ? '<span class="ip-stub-tag">soon</span>' : '';
+        const addBtn = def.stub ? '<button class="ip-add-btn" disabled style="opacity:.4;cursor:default">+ \u0414\u043e\u0431\u0430\u0432\u0438\u0442\u044c</button>' : '<button class="ip-add-btn" onclick="addIndicator(\'' + def.id + '\')">+ \u0414\u043e\u0431\u0430\u0432\u0438\u0442\u044c</button>';
+        return '<div class="ip-item"><div class="ip-item-info"><span class="ip-item-name">' + def.name + stub + '</span><span class="ip-item-desc">' + def.description + '</span></div><div class="ip-item-actions"><button class="ip-fav-btn' + fav + '" onclick="event.stopPropagation();ipToggleFav(\'' + def.id + '\')" title="\u0418\u0437\u0431\u0440\u0430\u043d\u043d\u043e\u0435">\u2605</button>' + addBtn + '</div></div>';
+    }
+
+    wlRender();
         } else {
             moexCats.style.display = 'none';
             document.getElementById('divScanTitle').textContent = 'Дивергенции 1D · Крипто';
@@ -3484,6 +3998,24 @@
         </div>
     </div>
 
+
+    <!-- Панель индикаторов -->
+    <div class="modal-overlay" id="indicatorPanelOverlay" style="display:none" onclick="if(event.target===this)closeIndicatorPanel()">
+        <div class="indicator-panel">
+            <div class="ip-header">
+                <span>Индикаторы</span>
+                <button class="ip-close" onclick="closeIndicatorPanel()">✕</button>
+            </div>
+            <div class="ip-search-wrap">
+                <input class="ip-search" id="ipSearch" type="text" placeholder="Поиск индикатора..." oninput="ipFilter(this.value)">
+            </div>
+            <div class="ip-body">
+                <div class="ip-section-title">Активные на графике</div>
+                <div id="ipActiveList"><div class="ip-empty">Нет активных индикаторов</div></div>
+                <div id="ipCategoryList"></div>
+            </div>
+        </div>
+    </div>
     <!-- Настройки -->
     <div class="modal-overlay" id="settingsModal" style="display:none" onclick="if(event.target===this)closeSettings()">
         <div class="rc-box" style="width:440px">
