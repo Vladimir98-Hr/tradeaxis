@@ -848,29 +848,66 @@
         }
         .mc-draw-toolbar.visible { display: flex; }
 
-        /* Settings Modal */
-        .settings-tabs { display: flex; gap: 4px; padding: 0 4px 12px; border-bottom: 1px solid var(--border-color); }
-        .stab-btn { flex: 1; padding: 6px 0; border-radius: 8px; border: 1px solid var(--border-color); background: var(--bg-color); color: var(--text-secondary); font-size: 12px; cursor: pointer; transition: all .15s; }
-        .stab-btn.active { border-color: var(--accent-color); color: var(--accent-color); background: rgba(41,98,255,.1); }
-        .settings-panel { display: none; flex-direction: column; gap: 12px; padding-top: 12px; }
-        .settings-panel.active { display: flex; }
-        .settings-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
-        .settings-label { font-size: 13px; color: var(--text-primary); }
-        .settings-sub { font-size: 11px; color: var(--text-secondary); }
-        .settings-group { display: flex; flex-direction: column; gap: 6px; }
-        .settings-group-title { font-size: 11px; font-weight: 600; color: var(--text-secondary); text-transform: uppercase; letter-spacing: .5px; }
-        .settings-color-row { display: flex; align-items: center; gap: 8px; }
-        .settings-color-row label { font-size: 12px; color: var(--text-secondary); flex: 1; }
-        .settings-color-row input[type=color] { width: 36px; height: 28px; border: 1px solid var(--border-color); border-radius: 6px; background: var(--bg-color); padding: 2px; cursor: pointer; }
-        .settings-toggle { position: relative; display: inline-block; width: 36px; height: 20px; }
-        .settings-toggle input { opacity: 0; width: 0; height: 0; }
-        .settings-slider { position: absolute; cursor: pointer; inset: 0; background: var(--border-color); border-radius: 20px; transition: .2s; }
-        .settings-slider:before { content: ""; position: absolute; width: 14px; height: 14px; left: 3px; bottom: 3px; background: white; border-radius: 50%; transition: .2s; }
-        .settings-toggle input:checked + .settings-slider { background: var(--accent-color); }
-        .settings-toggle input:checked + .settings-slider:before { transform: translateX(16px); }
-        .settings-select { background: var(--bg-color); border: 1px solid var(--border-color); border-radius: 6px; color: var(--text-primary); font-size: 12px; padding: 4px 8px; cursor: pointer; outline: none; }
-        .settings-input-num { background: var(--bg-color); border: 1px solid var(--border-color); border-radius: 6px; color: var(--text-primary); font-size: 13px; padding: 4px 8px; width: 70px; outline: none; text-align: center; }
-        .settings-footer { display: flex; gap: 8px; padding-top: 12px; border-top: 1px solid var(--border-color); }
+        /* Settings v2 — left nav + content pane */
+        .sv2-box { width:760px; max-height:80vh; min-height:460px; display:flex; flex-direction:column; background:var(--bg-card); border-radius:12px; overflow:hidden; box-shadow:0 24px 80px rgba(0,0,0,.65); }
+        .sv2-header { display:flex; align-items:center; gap:10px; padding:13px 16px; border-bottom:1px solid var(--border-color); flex-shrink:0; }
+        .sv2-header-icon { flex-shrink:0; width:18px; height:18px; fill:var(--text-secondary); }
+        .sv2-title { font-size:15px; font-weight:600; flex:1; }
+        .sv2-search { flex:0 0 188px; background:var(--bg-color); border:1px solid var(--border-color); border-radius:8px; color:var(--text-primary); font-size:12px; padding:5px 10px; outline:none; font-family:inherit; }
+        .sv2-search:focus { border-color:var(--accent-blue); }
+        .sv2-close { background:none; border:none; color:var(--text-secondary); font-size:20px; cursor:pointer; padding:2px 8px; border-radius:4px; line-height:1; }
+        .sv2-close:hover { background:var(--hover-bg); color:var(--text-primary); }
+        .sv2-body { display:flex; flex:1; overflow:hidden; }
+        .sv2-nav { width:176px; flex-shrink:0; border-right:1px solid var(--border-color); overflow-y:auto; padding:6px 0; background:var(--bg-secondary); }
+        .sv2-nav-item { display:flex; align-items:center; gap:9px; padding:9px 14px; cursor:pointer; font-size:13px; color:var(--text-secondary); transition:all .15s; border-left:2px solid transparent; user-select:none; }
+        .sv2-nav-item:hover { background:var(--hover-bg); color:var(--text-primary); }
+        .sv2-nav-item.active { background:rgba(41,98,255,.12); color:var(--accent-blue); border-left-color:var(--accent-blue); font-weight:500; }
+        .sv2-nav-item svg { flex-shrink:0; width:15px; height:15px; fill:currentColor; }
+        .sv2-content { flex:1; overflow-y:auto; padding:18px 22px 14px; }
+        .sv2-section { display:none; }
+        .sv2-section.active { display:block; }
+        .sv2-section-title { font-size:15px; font-weight:600; margin-bottom:3px; }
+        .sv2-section-desc { font-size:12px; color:var(--text-secondary); margin-bottom:16px; }
+        .sv2-group { margin-bottom:18px; }
+        .sv2-group-title { font-size:11px; font-weight:700; color:var(--text-secondary); text-transform:uppercase; letter-spacing:.5px; margin-bottom:8px; padding-bottom:5px; border-bottom:1px solid var(--border-color); display:flex; align-items:center; justify-content:space-between; }
+        .sv2-row { display:flex; align-items:center; justify-content:space-between; gap:10px; padding:5px 0; }
+        .sv2-label { font-size:13px; color:var(--text-primary); }
+        .sv2-sub { font-size:11px; color:var(--text-secondary); margin-top:1px; }
+        .sv2-color { width:36px; height:28px; border:1px solid var(--border-color); border-radius:6px; background:var(--bg-color); padding:2px; cursor:pointer; vertical-align:middle; }
+        .sv2-select { background:var(--bg-color); border:1px solid var(--border-color); border-radius:6px; color:var(--text-primary); font-size:12px; padding:4px 8px; cursor:pointer; outline:none; }
+        .sv2-num { background:var(--bg-color); border:1px solid var(--border-color); border-radius:6px; color:var(--text-primary); font-size:13px; padding:4px 8px; width:70px; outline:none; text-align:center; }
+        .sv2-toggle { position:relative; display:inline-block; width:36px; height:20px; flex-shrink:0; }
+        .sv2-toggle input { opacity:0; width:0; height:0; }
+        .sv2-toggle-slider { position:absolute; cursor:pointer; inset:0; background:var(--border-color); border-radius:20px; transition:.2s; }
+        .sv2-toggle-slider:before { content:""; position:absolute; width:14px; height:14px; left:3px; bottom:3px; background:white; border-radius:50%; transition:.2s; }
+        .sv2-toggle input:checked + .sv2-toggle-slider { background:var(--accent-blue); }
+        .sv2-toggle input:checked + .sv2-toggle-slider:before { transform:translateX(16px); }
+        .sv2-radio-group { display:flex; gap:4px; }
+        .sv2-radio-btn { padding:5px 12px; border:1px solid var(--border-color); border-radius:6px; background:var(--bg-color); color:var(--text-secondary); font-size:12px; cursor:pointer; transition:all .15s; }
+        .sv2-radio-btn.active { border-color:var(--accent-blue); color:var(--accent-blue); background:rgba(41,98,255,.1); }
+        .sv2-data-btn { width:100%; padding:8px 12px; background:var(--bg-color); border:1px solid var(--border-color); border-radius:8px; color:var(--text-primary); font-size:13px; cursor:pointer; text-align:left; transition:all .15s; margin-bottom:6px; display:flex; align-items:center; gap:8px; font-family:inherit; }
+        .sv2-data-btn:hover { background:var(--hover-bg); border-color:var(--accent-blue); }
+        .sv2-data-btn.danger:hover { border-color:#ef5350; color:#ef5350; }
+        .sv2-data-btn svg { fill:currentColor; flex-shrink:0; }
+        .sv2-hotkeys-table { width:100%; border-collapse:collapse; font-size:13px; }
+        .sv2-hotkeys-table th { text-align:left; font-size:11px; text-transform:uppercase; letter-spacing:.5px; color:var(--text-secondary); padding:4px 8px 8px; font-weight:600; }
+        .sv2-hotkeys-table td { padding:7px 8px; border-top:1px solid var(--border-color); }
+        .sv2-kbd { display:inline-block; padding:2px 7px; background:var(--bg-color); border:1px solid var(--border-color); border-radius:4px; font-family:monospace; font-size:12px; color:var(--text-primary); }
+        .sv2-reset-btn { font-size:11px; color:var(--text-secondary); cursor:pointer; margin-top:8px; background:none; border:none; padding:2px 0; font-family:inherit; }
+        .sv2-reset-btn:hover { color:var(--text-primary); text-decoration:underline; }
+        .sv2-footer { display:flex; gap:8px; padding:10px 16px; border-top:1px solid var(--border-color); flex-shrink:0; justify-content:flex-end; }
+        .sv2-btn-save { padding:7px 20px; background:var(--accent-blue); border:none; border-radius:8px; color:#fff; font-size:13px; cursor:pointer; font-weight:500; font-family:inherit; }
+        .sv2-btn-save:hover { opacity:.88; }
+        .sv2-btn-cancel { padding:7px 16px; background:var(--bg-color); border:1px solid var(--border-color); border-radius:8px; color:var(--text-secondary); font-size:13px; cursor:pointer; font-family:inherit; }
+        .sv2-btn-cancel:hover { background:var(--hover-bg); color:var(--text-primary); }
+        .sv2-no-results { font-size:13px; color:var(--text-secondary); font-style:italic; padding:30px 0; text-align:center; display:none; }
+        /* backward compat */
+        .settings-toggle { position:relative; display:inline-block; width:36px; height:20px; }
+        .settings-toggle input { opacity:0; width:0; height:0; }
+        .settings-slider { position:absolute; cursor:pointer; inset:0; background:var(--border-color); border-radius:20px; transition:.2s; }
+        .settings-slider:before { content:""; position:absolute; width:14px; height:14px; left:3px; bottom:3px; background:white; border-radius:50%; transition:.2s; }
+        .settings-toggle input:checked + .settings-slider { background:var(--accent-blue); }
+        .settings-toggle input:checked + .settings-slider:before { transform:translateX(16px); }
 
         /* ── Панель индикаторов ──────────────────────────────────── */
         .indicator-panel { width:420px; max-height:82vh; background:var(--card-bg); border:1px solid var(--border-color); border-radius:12px; display:flex; flex-direction:column; overflow:hidden; box-shadow:0 20px 60px rgba(0,0,0,.55); }
@@ -3389,22 +3426,61 @@
 
 
     // ============================================================
-    // Настройки
+    // Настройки v2
     // ============================================================
     const SETTINGS_DEFAULTS = {
+        // Существующие ключи (backward compat)
         candleUp: '#26a69a', candleDown: '#ef5350', chartLimit: 200,
         showAlligator: true, jawColor: '#2962ff', teethColor: '#ef5350', lipsColor: '#26a69a',
         showBB: true, bbColor: '#2196f3',
         showAO: true, aoUp: '#26a69a', aoDown: '#ef5350',
         volThresholdCrypto: 3, volThresholdMoex: 1.0,
-        volAutoRefresh: false, volRefreshInterval: 60
+        volAutoRefresh: false, volRefreshInterval: 60,
+        // Новые ключи
+        showGrid: true, logScale: false, autoScale: true,
+        volMaxResults: 20, scanClickBehavior: 'current',
+        rememberLastMarket: true, rememberLastTimeframe: true,
+        rememberFxIndicators: false, confirmClearAll: true,
     };
+
+    let _settingsSnapshot = null;
+    let _themeSnapshot = null;
 
     function loadSettings() {
         try {
             const stored = JSON.parse(localStorage.getItem('cryptoSettings') || '{}');
             return Object.assign({}, SETTINGS_DEFAULTS, stored);
         } catch { return Object.assign({}, SETTINGS_DEFAULTS); }
+    }
+
+    function collectSettingsFromForm() {
+        return {
+            candleUp:             document.getElementById('s_candleUp').value,
+            candleDown:           document.getElementById('s_candleDown').value,
+            chartLimit:           parseInt(document.getElementById('s_chartLimit').value),
+            showAlligator:        document.getElementById('s_showAlligator').checked,
+            jawColor:             document.getElementById('s_jawColor').value,
+            teethColor:           document.getElementById('s_teethColor').value,
+            lipsColor:            document.getElementById('s_lipsColor').value,
+            showBB:               document.getElementById('s_showBB').checked,
+            bbColor:              document.getElementById('s_bbColor').value,
+            showAO:               document.getElementById('s_showAO').checked,
+            aoUp:                 document.getElementById('s_aoUp').value,
+            aoDown:               document.getElementById('s_aoDown').value,
+            volThresholdCrypto:   parseFloat(document.getElementById('s_volCrypto').value),
+            volThresholdMoex:     parseFloat(document.getElementById('s_volMoex').value),
+            volAutoRefresh:       document.getElementById('s_volAutoRefresh').checked,
+            volRefreshInterval:   parseInt(document.getElementById('s_volInterval').value),
+            showGrid:             document.getElementById('s_showGrid').checked,
+            logScale:             document.getElementById('s_logScale').checked,
+            autoScale:            document.getElementById('s_autoScale').checked,
+            volMaxResults:        parseInt(document.getElementById('s_volMaxResults').value),
+            scanClickBehavior:    document.getElementById('s_scanClick').value,
+            rememberLastMarket:   document.getElementById('s_rememberMarket').checked,
+            rememberLastTimeframe:document.getElementById('s_rememberTf').checked,
+            rememberFxIndicators: document.getElementById('s_rememberFx').checked,
+            confirmClearAll:      document.getElementById('s_confirmClear').checked,
+        };
     }
 
     function applySettings(s) {
@@ -3423,87 +3499,204 @@
             bbLowerSeries.applyOptions({ color: s.bbColor, visible: authorIndicatorsVisible && s.showBB });
         }
         if (aoSeries) aoSeries.applyOptions({ visible: authorIndicatorsVisible && s.showAO });
+        // Сетка
+        try {
+            const gridOpt = { vertLines: { visible: s.showGrid }, horzLines: { visible: s.showGrid } };
+            const allC = [mainChart, volumeChart, aoChart];
+            if (typeof oscPanes !== 'undefined') oscPanes.forEach(p => { if (p && p.chart) allC.push(p.chart); });
+            allC.forEach(ch => { if (ch) ch.applyOptions({ grid: gridOpt }); });
+        } catch(e) {}
+        // Логарифм
+        try {
+            if (mainChart) mainChart.priceScale('right').applyOptions({ mode: s.logScale ? 1 : 0 });
+        } catch(e) {}
+        // Автообновление сканера
         if (volScanInterval) clearInterval(volScanInterval);
         if (s.volAutoRefresh) {
             volScanInterval = setInterval(fetchVolScan, s.volRefreshInterval * 1000);
         }
     }
 
+    function applySettingsLive() {
+        if (document.getElementById('settingsModal').style.display === 'none') return;
+        applySettings(collectSettingsFromForm());
+    }
+
+    function fillSettingsForm(s) {
+        document.getElementById('s_candleUp').value          = s.candleUp;
+        document.getElementById('s_candleDown').value        = s.candleDown;
+        document.getElementById('s_chartLimit').value        = s.chartLimit;
+        document.getElementById('s_showAlligator').checked   = s.showAlligator;
+        document.getElementById('s_jawColor').value          = s.jawColor;
+        document.getElementById('s_teethColor').value        = s.teethColor;
+        document.getElementById('s_lipsColor').value         = s.lipsColor;
+        document.getElementById('s_showBB').checked          = s.showBB;
+        document.getElementById('s_bbColor').value           = s.bbColor;
+        document.getElementById('s_showAO').checked          = s.showAO;
+        document.getElementById('s_aoUp').value              = s.aoUp;
+        document.getElementById('s_aoDown').value            = s.aoDown;
+        document.getElementById('s_volCrypto').value         = s.volThresholdCrypto;
+        document.getElementById('s_volMoex').value           = s.volThresholdMoex;
+        document.getElementById('s_volAutoRefresh').checked  = s.volAutoRefresh;
+        document.getElementById('s_volInterval').value       = s.volRefreshInterval;
+        document.getElementById('s_showGrid').checked        = s.showGrid;
+        document.getElementById('s_logScale').checked        = s.logScale;
+        document.getElementById('s_autoScale').checked       = s.autoScale;
+        document.getElementById('s_volMaxResults').value     = s.volMaxResults;
+        document.getElementById('s_scanClick').value         = s.scanClickBehavior;
+        document.getElementById('s_rememberMarket').checked  = s.rememberLastMarket;
+        document.getElementById('s_rememberTf').checked      = s.rememberLastTimeframe;
+        document.getElementById('s_rememberFx').checked      = s.rememberFxIndicators;
+        document.getElementById('s_confirmClear').checked    = s.confirmClearAll;
+        // Тема
+        const curTheme = document.body.dataset.theme || 'dark';
+        document.querySelectorAll('#sv2ThemeGroup .sv2-radio-btn').forEach(btn => {
+            btn.classList.toggle('active', btn.dataset.theme === curTheme);
+        });
+    }
+
     function openSettings() {
         const s = loadSettings();
-        document.getElementById('s_candleUp').value         = s.candleUp;
-        document.getElementById('s_candleDown').value       = s.candleDown;
-        document.getElementById('s_chartLimit').value       = s.chartLimit;
-        document.getElementById('s_showAlligator').checked  = s.showAlligator;
-        document.getElementById('s_jawColor').value         = s.jawColor;
-        document.getElementById('s_teethColor').value       = s.teethColor;
-        document.getElementById('s_lipsColor').value        = s.lipsColor;
-        document.getElementById('s_showBB').checked         = s.showBB;
-        document.getElementById('s_bbColor').value          = s.bbColor;
-        document.getElementById('s_showAO').checked         = s.showAO;
-        document.getElementById('s_aoUp').value             = s.aoUp;
-        document.getElementById('s_aoDown').value           = s.aoDown;
-        document.getElementById('s_volCrypto').value        = s.volThresholdCrypto;
-        document.getElementById('s_volMoex').value          = s.volThresholdMoex;
-        document.getElementById('s_volAutoRefresh').checked = s.volAutoRefresh;
-        document.getElementById('s_volInterval').value      = s.volRefreshInterval;
-        switchSettingsTab('charts');
+        _settingsSnapshot = JSON.stringify(s);
+        _themeSnapshot = document.body.dataset.theme || 'dark';
+        fillSettingsForm(s);
+        document.getElementById('settingsSearch').value = '';
+        settingsSearchFn('');
+        switchSettingsTab('chart');
         document.getElementById('settingsModal').style.display = 'flex';
     }
 
-    function closeSettings() { document.getElementById('settingsModal').style.display = 'none'; }
+    function closeSettings() {
+        document.getElementById('settingsModal').style.display = 'none';
+    }
+
+    function cancelSettings() {
+        if (_settingsSnapshot) applySettings(JSON.parse(_settingsSnapshot));
+        if (_themeSnapshot && _themeSnapshot !== (document.body.dataset.theme || 'dark')) {
+            document.body.dataset.theme = _themeSnapshot;
+            localStorage.setItem('theme', _themeSnapshot);
+            updateThemeIcon();
+            applyThemeToCharts();
+        }
+        closeSettings();
+    }
 
     function saveSettings() {
-        const s = {
-            candleUp:           document.getElementById('s_candleUp').value,
-            candleDown:         document.getElementById('s_candleDown').value,
-            chartLimit:         parseInt(document.getElementById('s_chartLimit').value),
-            showAlligator:      document.getElementById('s_showAlligator').checked,
-            jawColor:           document.getElementById('s_jawColor').value,
-            teethColor:         document.getElementById('s_teethColor').value,
-            lipsColor:          document.getElementById('s_lipsColor').value,
-            showBB:             document.getElementById('s_showBB').checked,
-            bbColor:            document.getElementById('s_bbColor').value,
-            showAO:             document.getElementById('s_showAO').checked,
-            aoUp:               document.getElementById('s_aoUp').value,
-            aoDown:             document.getElementById('s_aoDown').value,
-            volThresholdCrypto: parseFloat(document.getElementById('s_volCrypto').value),
-            volThresholdMoex:   parseFloat(document.getElementById('s_volMoex').value),
-            volAutoRefresh:     document.getElementById('s_volAutoRefresh').checked,
-            volRefreshInterval: parseInt(document.getElementById('s_volInterval').value),
-        };
+        const s = collectSettingsFromForm();
         localStorage.setItem('cryptoSettings', JSON.stringify(s));
         applySettings(s);
         closeSettings();
     }
 
-    function resetSettings() {
-        localStorage.removeItem('cryptoSettings');
-        const s = SETTINGS_DEFAULTS;
-        document.getElementById('s_candleUp').value         = s.candleUp;
-        document.getElementById('s_candleDown').value       = s.candleDown;
-        document.getElementById('s_chartLimit').value       = s.chartLimit;
-        document.getElementById('s_showAlligator').checked  = s.showAlligator;
-        document.getElementById('s_jawColor').value         = s.jawColor;
-        document.getElementById('s_teethColor').value       = s.teethColor;
-        document.getElementById('s_lipsColor').value        = s.lipsColor;
-        document.getElementById('s_showBB').checked         = s.showBB;
-        document.getElementById('s_bbColor').value          = s.bbColor;
-        document.getElementById('s_showAO').checked         = s.showAO;
-        document.getElementById('s_aoUp').value             = s.aoUp;
-        document.getElementById('s_aoDown').value           = s.aoDown;
-        document.getElementById('s_volCrypto').value        = s.volThresholdCrypto;
-        document.getElementById('s_volMoex').value          = s.volThresholdMoex;
-        document.getElementById('s_volAutoRefresh').checked = s.volAutoRefresh;
-        document.getElementById('s_volInterval').value      = s.volRefreshInterval;
+    function switchSettingsTab(tab) {
+        document.querySelectorAll('.sv2-nav-item').forEach(item => {
+            item.classList.toggle('active', item.dataset.tab === tab);
+        });
+        document.querySelectorAll('.sv2-section').forEach(sec => {
+            sec.classList.remove('active');
+            sec.style.display = '';
+        });
+        const el = document.getElementById('sv2-' + tab);
+        if (el) { el.classList.add('active'); el.style.display = 'block'; }
     }
 
-    function switchSettingsTab(tab) {
-        const tabs = ['charts', 'indicators', 'scanners'];
-        document.querySelectorAll('.stab-btn').forEach((b, i) => b.classList.toggle('active', tabs[i] === tab));
-        document.querySelectorAll('.settings-panel').forEach(p => p.classList.remove('active'));
-        document.getElementById('stab-' + tab).classList.add('active');
+    function sv2SetTheme(theme, btn) {
+        document.querySelectorAll('#sv2ThemeGroup .sv2-radio-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        document.body.dataset.theme = theme;
+        localStorage.setItem('theme', theme);
+        updateThemeIcon();
+        applyThemeToCharts();
     }
+
+    function settingsSearchFn(q) {
+        q = (q || '').toLowerCase().trim();
+        const noRes = document.getElementById('sv2NoResults');
+        if (!q) {
+            document.querySelectorAll('.sv2-row[data-search]').forEach(r => r.style.display = '');
+            document.querySelectorAll('.sv2-section').forEach(s => { s.style.display = ''; s.classList.remove('active'); });
+            noRes.style.display = 'none';
+            switchSettingsTab('chart');
+            return;
+        }
+        let found = false;
+        document.querySelectorAll('.sv2-row[data-search]').forEach(row => {
+            const match = row.dataset.search.toLowerCase().includes(q);
+            row.style.display = match ? '' : 'none';
+            if (match) found = true;
+        });
+        let firstTab = null;
+        document.querySelectorAll('.sv2-section').forEach(sec => {
+            const hasVisible = Array.from(sec.querySelectorAll('.sv2-row[data-search]')).some(r => r.style.display !== 'none');
+            sec.style.display = hasVisible ? '' : 'none';
+            sec.classList.remove('active');
+            if (hasVisible && !firstTab) firstTab = sec.id.replace('sv2-', '');
+        });
+        if (firstTab) switchSettingsTab(firstTab);
+        noRes.style.display = found ? 'none' : '';
+    }
+
+    // Сброс разделов
+    const SECTION_KEYS = {
+        chart:      ['candleUp','candleDown','chartLimit','showGrid','logScale','autoScale'],
+        ui:         [],
+        scanner:    ['volThresholdCrypto','volThresholdMoex','volAutoRefresh','volRefreshInterval','volMaxResults','scanClickBehavior'],
+        indicators: ['showAlligator','jawColor','teethColor','lipsColor','showBB','bbColor','showAO','aoUp','aoDown'],
+        behavior:   ['rememberLastMarket','rememberLastTimeframe','rememberFxIndicators','confirmClearAll'],
+    };
+
+    function resetSection(section) {
+        const keys = SECTION_KEYS[section] || [];
+        const s = loadSettings();
+        keys.forEach(k => { if (k in SETTINGS_DEFAULTS) s[k] = SETTINGS_DEFAULTS[k]; });
+        fillSettingsForm(s);
+        applySettings(s);
+    }
+
+    function resetSectionData(section) {
+        resetSection(section);
+        const s = collectSettingsFromForm();
+        localStorage.setItem('cryptoSettings', JSON.stringify(s));
+    }
+
+    function resetAllSettings() {
+        if (!confirm('Сбросить все настройки до значений по умолчанию?')) return;
+        localStorage.removeItem('cryptoSettings');
+        fillSettingsForm(SETTINGS_DEFAULTS);
+        applySettings(SETTINGS_DEFAULTS);
+    }
+
+    function exportSettings() {
+        const s = loadSettings();
+        const blob = new Blob([JSON.stringify(s, null, 2)], { type: 'application/json' });
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = 'cryptoSettings.json';
+        a.click();
+        URL.revokeObjectURL(a.href);
+    }
+
+    function importSettings(input) {
+        const file = input.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = e => {
+            try {
+                const imported = JSON.parse(e.target.result);
+                const s = Object.assign({}, SETTINGS_DEFAULTS, imported);
+                localStorage.setItem('cryptoSettings', JSON.stringify(s));
+                fillSettingsForm(s);
+                applySettings(s);
+                alert('Настройки импортированы!');
+            } catch(ex) { alert('Ошибка импорта файла'); }
+        };
+        reader.readAsText(file);
+        input.value = '';
+    }
+
+    // backward compat
+    function resetSettings() { resetAllSettings(); }
+
 
     // ============================================================
     // Система индикаторов
@@ -4042,80 +4235,281 @@
             </div>
         </div>
     </div>
-    <!-- Настройки -->
-    <div class="modal-overlay" id="settingsModal" style="display:none" onclick="if(event.target===this)closeSettings()">
-        <div class="rc-box" style="width:440px">
-            <div class="rc-header">
-                <span>Настройки</span>
-                <button class="rc-close" onclick="closeSettings()">&#x00d7;</button>
+    <!-- Настройки v2 -->
+    <div class="modal-overlay" id="settingsModal" style="display:none" onclick="if(event.target===this)cancelSettings()">
+        <div class="sv2-box">
+            <div class="sv2-header">
+                <svg class="sv2-header-icon" viewBox="0 0 24 24"><path d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58c.18-.14.23-.41.12-.61l-1.92-3.32c-.12-.22-.37-.29-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54c-.04-.24-.24-.41-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.07.62-.07.94s.02.64.07.94l-2.03 1.58c-.18.14-.23.41-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"/></svg>
+                <span class="sv2-title">Настройки</span>
+                <input type="text" class="sv2-search" id="settingsSearch" placeholder="Поиск настроек..." oninput="settingsSearchFn(this.value)">
+                <button class="sv2-close" onclick="cancelSettings()">&#xD7;</button>
             </div>
-            <div class="rc-body">
-                <div class="settings-tabs">
-                    <button class="stab-btn active" onclick="switchSettingsTab('charts')">Графики</button>
-                    <button class="stab-btn" onclick="switchSettingsTab('indicators')">Индикаторы</button>
-                    <button class="stab-btn" onclick="switchSettingsTab('scanners')">Сканеры</button>
-                </div>
-                <div class="settings-panel active" id="stab-charts">
-                    <div class="settings-group">
-                        <div class="settings-group-title">Цвета свечей</div>
-                        <div class="settings-color-row"><label>Бычья (рост)</label><input type="color" id="s_candleUp" value="#26a69a"></div>
-                        <div class="settings-color-row"><label>Медвежья (падение)</label><input type="color" id="s_candleDown" value="#ef5350"></div>
+            <div class="sv2-body">
+                <nav class="sv2-nav">
+                    <div class="sv2-nav-item active" onclick="switchSettingsTab('chart')" data-tab="chart">
+                        <svg viewBox="0 0 24 24"><path d="M9 17H7v-7h2v7zm4 0h-2V7h2v10zm4 0h-2v-4h2v4zm2 2H5V5h14v14zm0-16H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2z"/></svg>
+                        График
                     </div>
-                    <div class="settings-row">
-                        <div>
-                            <div class="settings-label">Количество свечей</div>
-                            <div class="settings-sub">История загружаемая за один запрос</div>
+                    <div class="sv2-nav-item" onclick="switchSettingsTab('ui')" data-tab="ui">
+                        <svg viewBox="0 0 24 24"><path d="M20 3H4a2 2 0 00-2 2v11a2 2 0 002 2h6v2H8v2h8v-2h-2v-2h6a2 2 0 002-2V5a2 2 0 00-2-2zm0 13H4V5h16v11z"/></svg>
+                        Интерфейс
+                    </div>
+                    <div class="sv2-nav-item" onclick="switchSettingsTab('scanner')" data-tab="scanner">
+                        <svg viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27A6.471 6.471 0 0016 9.5 6.5 6.5 0 109.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg>
+                        Сканеры
+                    </div>
+                    <div class="sv2-nav-item" onclick="switchSettingsTab('indicators')" data-tab="indicators">
+                        <svg viewBox="0 0 24 24"><path d="M3.5 18.49l6-6.01 4 4L22 6.92l-1.41-1.41-7.09 7.97-4-4L2 16.99z"/></svg>
+                        Базовые инд.
+                    </div>
+                    <div class="sv2-nav-item" onclick="switchSettingsTab('behavior')" data-tab="behavior">
+                        <svg viewBox="0 0 24 24"><path d="M3 17v2h6v-2H3zM3 5v2h10V5H3zm10 16v-2h8v-2h-8v-2h-2v6h2zM7 9v2H3v2h4v2h2V9H7zm14 4v-2H11v2h10zm-6-4h2V7h4V5h-4V3h-2v6z"/></svg>
+                        Модули
+                    </div>
+                    <div class="sv2-nav-item" onclick="switchSettingsTab('data')" data-tab="data">
+                        <svg viewBox="0 0 24 24"><path d="M12 3C7.58 3 4 4.79 4 7v10c0 2.21 3.58 4 8 4s8-1.79 8-4V7c0-2.21-3.58-4-8-4zm0 2c3.87 0 6 1.5 6 2s-2.13 2-6 2-6-1.5-6-2 2.13-2 6-2zm6 12c0 .5-2.13 2-6 2s-6-1.5-6-2v-1.72C7.5 17.7 9.63 18 12 18s4.5-.3 6-1.72V17zm0-4c0 .5-2.13 2-6 2s-6-1.5-6-2v-1.72C7.5 13.7 9.63 14 12 14s4.5-.3 6-1.72V13z"/></svg>
+                        Данные
+                    </div>
+                    <div class="sv2-nav-item" onclick="switchSettingsTab('hotkeys')" data-tab="hotkeys">
+                        <svg viewBox="0 0 24 24"><path d="M20 5H4c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm-9 3h2v2h-2V8zm0 3h2v2h-2v-2zM8 8h2v2H8V8zm0 3h2v2H8v-2zm-1 5H5v-2h2v2zm9 0H8v-2h8v2zm0-3h-2v-2h2v2zm0-3h-2V8h2v2zm3 6h-2v-2h2v2z"/></svg>
+                        Горячие кл.
+                    </div>
+                </nav>
+                <div class="sv2-content">
+
+                    <!-- График -->
+                    <div class="sv2-section active" id="sv2-chart">
+                        <div class="sv2-section-title">График</div>
+                        <div class="sv2-section-desc">Визуальные параметры свечного графика</div>
+                        <div class="sv2-group">
+                            <div class="sv2-group-title">Цвета свечей</div>
+                            <div class="sv2-row" data-search="цвет бычья свеча рост">
+                                <div><div class="sv2-label">Бычья (рост)</div></div>
+                                <input type="color" class="sv2-color" id="s_candleUp" value="#26a69a" oninput="applySettingsLive()">
+                            </div>
+                            <div class="sv2-row" data-search="цвет медвежья свеча падение">
+                                <div><div class="sv2-label">Медвежья (падение)</div></div>
+                                <input type="color" class="sv2-color" id="s_candleDown" value="#ef5350" oninput="applySettingsLive()">
+                            </div>
                         </div>
-                        <select class="settings-select" id="s_chartLimit">
-                            <option value="50">50</option>
-                            <option value="100">100</option>
-                            <option value="200" selected>200</option>
-                            <option value="500">500</option>
-                        </select>
-                    </div>
-                </div>
-                <div class="settings-panel" id="stab-indicators">
-                    <div class="settings-group">
-                        <div class="settings-row">
-                            <div class="settings-group-title">Alligator</div>
-                            <label class="settings-toggle"><input type="checkbox" id="s_showAlligator" checked><span class="settings-slider"></span></label>
+                        <div class="sv2-group">
+                            <div class="sv2-group-title">Данные</div>
+                            <div class="sv2-row" data-search="количество свечей баров история лимит">
+                                <div><div class="sv2-label">Количество баров</div><div class="sv2-sub">История за один запрос</div></div>
+                                <select class="sv2-select" id="s_chartLimit" onchange="applySettingsLive()">
+                                    <option value="50">50</option>
+                                    <option value="100">100</option>
+                                    <option value="200" selected>200</option>
+                                    <option value="500">500</option>
+                                </select>
+                            </div>
                         </div>
-                        <div class="settings-color-row"><label>Jaw (синяя)</label><input type="color" id="s_jawColor" value="#2962ff"></div>
-                        <div class="settings-color-row"><label>Teeth (красная)</label><input type="color" id="s_teethColor" value="#ef5350"></div>
-                        <div class="settings-color-row"><label>Lips (зелёная)</label><input type="color" id="s_lipsColor" value="#26a69a"></div>
-                    </div>
-                    <div class="settings-group">
-                        <div class="settings-row">
-                            <div class="settings-group-title">Bollinger Bands</div>
-                            <label class="settings-toggle"><input type="checkbox" id="s_showBB" checked><span class="settings-slider"></span></label>
+                        <div class="sv2-group">
+                            <div class="sv2-group-title">Отображение</div>
+                            <div class="sv2-row" data-search="сетка линии грид">
+                                <div><div class="sv2-label">Сетка</div><div class="sv2-sub">Горизонтальные и вертикальные линии</div></div>
+                                <label class="sv2-toggle"><input type="checkbox" id="s_showGrid" checked onchange="applySettingsLive()"><span class="sv2-toggle-slider"></span></label>
+                            </div>
+                            <div class="sv2-row" data-search="логарифм шкала лог">
+                                <div><div class="sv2-label">Логарифмическая шкала</div></div>
+                                <label class="sv2-toggle"><input type="checkbox" id="s_logScale" onchange="applySettingsLive()"><span class="sv2-toggle-slider"></span></label>
+                            </div>
+                            <div class="sv2-row" data-search="автомасштаб автоскейл">
+                                <div><div class="sv2-label">Автомасштаб</div></div>
+                                <label class="sv2-toggle"><input type="checkbox" id="s_autoScale" checked onchange="applySettingsLive()"><span class="sv2-toggle-slider"></span></label>
+                            </div>
                         </div>
-                        <div class="settings-color-row"><label>Цвет полос</label><input type="color" id="s_bbColor" value="#2196f3"></div>
+                        <button class="sv2-reset-btn" onclick="resetSection('chart')">&#x21BA; Сбросить раздел</button>
                     </div>
-                    <div class="settings-group">
-                        <div class="settings-row">
-                            <div class="settings-group-title">Awesome Oscillator</div>
-                            <label class="settings-toggle"><input type="checkbox" id="s_showAO" checked><span class="settings-slider"></span></label>
+
+                    <!-- Интерфейс -->
+                    <div class="sv2-section" id="sv2-ui">
+                        <div class="sv2-section-title">Интерфейс</div>
+                        <div class="sv2-section-desc">Внешний вид платформы</div>
+                        <div class="sv2-group">
+                            <div class="sv2-group-title">Тема</div>
+                            <div class="sv2-row" data-search="тема тёмная светлая dark light">
+                                <div class="sv2-label">Цветовая схема</div>
+                                <div class="sv2-radio-group" id="sv2ThemeGroup">
+                                    <button class="sv2-radio-btn active" data-theme="dark" onclick="sv2SetTheme('dark',this)">?? Тёмная</button>
+                                    <button class="sv2-radio-btn" data-theme="light" onclick="sv2SetTheme('light',this)">&#9728; Светлая</button>
+                                </div>
+                            </div>
                         </div>
-                        <div class="settings-color-row"><label>Цвет роста</label><input type="color" id="s_aoUp" value="#26a69a"></div>
-                        <div class="settings-color-row"><label>Цвет падения</label><input type="color" id="s_aoDown" value="#ef5350"></div>
+                        <button class="sv2-reset-btn" onclick="resetSection('ui')">&#x21BA; Сбросить раздел</button>
                     </div>
-                </div>
-                <div class="settings-panel" id="stab-scanners">
-                    <div class="settings-group">
-                        <div class="settings-group-title">Сканер волатильности</div>
-                        <div class="settings-row"><div class="settings-label">Порог крипто (%)</div><input type="number" class="settings-input-num" id="s_volCrypto" value="3" min="0.1" max="50" step="0.5"></div>
-                        <div class="settings-row"><div class="settings-label">Порог MOEX (%)</div><input type="number" class="settings-input-num" id="s_volMoex" value="1" min="0.1" max="50" step="0.5"></div>
+
+                    <!-- Сканеры -->
+                    <div class="sv2-section" id="sv2-scanner">
+                        <div class="sv2-section-title">Сканеры</div>
+                        <div class="sv2-section-desc">Параметры сканера волатильности и дивергенций</div>
+                        <div class="sv2-group">
+                            <div class="sv2-group-title">Сканер волатильности</div>
+                            <div class="sv2-row" data-search="порог волатильность крипто процент">
+                                <div class="sv2-label">Порог крипто (%)</div>
+                                <input type="number" class="sv2-num" id="s_volCrypto" value="3" min="0.1" max="50" step="0.5">
+                            </div>
+                            <div class="sv2-row" data-search="порог волатильность moex биржа">
+                                <div class="sv2-label">Порог MOEX (%)</div>
+                                <input type="number" class="sv2-num" id="s_volMoex" value="1" min="0.1" max="50" step="0.5">
+                            </div>
+                            <div class="sv2-row" data-search="макс результаты количество">
+                                <div><div class="sv2-label">Макс. результатов</div></div>
+                                <select class="sv2-select" id="s_volMaxResults">
+                                    <option value="10">10</option>
+                                    <option value="20" selected>20</option>
+                                    <option value="30">30</option>
+                                    <option value="50">50</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="sv2-group">
+                            <div class="sv2-group-title">Автообновление</div>
+                            <div class="sv2-row" data-search="автообновление авто">
+                                <div><div class="sv2-label">Автообновлять сканер</div></div>
+                                <label class="sv2-toggle"><input type="checkbox" id="s_volAutoRefresh"><span class="sv2-toggle-slider"></span></label>
+                            </div>
+                            <div class="sv2-row" data-search="интервал секунды минута">
+                                <div class="sv2-label">Интервал</div>
+                                <select class="sv2-select" id="s_volInterval">
+                                    <option value="30">30 сек</option>
+                                    <option value="60" selected>1 мин</option>
+                                    <option value="300">5 мин</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="sv2-group">
+                            <div class="sv2-group-title">Клик по результату</div>
+                            <div class="sv2-row" data-search="клик результат перейти">
+                                <div class="sv2-label">Переключить инструмент</div>
+                                <select class="sv2-select" id="s_scanClick">
+                                    <option value="current" selected>В текущем графике</option>
+                                    <option value="auto">Автоматически</option>
+                                </select>
+                            </div>
+                        </div>
+                        <button class="sv2-reset-btn" onclick="resetSection('scanner')">&#x21BA; Сбросить раздел</button>
                     </div>
-                    <div class="settings-group">
-                        <div class="settings-group-title">Автообновление</div>
-                        <div class="settings-row"><div class="settings-label">Автообновлять сканер</div><label class="settings-toggle"><input type="checkbox" id="s_volAutoRefresh"><span class="settings-slider"></span></label></div>
-                        <div class="settings-row"><div class="settings-label">Интервал</div><select class="settings-select" id="s_volInterval"><option value="30">30 сек</option><option value="60" selected>1 мин</option><option value="300">5 мин</option></select></div>
+
+                    <!-- Базовые индикаторы -->
+                    <div class="sv2-section" id="sv2-indicators">
+                        <div class="sv2-section-title">Базовые индикаторы</div>
+                        <div class="sv2-section-desc">Встроенные индикаторы платформы</div>
+                        <div class="sv2-group">
+                            <div class="sv2-group-title">Alligator <label class="sv2-toggle"><input type="checkbox" id="s_showAlligator" checked onchange="applySettingsLive()"><span class="sv2-toggle-slider"></span></label></div>
+                            <div class="sv2-row" data-search="alligator аллигатор jaw челюсть">
+                                <div class="sv2-label">Jaw (челюсть)</div>
+                                <input type="color" class="sv2-color" id="s_jawColor" value="#2962ff" oninput="applySettingsLive()">
+                            </div>
+                            <div class="sv2-row" data-search="alligator аллигатор teeth зубы">
+                                <div class="sv2-label">Teeth (зубы)</div>
+                                <input type="color" class="sv2-color" id="s_teethColor" value="#ef5350" oninput="applySettingsLive()">
+                            </div>
+                            <div class="sv2-row" data-search="alligator аллигатор lips губы">
+                                <div class="sv2-label">Lips (губы)</div>
+                                <input type="color" class="sv2-color" id="s_lipsColor" value="#26a69a" oninput="applySettingsLive()">
+                            </div>
+                        </div>
+                        <div class="sv2-group">
+                            <div class="sv2-group-title">Bollinger Bands <label class="sv2-toggle"><input type="checkbox" id="s_showBB" checked onchange="applySettingsLive()"><span class="sv2-toggle-slider"></span></label></div>
+                            <div class="sv2-row" data-search="bollinger боллинджер полосы цвет">
+                                <div class="sv2-label">Цвет полос</div>
+                                <input type="color" class="sv2-color" id="s_bbColor" value="#2196f3" oninput="applySettingsLive()">
+                            </div>
+                        </div>
+                        <div class="sv2-group">
+                            <div class="sv2-group-title">Awesome Oscillator <label class="sv2-toggle"><input type="checkbox" id="s_showAO" checked onchange="applySettingsLive()"><span class="sv2-toggle-slider"></span></label></div>
+                            <div class="sv2-row" data-search="ao awesome oscillator рост">
+                                <div class="sv2-label">Цвет роста</div>
+                                <input type="color" class="sv2-color" id="s_aoUp" value="#26a69a" oninput="applySettingsLive()">
+                            </div>
+                            <div class="sv2-row" data-search="ao awesome oscillator падение">
+                                <div class="sv2-label">Цвет падения</div>
+                                <input type="color" class="sv2-color" id="s_aoDown" value="#ef5350" oninput="applySettingsLive()">
+                            </div>
+                        </div>
+                        <button class="sv2-reset-btn" onclick="resetSection('indicators')">&#x21BA; Сбросить раздел</button>
                     </div>
+
+                    <!-- Модули -->
+                    <div class="sv2-section" id="sv2-behavior">
+                        <div class="sv2-section-title">Модули и поведение</div>
+                        <div class="sv2-section-desc">UX-поведение модулей без дублирования их логики</div>
+                        <div class="sv2-group">
+                            <div class="sv2-group-title">Стартовое состояние</div>
+                            <div class="sv2-row" data-search="запомнить рынок крипто moex старт">
+                                <div><div class="sv2-label">Открывать последний рынок</div><div class="sv2-sub">Крипто или MOEX при запуске</div></div>
+                                <label class="sv2-toggle"><input type="checkbox" id="s_rememberMarket" checked><span class="sv2-toggle-slider"></span></label>
+                            </div>
+                            <div class="sv2-row" data-search="запомнить таймфрейм тф период">
+                                <div><div class="sv2-label">Открывать последний таймфрейм</div></div>
+                                <label class="sv2-toggle"><input type="checkbox" id="s_rememberTf" checked><span class="sv2-toggle-slider"></span></label>
+                            </div>
+                            <div class="sv2-row" data-search="запомнить fx индикаторы пользовательские">
+                                <div><div class="sv2-label">Сохранять индикаторы fx</div><div class="sv2-sub">SMA, EMA, RSI и др. из панели fx</div></div>
+                                <label class="sv2-toggle"><input type="checkbox" id="s_rememberFx"><span class="sv2-toggle-slider"></span></label>
+                            </div>
+                        </div>
+                        <div class="sv2-group">
+                            <div class="sv2-group-title">Подтверждения</div>
+                            <div class="sv2-row" data-search="подтвердить очистить удалить">
+                                <div><div class="sv2-label">Спрашивать при «Очистить всё»</div><div class="sv2-sub">Инструменты рисования</div></div>
+                                <label class="sv2-toggle"><input type="checkbox" id="s_confirmClear" checked><span class="sv2-toggle-slider"></span></label>
+                            </div>
+                        </div>
+                        <button class="sv2-reset-btn" onclick="resetSection('behavior')">&#x21BA; Сбросить раздел</button>
+                    </div>
+
+                    <!-- Данные -->
+                    <div class="sv2-section" id="sv2-data">
+                        <div class="sv2-section-title">Данные и сохранение</div>
+                        <div class="sv2-section-desc">Управление сохранёнными настройками</div>
+                        <div class="sv2-group">
+                            <div class="sv2-group-title">Экспорт / Импорт</div>
+                            <button class="sv2-data-btn" onclick="exportSettings()">
+                                <svg viewBox="0 0 24 24" style="width:16px;height:16px"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg>
+                                Экспорт настроек в JSON
+                            </button>
+                            <button class="sv2-data-btn" onclick="document.getElementById('sv2ImportFile').click()">
+                                <svg viewBox="0 0 24 24" style="width:16px;height:16px"><path d="M9 16h6v-6h4l-7-7-7 7h4zm-4 2h14v2H5z"/></svg>
+                                Импорт настроек из JSON
+                            </button>
+                            <input type="file" id="sv2ImportFile" accept=".json" style="display:none" onchange="importSettings(this)">
+                        </div>
+                        <div class="sv2-group">
+                            <div class="sv2-group-title">Сброс</div>
+                            <button class="sv2-data-btn" onclick="resetSectionData('chart')">&#x21BA; Сбросить настройки графика</button>
+                            <button class="sv2-data-btn" onclick="resetSectionData('scanner')">&#x21BA; Сбросить настройки сканера</button>
+                            <button class="sv2-data-btn" onclick="resetSectionData('indicators')">&#x21BA; Сбросить настройки индикаторов</button>
+                            <button class="sv2-data-btn danger" onclick="resetAllSettings()">&#x26A0; Полный сброс всех настроек</button>
+                        </div>
+                    </div>
+
+                    <!-- Горячие клавиши -->
+                    <div class="sv2-section" id="sv2-hotkeys">
+                        <div class="sv2-section-title">Горячие клавиши</div>
+                        <div class="sv2-section-desc">Текущие горячие клавиши платформы</div>
+                        <table class="sv2-hotkeys-table">
+                            <thead><tr><th>Клавиша</th><th>Действие</th></tr></thead>
+                            <tbody>
+                                <tr><td><span class="sv2-kbd">Delete</span></td><td>Удалить выделенный объект рисования</td></tr>
+                                <tr><td><span class="sv2-kbd">Ctrl+Z</span></td><td>Отменить последнее рисование</td></tr>
+                                <tr><td><span class="sv2-kbd">H</span></td><td>Горизонтальная линия</td></tr>
+                                <tr><td><span class="sv2-kbd">T</span></td><td>Трендовая линия</td></tr>
+                                <tr><td><span class="sv2-kbd">R</span></td><td>Линейка (линейка)</td></tr>
+                                <tr><td><span class="sv2-kbd">E</span></td><td>Ластик</td></tr>
+                                <tr><td><span class="sv2-kbd">Escape</span></td><td>Курсор (сбросить инструмент)</td></tr>
+                            </tbody>
+                        </table>
+                        <p style="font-size:11px;color:var(--text-secondary);margin-top:16px">Кастомизация горячих клавиш — в будущих версиях</p>
+                    </div>
+
+                    <div class="sv2-no-results" id="sv2NoResults">Ничего не найдено</div>
                 </div>
-                <div class="settings-footer">
-                    <button class="rc-calc-btn" style="flex:1" onclick="saveSettings()">Сохранить</button>
-                    <button class="rc-calc-btn" style="flex:0 0 auto;background:var(--bg-color);color:var(--text-secondary);border:1px solid var(--border-color)" onclick="resetSettings()">Сбросить</button>
-                </div>
+            </div>
+            <div class="sv2-footer">
+                <button class="sv2-btn-cancel" onclick="cancelSettings()">Отмена</button>
+                <button class="sv2-btn-save" onclick="saveSettings()">Сохранить</button>
             </div>
         </div>
     </div>
