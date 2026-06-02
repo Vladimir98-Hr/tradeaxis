@@ -26,6 +26,10 @@ Desktop.ini
 # Logs
 *.log
 
+# Database and uploads (data files, not code)
+users.db
+uploads/
+
 # Local scripts
 backtest.py
 

@@ -21,8 +21,9 @@ EXCHANGE_TIMEFRAMES = {
     '1d': '1d', '1w': '1w'
 }
 
-# Разрешенные CORS-источники
-CORS_ORIGINS = ["http://localhost:3000", "http://localhost:8000"]
+# Разрешенные CORS-источники (берём из .env через запятую)
+_cors_raw = os.getenv("CORS_ORIGINS", "http://localhost:8000")
+CORS_ORIGINS = [s.strip() for s in _cors_raw.split(",")]
 
 # Время жизни кеша в секундах (по умолчанию 5 минут)
 CACHE_TTL = 300
@@ -34,6 +35,14 @@ RATE_LIMIT_SECONDS = 60
 # Хост и порт сервера
 HOST = os.getenv("HOST", "0.0.0.0")
 PORT = int(os.getenv("PORT", "8000"))
+
+# Настройки аутентификации (JWT)
+JWT_SECRET = os.getenv("JWT_SECRET", "change-me-in-production-please")
+JWT_ALGORITHM = "HS256"
+JWT_EXPIRE_DAYS = 30
+
+# База данных пользователей (SQLite)
+DATABASE_URL = os.getenv("DATABASE_URL", "sqlite+aiosqlite:///./users.db")
 
 # Акции MOEX (через MOEX ISS API, без токена, борд TQBR)
 MOEX_SYMBOLS = {

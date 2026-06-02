@@ -24,8 +24,10 @@
             --green: #26a69a;
             --red: #ef5350;
             --grid-line: #1e222d;
+            --panel-bg: #1e222d;
             --shadow: 0 2px 8px rgba(0,0,0,0.3);
             --hover-bg: #252a37;
+            --bg-color: #1e222d;
             --placeholder-bg: rgba(42, 46, 57, 0.5);
             --placeholder-border: #2a2e39;
             --chart-bg: #131722;
@@ -47,8 +49,10 @@
             --green: #26a69a;
             --red: #ef5350;
             --grid-line: #e0e3eb;
+            --panel-bg: #ffffff;
             --shadow: 0 2px 8px rgba(0,0,0,0.08);
             --hover-bg: #eef0f4;
+            --bg-color: #ffffff;
             --placeholder-bg: rgba(224, 227, 235, 0.4);
             --placeholder-border: #d1d4dc;
             --chart-bg: #ffffff;
@@ -122,8 +126,11 @@
             background: var(--accent-blue);
             display: flex; align-items: center; justify-content: center;
             color: #fff; font-size: 14px; font-weight: 600;
-            cursor: pointer;
+            cursor: pointer; overflow: hidden;
         }
+        .sidebar-avatar img { width:100%; height:100%; object-fit:cover; border-radius:50%; display:block; }
+        .pd-avatar-upload { display:flex; align-items:center; gap:8px; padding:8px 12px; font-size:12px; color:var(--text-secondary); cursor:pointer; border-radius:4px; }
+        .pd-avatar-upload:hover { background:var(--hover-bg); }
 
         /* ============================================================
            Topbar (колонки 2-4, строка 1)
@@ -332,6 +339,9 @@
         .pair-change { font-size: 11px; font-weight: 500; }
         .pair-change.positive { color: var(--green); }
         .pair-change.negative { color: var(--red); }
+        .pair-icon img { width:100%; height:100%; border-radius:50%; object-fit:contain; }
+        .pairs-sort-btn { background:none; border:none; color:var(--text-secondary); cursor:pointer; padding:2px 5px; font-size:11px; border-radius:3px; line-height:1; }
+        .pairs-sort-btn.active { color:var(--accent-blue); background:rgba(41,98,255,.12); }
 
         /* ============================================================
            Center Panel (колонка 3, строка 2)
@@ -873,7 +883,9 @@
         .sv2-row { display:flex; align-items:center; justify-content:space-between; gap:10px; padding:5px 0; }
         .sv2-label { font-size:13px; color:var(--text-primary); }
         .sv2-sub { font-size:11px; color:var(--text-secondary); margin-top:1px; }
-        .sv2-color { width:36px; height:28px; border:1px solid var(--border-color); border-radius:6px; background:var(--bg-color); padding:2px; cursor:pointer; vertical-align:middle; }
+        .sv2-swatch { -webkit-appearance:none; appearance:none; width:36px; height:28px; border:1px solid var(--border-color); border-radius:6px; cursor:pointer; vertical-align:middle; padding:0; }
+        .sv2-swatch::-webkit-color-swatch-wrapper { padding:0; border-radius:5px; }
+        .sv2-swatch::-webkit-color-swatch { border:none; border-radius:4px; }
         .sv2-select { background:var(--bg-color); border:1px solid var(--border-color); border-radius:6px; color:var(--text-primary); font-size:12px; padding:4px 8px; cursor:pointer; outline:none; }
         .sv2-num { background:var(--bg-color); border:1px solid var(--border-color); border-radius:6px; color:var(--text-primary); font-size:13px; padding:4px 8px; width:70px; outline:none; text-align:center; }
         .sv2-toggle { position:relative; display:inline-block; width:36px; height:20px; flex-shrink:0; }
@@ -948,6 +960,321 @@
         .osc-pane-hdr { position:absolute; top:0; left:0; right:0; z-index:3; display:flex; align-items:center; justify-content:space-between; padding:1px 8px; background:rgba(19,23,34,.75); font-size:11px; color:var(--text-secondary); pointer-events:none; }
         .osc-pane-hdr button { pointer-events:all; background:none; border:none; color:var(--text-secondary); font-size:11px; cursor:pointer; padding:0 4px; }
         .osc-pane-hdr button:hover { color:var(--text-primary); }
+        /* ── Auth Modal ─────────────────────────────────────────── */
+        .auth-overlay { position:fixed; inset:0; background:rgba(0,0,0,.65); z-index:3000; display:flex; align-items:center; justify-content:center; }
+        .auth-box { background:var(--panel-bg); border:1px solid var(--border-color); border-radius:10px; width:360px; max-width:calc(100vw - 32px); padding:28px 28px 24px; }
+        .auth-title { font-size:18px; font-weight:600; margin-bottom:18px; color:var(--text-primary); }
+        .auth-tabs { display:flex; gap:4px; margin-bottom:20px; }
+        .auth-tab { flex:1; padding:7px; background:none; border:none; border-bottom:2px solid var(--border-color); color:var(--text-secondary); font-size:13px; cursor:pointer; }
+        .auth-tab.active { color:var(--accent-blue); border-color:var(--accent-blue); }
+        .auth-form { display:flex; flex-direction:column; gap:12px; }
+        .auth-input { background:rgba(255,255,255,.06); border:1px solid var(--border-color); border-radius:6px; color:var(--text-primary); font-size:13px; padding:9px 12px; outline:none; }
+        .auth-input:focus { border-color:var(--accent-blue); }
+        .auth-input:-webkit-autofill, .auth-input:-webkit-autofill:hover, .auth-input:-webkit-autofill:focus { -webkit-box-shadow:0 0 0 1000px #1a1e2b inset !important; -webkit-text-fill-color:var(--text-primary) !important; transition:background-color 5000s; }
+        .journal-r-input::-webkit-inner-spin-button, .journal-r-input::-webkit-outer-spin-button { -webkit-appearance:none; margin:0; }
+        .journal-r-input { -webkit-appearance:textfield; appearance:textfield; background:var(--bg-color) !important; color:var(--text-primary) !important; }
+        .journal-r-input:-webkit-autofill { -webkit-box-shadow:0 0 0 1000px var(--bg-color) inset !important; -webkit-text-fill-color:var(--text-primary) !important; }
+        .auth-btn { background:var(--accent-blue); border:none; border-radius:6px; color:#fff; font-size:13px; font-weight:600; padding:10px; cursor:pointer; }
+        .auth-btn:hover { filter:brightness(1.1); }
+        .auth-btn-ghost { background:none; border:1px solid var(--border-color); border-radius:6px; color:var(--text-secondary); font-size:12px; padding:8px; cursor:pointer; }
+        .auth-btn-ghost:hover { color:var(--text-primary); border-color:var(--text-secondary); }
+        .auth-error { color:#ef5350; font-size:12px; text-align:center; min-height:16px; }
+        .auth-pw-wrap { position:relative; }
+        .auth-pw-wrap .auth-input { width:100%; box-sizing:border-box; padding-right:36px; }
+        .auth-eye { position:absolute; right:9px; top:50%; transform:translateY(-50%); background:none; border:none; color:var(--text-secondary); cursor:pointer; font-size:15px; line-height:1; padding:0; }
+        /* ── Profile dropdown ──────────────────────────────────── */
+        .profile-dropdown { position:absolute; bottom:50px; left:52px; background:var(--panel-bg); border:1px solid var(--border-color); border-radius:8px; min-width:180px; z-index:500; box-shadow:0 4px 16px rgba(0,0,0,.4); padding:6px 0; }
+        .profile-dropdown.hidden { display:none; }
+        .pd-username { padding:10px 14px 6px; font-size:13px; font-weight:600; color:var(--text-primary); border-bottom:1px solid var(--border-color); margin-bottom:4px; }
+        .pd-btn { width:100%; background:none; border:none; text-align:left; padding:8px 14px; font-size:13px; color:var(--text-secondary); cursor:pointer; }
+        .pd-btn:hover { background:rgba(255,255,255,.05); color:var(--text-primary); }
+        /* ── News panel ─────────────────────────────────────────── */
+        .news-panel { position:fixed; right:0; top:0; bottom:0; width:360px; background:var(--panel-bg); border-left:1px solid var(--border-color); z-index:401; display:flex; flex-direction:column; transform:translateX(100%); transition:transform .25s ease; }
+        .news-panel.open { transform:translateX(0); }
+        .news-feed { flex:1; overflow-y:auto; padding:12px; display:flex; flex-direction:column; gap:12px; }
+        .news-post { background:var(--bg-secondary); border:1px solid var(--border-color); border-radius:8px; padding:12px; }
+        .news-post-meta { font-size:11px; color:var(--text-secondary); margin-bottom:6px; }
+        .news-post-text { font-size:13px; line-height:1.55; white-space:pre-wrap; word-break:break-word; }
+        .news-media-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(100px,1fr)); gap:6px; margin-top:8px; }
+        .news-media-grid img { width:100%; border-radius:6px; cursor:pointer; object-fit:cover; aspect-ratio:1; }
+        .news-audio { width:100%; margin-top:8px; height:32px; }
+        .news-doc-link { display:inline-flex; align-items:center; gap:6px; font-size:12px; color:#2196f3; text-decoration:none; margin-top:8px; padding:4px 8px; background:rgba(33,150,243,.1); border-radius:4px; }
+        .news-admin-form { padding:10px; border-bottom:1px solid var(--border-color); display:flex; flex-direction:column; gap:8px; flex-shrink:0; }
+        .news-admin-textarea { background:var(--bg-secondary); border:1px solid var(--border-color); border-radius:6px; color:var(--text-primary); font-size:13px; padding:8px; resize:none; min-height:70px; outline:none; width:100%; box-sizing:border-box; }
+        .news-admin-textarea:focus { border-color:#2962ff; }
+        .news-admin-row { display:flex; gap:8px; align-items:center; }
+        .news-delete-btn { margin-top:6px; background:rgba(233,30,99,.15); border:none; color:#e91e63; border-radius:4px; padding:3px 8px; cursor:pointer; font-size:11px; }
+
+        /* ── Chat panel ────────────────────────────────────────── */
+        .chat-panel { position:fixed; right:0; top:0; bottom:0; width:300px; background:var(--panel-bg); border-left:1px solid var(--border-color); z-index:400; display:flex; flex-direction:column; transform:translateX(100%); transition:transform .25s ease; }
+        .chat-panel.open { transform:translateX(0); }
+        .chat-header { display:flex; align-items:center; justify-content:space-between; padding:12px 14px; border-bottom:1px solid var(--border-color); flex-shrink:0; }
+        .chat-header-title { font-size:14px; font-weight:600; color:var(--text-primary); }
+        .chat-online { font-size:11px; color:var(--text-secondary); }
+        .chat-close { background:none; border:none; color:var(--text-secondary); font-size:18px; cursor:pointer; line-height:1; }
+        .chat-messages { flex:1; overflow-y:auto; padding:10px; display:flex; flex-direction:column; gap:6px; }
+        .chat-msg { font-size:12px; line-height:1.5; }
+        .chat-msg-author { font-weight:600; color:var(--accent-blue); margin-right:4px; }
+        .chat-msg-text { color:var(--text-primary); word-break:break-word; }
+        .chat-msg-time { font-size:10px; color:var(--text-secondary); margin-left:4px; }
+        .chat-input-row { display:flex; gap:6px; padding:10px; border-top:1px solid var(--border-color); flex-shrink:0; }
+        .chat-input { flex:1; background:rgba(255,255,255,.06); border:1px solid var(--border-color); border-radius:6px; color:var(--text-primary); font-size:12px; padding:7px 10px; outline:none; }
+        .chat-input:focus { border-color:var(--accent-blue); }
+        .chat-send-btn { background:var(--accent-blue); border:none; border-radius:6px; color:#fff; font-size:12px; padding:7px 12px; cursor:pointer; }
+        .chat-send-btn:hover { filter:brightness(1.1); }
+        .chat-guest-msg { font-size:12px; color:var(--text-secondary); text-align:center; padding:20px 10px; }
+        .chat-admin-badge { font-size:9px; background:rgba(239,83,80,.18); color:#ef5350; padding:1px 5px; border-radius:3px; margin-left:3px; vertical-align:middle; font-weight:700; letter-spacing:.3px; }
+        .chat-del-btn { background:none; border:none; color:var(--text-secondary); font-size:13px; cursor:pointer; padding:0 4px; opacity:.5; margin-left:4px; }
+        .chat-del-btn:hover { color:#ef5350; opacity:1; }
+        .pd-admin-badge { font-size:10px; background:rgba(239,83,80,.18); color:#ef5350; padding:1px 6px; border-radius:3px; margin-left:6px; font-weight:700; }
+
+        /* ============================================================
+           Info Modal — TradeAxis Strategy Presentation
+           ============================================================ */
+        .info-overlay {
+            display: none; position: fixed; inset: 0; z-index: 900;
+            background: rgba(0,0,0,.75); backdrop-filter: blur(3px);
+            overflow-y: auto; padding: 20px 12px 40px;
+        }
+        .info-overlay.open { display: block; }
+        .info-panel {
+            max-width: 860px; margin: 0 auto; border-radius: 16px;
+            background: var(--bg-secondary); border: 1px solid var(--border-color);
+            overflow: hidden; box-shadow: 0 24px 64px rgba(0,0,0,.5);
+        }
+        .info-hero {
+            background: linear-gradient(135deg, #0d1b3e 0%, #131722 40%, #1a0d35 100%);
+            padding: 40px 40px 32px; position: relative; overflow: hidden;
+            border-bottom: 1px solid rgba(41,98,255,.3);
+        }
+        .info-hero::before {
+            content: ''; position: absolute; top: -40px; right: -40px;
+            width: 200px; height: 200px; border-radius: 50%;
+            background: radial-gradient(circle, rgba(41,98,255,.15) 0%, transparent 70%);
+        }
+        .info-hero::after {
+            content: ''; position: absolute; bottom: -20px; left: 30%;
+            width: 300px; height: 150px; border-radius: 50%;
+            background: radial-gradient(ellipse, rgba(156,39,176,.08) 0%, transparent 70%);
+        }
+        .info-logo-row { display: flex; align-items: center; gap: 14px; margin-bottom: 16px; }
+        .info-logo {
+            width: 48px; height: 48px; border-radius: 14px;
+            background: linear-gradient(135deg, #2962ff, #1976d2);
+            display: flex; align-items: center; justify-content: center;
+            box-shadow: 0 4px 16px rgba(41,98,255,.4);
+        }
+        .info-logo svg { width: 26px; height: 26px; fill: #fff; }
+        .info-platform-name { font-size: 28px; font-weight: 800; color: #fff; letter-spacing: -.5px; }
+        .info-platform-sub { font-size: 13px; color: rgba(255,255,255,.5); margin-top: 2px; letter-spacing: .5px; text-transform: uppercase; }
+        .info-hero-desc { font-size: 15px; color: rgba(255,255,255,.75); max-width: 600px; line-height: 1.6; position: relative; z-index: 1; }
+        .info-hero-tags { display: flex; gap: 8px; margin-top: 20px; flex-wrap: wrap; }
+        .info-tag {
+            padding: 4px 12px; border-radius: 20px; font-size: 11px; font-weight: 600;
+            letter-spacing: .4px; text-transform: uppercase;
+        }
+        .info-tag.blue { background: rgba(41,98,255,.2); color: #6b8fff; border: 1px solid rgba(41,98,255,.3); }
+        .info-tag.cyan { background: rgba(0,188,212,.15); color: #4dd0e1; border: 1px solid rgba(0,188,212,.25); }
+        .info-tag.purple { background: rgba(156,39,176,.15); color: #ce93d8; border: 1px solid rgba(156,39,176,.25); }
+        .info-tag.green { background: rgba(38,166,154,.15); color: #80cbc4; border: 1px solid rgba(38,166,154,.25); }
+        .info-close-btn {
+            position: absolute; top: 16px; right: 16px;
+            background: rgba(255,255,255,.08); border: 1px solid rgba(255,255,255,.12);
+            color: rgba(255,255,255,.7); width: 36px; height: 36px;
+            border-radius: 10px; font-size: 18px; cursor: pointer; z-index: 2;
+            display: flex; align-items: center; justify-content: center; transition: .15s;
+        }
+        .info-close-btn:hover { background: rgba(255,255,255,.15); color: #fff; }
+        .info-body { padding: 32px 40px 40px; }
+        .info-section { margin-bottom: 36px; }
+        .info-section-title {
+            font-size: 11px; font-weight: 700; letter-spacing: 1.5px; text-transform: uppercase;
+            color: var(--text-secondary); margin-bottom: 16px;
+            display: flex; align-items: center; gap: 8px;
+        }
+        .info-section-title::after { content: ''; flex: 1; height: 1px; background: var(--border-color); }
+        .info-section-num {
+            width: 22px; height: 22px; border-radius: 6px; font-size: 11px; font-weight: 700;
+            display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+        }
+        .info-section-num.blue { background: rgba(41,98,255,.2); color: #6b8fff; }
+        .info-section-num.cyan { background: rgba(0,188,212,.2); color: #4dd0e1; }
+        .info-section-num.purple { background: rgba(156,39,176,.2); color: #ce93d8; }
+        .info-section-num.orange { background: rgba(255,152,0,.2); color: #ffcc80; }
+        .info-h2 { font-size: 18px; font-weight: 700; color: var(--text-accent); margin-bottom: 12px; margin-top: 0; }
+        .info-h3 { font-size: 14px; font-weight: 700; color: var(--text-primary); margin-bottom: 8px; margin-top: 0; }
+        .info-p { font-size: 13px; color: var(--text-secondary); line-height: 1.65; margin-bottom: 10px; }
+        .info-cards { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 14px; }
+        .info-cards.col3 { grid-template-columns: repeat(3,1fr); }
+        .info-cards.col1 { grid-template-columns: 1fr; }
+        .info-card {
+            background: var(--bg-primary); border: 1px solid var(--border-color);
+            border-radius: 12px; padding: 18px;
+        }
+        .info-card.accent-blue { border-left: 3px solid #2962ff; }
+        .info-card.accent-cyan { border-left: 3px solid #00bcd4; }
+        .info-card.accent-purple { border-left: 3px solid #9c27b0; }
+        .info-card.accent-green { border-left: 3px solid #26a69a; }
+        .info-card.accent-red { border-left: 3px solid #ef5350; }
+        .info-card.accent-orange { border-left: 3px solid #ff9800; }
+        .info-card-icon { font-size: 22px; margin-bottom: 10px; display: block; }
+        .info-badge {
+            display: inline-flex; align-items: center; gap: 5px;
+            padding: 3px 10px; border-radius: 20px; font-size: 11px; font-weight: 600;
+            margin: 2px 0;
+        }
+        .info-badge.bull { background: rgba(0,188,212,.15); color: #4dd0e1; }
+        .info-badge.bear { background: rgba(156,39,176,.15); color: #ce93d8; }
+        .info-badge.up { background: rgba(38,166,154,.15); color: #80cbc4; }
+        .info-badge.dn { background: rgba(239,83,80,.15); color: #ef9a9a; }
+        .info-badge.super { background: linear-gradient(90deg,rgba(41,98,255,.2),rgba(156,39,176,.2)); color: #e0b4ff; border: 1px solid rgba(156,39,176,.3); }
+        .info-steps { counter-reset: step; list-style: none; padding: 0; margin: 0; }
+        .info-steps li {
+            counter-increment: step; padding: 8px 0 8px 38px; position: relative;
+            font-size: 13px; color: var(--text-secondary); line-height: 1.5;
+            border-bottom: 1px solid var(--border-color);
+        }
+        .info-steps li:last-child { border-bottom: none; }
+        .info-steps li::before {
+            content: counter(step); position: absolute; left: 0; top: 8px;
+            width: 22px; height: 22px; border-radius: 6px;
+            background: rgba(41,98,255,.15); color: #6b8fff;
+            font-size: 11px; font-weight: 700;
+            display: flex; align-items: center; justify-content: center;
+        }
+        .info-steps li strong { color: var(--text-primary); }
+        .info-formula {
+            background: var(--bg-primary); border: 1px solid var(--border-color);
+            border-radius: 10px; padding: 14px 18px; font-family: monospace;
+            font-size: 13px; color: #6b8fff; margin: 10px 0;
+        }
+        .info-highlight {
+            background: rgba(41,98,255,.08); border: 1px solid rgba(41,98,255,.2);
+            border-radius: 10px; padding: 14px 18px; margin: 12px 0;
+        }
+        .info-highlight-title { font-size: 12px; font-weight: 700; color: #6b8fff; margin-bottom: 6px; text-transform: uppercase; letter-spacing: .5px; }
+        .info-highlight p { font-size: 13px; color: var(--text-secondary); margin: 0; line-height: 1.6; }
+        @media (max-width: 600px) {
+            .info-hero { padding: 28px 20px 24px; }
+            .info-body { padding: 20px 20px 28px; }
+            .info-cards, .info-cards.col3 { grid-template-columns: 1fr; }
+            .info-platform-name { font-size: 22px; }
+        }
+
+        /* ============================================================
+           Мобильные кнопки — скрыты на десктопе
+           ============================================================ */
+        .mob-only { display: none !important; }
+
+        /* ============================================================
+           Адаптивность для мобильных (≤768px)
+           ============================================================ */
+        @media (max-width: 768px) {
+            .mob-only { display: flex !important; }
+
+            .app-layout {
+                grid-template-columns: 1fr;
+                grid-template-rows: 48px 1fr;
+                min-width: unset;
+            }
+
+            /* Сайдбар → нижняя навигационная панель */
+            .sidebar {
+                position: fixed;
+                bottom: 0; left: 0; right: 0;
+                height: 56px;
+                flex-direction: row;
+                justify-content: space-around;
+                align-items: center;
+                padding: 0 4px;
+                border-right: none;
+                border-top: 1px solid var(--border-color);
+                z-index: 200;
+                gap: 0;
+            }
+            .sidebar-logo { display: none; }
+            .sidebar-icons { flex-direction: row; flex: unset; gap: 0; align-items: center; }
+            .sidebar-bottom { flex-direction: row; margin-top: 0; gap: 0; align-items: center; }
+            .sidebar-btn { width: 44px; height: 44px; }
+
+            /* Topbar */
+            .topbar { grid-column: 1; grid-row: 1; padding: 0 8px; gap: 4px; }
+            .topbar-title { font-size: 13px; margin-right: 4px; }
+            .topbar-sep { display: none; }
+
+            /* Основная область — полная ширина */
+            .center-panel {
+                grid-column: 1;
+                grid-row: 2;
+                padding-bottom: 56px;
+            }
+
+            /* Левая панель → выдвигаемый ящик слева */
+            .left-panel {
+                position: fixed;
+                left: 0; top: 48px; bottom: 56px;
+                width: min(300px, 88vw);
+                z-index: 300;
+                transform: translateX(-100%);
+                transition: transform 0.25s ease;
+                background: var(--bg-secondary);
+                border-right: 1px solid var(--border-color);
+                grid-column: unset; grid-row: unset;
+            }
+            .left-panel.mob-open { transform: translateX(0); }
+
+            /* Правая панель → выдвигаемый ящик справа */
+            .right-panel {
+                position: fixed;
+                right: 0; top: 48px; bottom: 56px;
+                width: min(280px, 88vw);
+                z-index: 300;
+                transform: translateX(100%);
+                transition: transform 0.25s ease;
+                background: var(--bg-secondary);
+                border-left: 1px solid var(--border-color);
+                grid-column: unset; grid-row: unset;
+            }
+            .right-panel.mob-open { transform: translateX(0); }
+
+            /* Затемнение фона при открытом ящике */
+            .mob-backdrop {
+                display: block;
+                position: fixed;
+                inset: 0;
+                background: rgba(0,0,0,0.55);
+                z-index: 280;
+                opacity: 0;
+                pointer-events: none;
+                transition: opacity 0.25s;
+            }
+            .mob-backdrop.active { opacity: 1; pointer-events: auto; }
+
+            /* Чат-панель на мобиле */
+            .chat-panel { width: 100% !important; }
+
+            /* Скрыть лишние кнопки в topbar на мобиле */
+            .topbar-right .topbar-sep,
+            .topbar-right > button:not(.mob-keep) { font-size: 11px; padding: 4px 8px; }
+
+            /* Мультиграфик — крестик всегда виден */
+            .mc-topbar { position: relative; padding: 6px 48px 6px 10px; overflow-x: auto; }
+            .mc-close-btn {
+                position: absolute; right: 6px; top: 50%; transform: translateY(-50%);
+                background: var(--bg-secondary); z-index: 1;
+                box-shadow: -6px 0 10px var(--bg-secondary);
+            }
+
+            /* Шапка графика — компактная */
+            .chart-header { padding: 4px 8px; flex-wrap: nowrap; gap: 6px; overflow: hidden; }
+            .chart-stats { display: none; }
+            .symbol-name { font-size: 13px; }
+            .symbol-price { font-size: 14px; }
+            .symbol-change { font-size: 11px; padding: 1px 5px; }
+            .chart-controls { gap: 4px; }
+            .chart-controls .timeframes button,
+            .chart-controls .chart-type-toggle button { padding: 3px 7px; font-size: 11px; }
+        }
     </style>
 </head>
 <body data-theme="dark">
@@ -965,7 +1292,7 @@
             <button class="sidebar-btn active" title="Графики" onclick="openMultiChart()">
                 <svg viewBox="0 0 24 24"><path d="M3 13h2v-2H3v2zm0 4h2v-2H3v2zm0-8h2V7H3v2zm4 4h14v-2H7v2zm0 4h14v-2H7v2zM7 7v2h14V7H7z"/></svg>
             </button>
-            <button class="sidebar-btn" title="Калькулятор риска" onclick="openRiskCalc()">
+            <button class="sidebar-btn" id="riskCalcBtn" title="Калькулятор риска" onclick="openRiskCalc()">
                 <svg viewBox="0 0 24 24"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-7 3c1.93 0 3.5 1.57 3.5 3.5S13.93 13 12 13s-3.5-1.57-3.5-3.5S10.07 6 12 6zm7 13H5v-.23c0-.62.28-1.2.76-1.58C7.47 15.82 9.64 15 12 15s4.53.82 6.24 2.19c.48.38.76.97.76 1.58V19z"/></svg>
             </button>
             <button class="sidebar-btn" id="drawPanelBtn" title="Инструменты рисования" onclick="toggleDrawingPanel()">
@@ -978,12 +1305,34 @@
             <button class="sidebar-btn" id="settingsBtn" title="Настройки" onclick="openSettings()">
                 <svg viewBox="0 0 24 24"><path d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58c.18-.14.23-.41.12-.61l-1.92-3.32c-.12-.22-.37-.29-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54c-.04-.24-.24-.41-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.07.62-.07.94s.02.64.07.94l-2.03 1.58c-.18.14-.23.41-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"/></svg>
             </button>
-            <button class="sidebar-btn" title="Информация">
+            <button class="sidebar-btn" title="Информация" onclick="openInfoModal()">
                 <svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"/></svg>
             </button>
+            <button class="sidebar-btn" id="newsBtn" title="Журнал автора" onclick="openNews()">
+                <svg viewBox="0 0 24 24"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-5 14H7v-2h7v2zm3-4H7v-2h10v2zm0-4H7V7h10v2z"/></svg>
+            </button>
+            <button class="sidebar-btn" id="chatBtn" title="Чат сообщества" onclick="openChat()">
+                <svg viewBox="0 0 24 24"><path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm0 14H5.17L4 17.17V4h16v12z"/></svg>
+            </button>
+            <!-- Мобильные кнопки — видны только на телефоне -->
+            <button class="sidebar-btn mob-only" title="Список символов" onclick="mobTogglePanel('left')">
+                <svg viewBox="0 0 24 24"><path d="M3 18h18v-2H3v2zm0-5h18v-2H3v2zm0-7v2h18V6H3z"/></svg>
+            </button>
+            <button class="sidebar-btn mob-only" title="Сканер" onclick="mobTogglePanel('right')">
+                <svg viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27A6.471 6.471 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg>
+            </button>
         </div>
-        <div class="sidebar-bottom">
-            <div class="sidebar-avatar">V</div>
+        <div class="sidebar-bottom" style="position:relative">
+            <div class="sidebar-avatar" id="sidebarAvatar" title="Профиль" onclick="toggleProfileDropdown()" style="cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:600"></div>
+            <div id="profileDropdown" class="profile-dropdown hidden">
+                <div class="pd-username" id="pdUsername">—</div>
+                <label class="pd-avatar-upload">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M9 16h6v-6h4l-7-7-7 7h4zm-4 2h14v2H5z"/></svg>
+                    Изменить фото
+                    <input type="file" id="avatarFileInput" accept="image/*" style="display:none" onchange="uploadAvatar(this)">
+                </label>
+                <button class="pd-btn" onclick="logout()">Выйти</button>
+            </div>
         </div>
     </nav>
 
@@ -1000,7 +1349,6 @@
             <button class="theme-toggle" id="themeToggle" title="Сменить тему">
                 <span id="themeIcon">&#9788;</span>
             </button>
-            <span class="currency-badge">USD</span>
         </div>
     </header>
 
@@ -1018,9 +1366,14 @@
         <!-- Список пар -->
         <div class="card pairs-card">
             <input type="text" class="pairs-search" id="pairsSearch" placeholder="Поиск пары...">
-            <div class="pairs-header">
+            <div class="pairs-header" style="grid-template-columns:1fr auto">
                 <span>Пара</span>
-                <span>Цена / Изм.</span>
+                <span style="display:flex;align-items:center;gap:4px">
+                    Изм.
+                    <button class="pairs-sort-btn active" id="sortDefault" onclick="setPairsSort('default')" title="По умолчанию">—</button>
+                    <button class="pairs-sort-btn" id="sortAsc" onclick="setPairsSort('asc')" title="Лучшие">▲</button>
+                    <button class="pairs-sort-btn" id="sortDesc" onclick="setPairsSort('desc')" title="Худшие">▼</button>
+                </span>
             </div>
             <div id="pairsList" style="max-height: calc(100vh - 340px); overflow-y: auto;">
                 <!-- Пары загружаются динамически -->
@@ -1855,7 +2208,8 @@
 
         if (lastCandle && candleSeries) {
             const tfSec = getTimeframeMs(currentTimeframe) / 1000;
-            const expectedTime = Math.floor(Date.now() / 1000 / tfSec) * tfSec;
+            const _localOffSec = -new Date().getTimezoneOffset() * 60;
+            const expectedTime = Math.floor((Date.now() / 1000 + _localOffSec) / tfSec) * tfSec;
             if (expectedTime > lastCandle.time) {
                 // Новый бар
                 const newCandle = { time: expectedTime, open: data.price, high: data.price, low: data.price, close: data.price };
@@ -1916,8 +2270,8 @@
         el.textContent = h > 0
             ? `${h}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`
             : `${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
-        // MOEX: при истечении свечи — перезагрузить данные с сервера
-        if (remaining === 0 && currentMarket === 'moex' && !_moexCandleReloading) {
+        // При истечении свечи — перезагрузить данные с сервера (крипто и MOEX)
+        if (remaining === 0 && !_moexCandleReloading) {
             _moexCandleReloading = true;
             setTimeout(() => { fetchAll(); _moexCandleReloading = false; }, 2000);
         }
@@ -1955,7 +2309,7 @@
                 div.className = `pair-item${isActive ? ' active' : ''}`;
                 div.dataset.symbol = sym.symbol;
                 div.innerHTML = `
-                    <div class="pair-icon" style="background:${color}20;color:${color}">${sym.base[0]}</div>
+                    <div class="pair-icon" style="background:${color}20;color:${color}"><img src="https://cdn.jsdelivr.net/npm/cryptocurrency-icons@0.18.1/svg/color/${sym.base.toLowerCase()}.svg" onerror="this.style.display='none';this.parentNode.textContent='${sym.base[0]}'" alt=""></div>
                     <div class="pair-info">
                         <div class="pair-name">${sym.name}</div>
                         <div class="pair-name-sub">${sym.base}</div>
@@ -1968,6 +2322,7 @@
                 div.addEventListener('click', () => selectPair(sym));
                 container.appendChild(div);
             });
+            _defaultPairsOrder = allSymbols.map(s => s.symbol);
         } catch (e) {
             container.innerHTML = '<div style="padding:16px;text-align:center;color:var(--text-secondary)">Сервер недоступен</div>';
             console.error('Symbols error:', e);
@@ -2129,6 +2484,8 @@
             if (changeEl) {
                 changeEl.textContent = `${data.change24h > 0 ? '+' : ''}${data.change24h}%`;
                 changeEl.className = `pair-change ${data.change24h >= 0 ? 'positive' : 'negative'}`;
+                const pairItem = changeEl.closest('.pair-item');
+                if (pairItem) pairItem.dataset.changeVal = String(data.change24h);
             }
         } catch (e) {}
     }
@@ -2297,7 +2654,8 @@
                 const inst = mcInstances[i];
                 if (!inst || !inst.lastCandle || !inst.series) return;
                 const tfSec = getTimeframeMs(mcTf) / 1000;
-                const expectedTime = Math.floor(Date.now() / 1000 / tfSec) * tfSec;
+                const _localOffSec = -new Date().getTimezoneOffset() * 60;
+                const expectedTime = Math.floor((Date.now() / 1000 + _localOffSec) / tfSec) * tfSec;
                 if (expectedTime > inst.lastCandle.time) {
                     // Новый бар
                     const newC = { time: expectedTime, open: d.price, high: d.price, low: d.price, close: d.price };
@@ -2371,10 +2729,13 @@
                 if (changeEl) {
                     changeEl.textContent = `${data.change24h > 0 ? '+' : ''}${data.change24h}%`;
                     changeEl.className = `pair-change ${data.change24h >= 0 ? 'positive' : 'negative'}`;
+                    const pairItem = changeEl.closest('.pair-item');
+                    if (pairItem) pairItem.dataset.changeVal = String(data.change24h);
                 }
                 // Обновляем основной тикер для текущего символа
                 if (sym === currentSymbol) updateTicker(data);
             }
+            if (currentPairsSort !== 'default') applyPairsSort();
         } catch (e) {}
     }
 
@@ -2460,7 +2821,7 @@
     // ============================================================
     let volNextRefresh = 0;
     let _volGen = 0;   // счётчик поколений — защита от race condition при смене рынка
-    let volScanInterval = null;
+    let volAutoRefreshEnabled = true;
     let rulerPending = false;   // ждём второй клик для линейки
     let hoveredRulerIdx = -1;   // индекс линейки под курсором
     let spreadNextRefresh = 0;
@@ -2506,6 +2867,7 @@
     function tickVolTimer() {
         const el = document.getElementById('volScanTimer');
         if (!el) return;
+        if (!volAutoRefreshEnabled) { el.textContent = ''; return; }
         const left = Math.max(0, Math.round((volNextRefresh - Date.now()) / 1000));
         const m = Math.floor(left / 60), s = left % 60;
         el.textContent = left > 0 ? `↻ ${m}:${s.toString().padStart(2,'0')}` : '';
@@ -2523,7 +2885,7 @@
         const isMoex = currentMarket === 'moex';
         try {
             const url = isMoex
-                ? `${API_BASE}/moex/scan/spread?threshold=1.0&top=20`
+                ? `${API_BASE}/moex/scan/spread?threshold=3.0&top=20`
                 : `${API_BASE}/scan/spread?threshold=1.0&top=20`;
             const res = await fetch(url);
             const json = await res.json();
@@ -2547,6 +2909,7 @@
     function tickSpreadTimer() {
         const el = document.getElementById('spreadScanTimer');
         if (!el) return;
+        if (!volAutoRefreshEnabled) { el.textContent = ''; return; }
         const left = Math.max(0, Math.round((spreadNextRefresh - Date.now()) / 1000));
         const m = Math.floor(left / 60), s = left % 60;
         el.textContent = left > 0 ? `↻ ${m}:${s.toString().padStart(2,'0')}` : '';
@@ -2566,9 +2929,12 @@
         list.innerHTML = `<div class="div-scan-empty">Сканирование${isMoex ? ' MOEX...' : ' всех пар...<br>Может занять 20–40 сек'}</div>`;
         info.textContent = '';
         try {
+            const divTf = loadSettings().divScanTimeframe || '1d';
+            const divTfLabel = divTf === '1d' ? '1D' : divTf === '4h' ? '4H' : divTf === '1h' ? '1H' : divTf.toUpperCase();
+            document.getElementById('divScanTitle').textContent = `Дивергенции ${divTfLabel} · ${isMoex ? 'MOEX' : 'Крипто'}`;
             const url = isMoex
-                ? `${API_BASE}/moex/scan/divergences?timeframe=1d`
-                : `${API_BASE}/scan/divergences?timeframe=1d&limit=50`;
+                ? `${API_BASE}/moex/scan/divergences?timeframe=${divTf}`
+                : `${API_BASE}/scan/divergences?timeframe=${divTf}&limit=50`;
             const res = await fetch(url);
             const json = await res.json();
             if (!res.ok) throw new Error(json.detail || 'Ошибка');
@@ -2642,7 +3008,7 @@
         drawCanvas.addEventListener('mousedown', onDrawMouseDown);
         drawCanvas.addEventListener('mousemove', onDrawMouseMove);
         drawCanvas.addEventListener('mouseup', onDrawMouseUp);
-        // Ctrl+Z
+        // Ctrl+Z и Delete
         document.addEventListener('keydown', e => {
             if ((e.ctrlKey || e.metaKey) && e.key === 'z' && drawingPanelOpen) {
                 e.preventDefault(); undoDrawing();
@@ -3016,6 +3382,7 @@
     // ============================================================
     window.onload = async () => {
         requestAnimationFrame(async () => {
+            await initAuth();
             initCharts();
             initDrawingOverlay();
             setupResizeObserver();
@@ -3388,7 +3755,7 @@
 
     // ---- Watchlist (список наблюдения) ----
     function wlLoad() { return JSON.parse(localStorage.getItem('watchlist_' + currentMarket) || '[]'); }
-    function wlSave(list) { localStorage.setItem('watchlist_' + currentMarket, JSON.stringify(list)); }
+    function wlSave(list) { localStorage.setItem('watchlist_' + currentMarket, JSON.stringify(list)); pushWatchlistToServer(); }
 
     function wlAdd(raw) {
         if (!raw) return;
@@ -3434,11 +3801,11 @@
         showAlligator: true, jawColor: '#2962ff', teethColor: '#ef5350', lipsColor: '#26a69a',
         showBB: true, bbColor: '#2196f3',
         showAO: true, aoUp: '#26a69a', aoDown: '#ef5350',
-        volThresholdCrypto: 3, volThresholdMoex: 1.0,
-        volAutoRefresh: false, volRefreshInterval: 60,
+        volThresholdCrypto: 3, volThresholdMoex: 3,
+        volAutoRefresh: true,
         // Новые ключи
         showGrid: true, logScale: false, autoScale: true,
-        volMaxResults: 20, scanClickBehavior: 'current',
+        divScanTimeframe: '1d',
         rememberLastMarket: true, rememberLastTimeframe: true,
         rememberFxIndicators: false, confirmClearAll: true,
     };
@@ -3470,12 +3837,10 @@
             volThresholdCrypto:   parseFloat(document.getElementById('s_volCrypto').value),
             volThresholdMoex:     parseFloat(document.getElementById('s_volMoex').value),
             volAutoRefresh:       document.getElementById('s_volAutoRefresh').checked,
-            volRefreshInterval:   parseInt(document.getElementById('s_volInterval').value),
             showGrid:             document.getElementById('s_showGrid').checked,
             logScale:             document.getElementById('s_logScale').checked,
             autoScale:            document.getElementById('s_autoScale').checked,
-            volMaxResults:        parseInt(document.getElementById('s_volMaxResults').value),
-            scanClickBehavior:    document.getElementById('s_scanClick').value,
+            divScanTimeframe:     document.getElementById('s_divTimeframe').value,
             rememberLastMarket:   document.getElementById('s_rememberMarket').checked,
             rememberLastTimeframe:document.getElementById('s_rememberTf').checked,
             rememberFxIndicators: document.getElementById('s_rememberFx').checked,
@@ -3511,9 +3876,13 @@
             if (mainChart) mainChart.priceScale('right').applyOptions({ mode: s.logScale ? 1 : 0 });
         } catch(e) {}
         // Автообновление сканера
-        if (volScanInterval) clearInterval(volScanInterval);
-        if (s.volAutoRefresh) {
-            volScanInterval = setInterval(fetchVolScan, s.volRefreshInterval * 1000);
+        const wasEnabled = volAutoRefreshEnabled;
+        volAutoRefreshEnabled = s.volAutoRefresh;
+        if (s.volAutoRefresh && !wasEnabled) {
+            volNextRefresh = 0; spreadNextRefresh = 0;
+            fetchVolScan(); fetchSpreadScan();
+        } else if (!s.volAutoRefresh) {
+            volNextRefresh = 0; spreadNextRefresh = 0;
         }
     }
 
@@ -3538,12 +3907,10 @@
         document.getElementById('s_volCrypto').value         = s.volThresholdCrypto;
         document.getElementById('s_volMoex').value           = s.volThresholdMoex;
         document.getElementById('s_volAutoRefresh').checked  = s.volAutoRefresh;
-        document.getElementById('s_volInterval').value       = s.volRefreshInterval;
+        document.getElementById('s_divTimeframe').value      = s.divScanTimeframe || '1d';
         document.getElementById('s_showGrid').checked        = s.showGrid;
         document.getElementById('s_logScale').checked        = s.logScale;
         document.getElementById('s_autoScale').checked       = s.autoScale;
-        document.getElementById('s_volMaxResults').value     = s.volMaxResults;
-        document.getElementById('s_scanClick').value         = s.scanClickBehavior;
         document.getElementById('s_rememberMarket').checked  = s.rememberLastMarket;
         document.getElementById('s_rememberTf').checked      = s.rememberLastTimeframe;
         document.getElementById('s_rememberFx').checked      = s.rememberFxIndicators;
@@ -3556,6 +3923,7 @@
     }
 
     function openSettings() {
+        if (!currentUser) { openAuthModal('login'); return; }
         const s = loadSettings();
         _settingsSnapshot = JSON.stringify(s);
         _themeSnapshot = document.body.dataset.theme || 'dark';
@@ -3586,6 +3954,7 @@
         localStorage.setItem('cryptoSettings', JSON.stringify(s));
         applySettings(s);
         closeSettings();
+        pushSettingsToServer();
     }
 
     function switchSettingsTab(tab) {
@@ -3640,7 +4009,7 @@
     const SECTION_KEYS = {
         chart:      ['candleUp','candleDown','chartLimit','showGrid','logScale','autoScale'],
         ui:         [],
-        scanner:    ['volThresholdCrypto','volThresholdMoex','volAutoRefresh','volRefreshInterval','volMaxResults','scanClickBehavior'],
+        scanner:    ['volThresholdCrypto','volThresholdMoex','volAutoRefresh','divScanTimeframe'],
         indicators: ['showAlligator','jawColor','teethColor','lipsColor','showBB','bbColor','showAO','aoUp','aoDown'],
         behavior:   ['rememberLastMarket','rememberLastTimeframe','rememberFxIndicators','confirmClearAll'],
     };
@@ -4162,6 +4531,492 @@
     }
 
     wlRender();
+
+    // ── Глобальные горячие клавиши инструментов рисования ──────────
+    // capture=true: срабатывает до любых stopPropagation в дочерних элементах
+    document.addEventListener('keydown', function(e) {
+        const tag = (document.activeElement && document.activeElement.tagName) || '';
+        if (['INPUT','TEXTAREA','SELECT'].includes(tag)) return;
+        const modal = document.getElementById('settingsModal');
+        if (modal && modal.style.display !== 'none') return;
+        if (e.key === 'h' || e.key === 'H') { if (!drawingPanelOpen) toggleDrawingPanel(); setDrawTool('hline'); }
+        else if (e.key === 't' || e.key === 'T') { if (!drawingPanelOpen) toggleDrawingPanel(); setDrawTool('trendline'); }
+        else if (e.key === 'r' || e.key === 'R') { if (!drawingPanelOpen) toggleDrawingPanel(); setDrawTool('ruler'); }
+        else if (e.key === 'e' || e.key === 'E') { if (!drawingPanelOpen) toggleDrawingPanel(); setDrawTool('eraser'); }
+        else if (e.key === 'Escape' && drawingPanelOpen) { setDrawTool('cursor'); }
+        else if (e.key === ' ' && drawingPanelOpen) { e.preventDefault(); setDrawTool('cursor'); }
+    }, true);
+
+    // ================================================================
+    // AUTH & CHAT MODULE
+    // ================================================================
+    let authToken = localStorage.getItem('auth_token') || null;
+    let currentUser = null;
+    let _chatWS = null;
+
+    async function _authFetch(url, opts = {}) {
+        if (!opts.headers) opts.headers = {};
+        if (authToken) opts.headers['Authorization'] = 'Bearer ' + authToken;
+        if (opts.body && typeof opts.body === 'object') {
+            opts.body = JSON.stringify(opts.body);
+            opts.headers['Content-Type'] = 'application/json';
+        }
+        return fetch(url, opts);
+    }
+
+    async function initAuth() {
+        if (!authToken) { _updateAuthUI(); return; }
+        try {
+            const r = await fetch('/auth/me', { headers: { 'Authorization': 'Bearer ' + authToken } });
+            if (r.ok) {
+                currentUser = await r.json();
+                _updateAuthUI();
+                await syncSettingsFromServer();
+                await syncWatchlistFromServer();
+            } else {
+                authToken = null;
+                localStorage.removeItem('auth_token');
+                _updateAuthUI();
+            }
+        } catch { _updateAuthUI(); }
+    }
+
+    async function submitLogin() {
+        const username = document.getElementById('loginUsername').value.trim();
+        const password = document.getElementById('loginPassword').value;
+        const err = document.getElementById('loginError');
+        err.textContent = '';
+        if (!username || !password) { err.textContent = 'Заполните все поля'; return; }
+        try {
+            const r = await fetch('/auth/login', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ username, password })
+            });
+            const data = await r.json();
+            if (!r.ok) { err.textContent = data.detail || 'Ошибка входа'; return; }
+            authToken = data.access_token;
+            currentUser = data.user;
+            localStorage.setItem('auth_token', authToken);
+            closeAuthModal();
+            _updateAuthUI();
+            await syncSettingsFromServer();
+            await syncWatchlistFromServer();
+        } catch { err.textContent = 'Ошибка соединения'; }
+    }
+
+    async function submitRegister() {
+        const username = document.getElementById('regUsername').value.trim();
+        const email = document.getElementById('regEmail').value.trim();
+        const password = document.getElementById('regPassword').value;
+        const password2 = document.getElementById('regPassword2').value;
+        const err = document.getElementById('registerError');
+        err.textContent = '';
+        if (!username || !email || !password) { err.textContent = 'Заполните все поля'; return; }
+        if (password !== password2) { err.textContent = 'Пароли не совпадают'; return; }
+        if (password.length < 6) { err.textContent = 'Пароль минимум 6 символов'; return; }
+        try {
+            const r = await fetch('/auth/register', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ username, email, password })
+            });
+            const data = await r.json();
+            if (!r.ok) { err.textContent = data.detail || 'Ошибка регистрации'; return; }
+            authToken = data.access_token;
+            currentUser = data.user;
+            localStorage.setItem('auth_token', authToken);
+            closeAuthModal();
+            _updateAuthUI();
+        } catch { err.textContent = 'Ошибка соединения'; }
+    }
+
+    function logout() {
+        authToken = null;
+        currentUser = null;
+        localStorage.removeItem('auth_token');
+        _updateAuthUI();
+        closeChat();
+        const dd = document.getElementById('profileDropdown');
+        if (dd) dd.classList.add('hidden');
+    }
+
+    function _updateAuthUI() {
+        const pdUsername = document.getElementById('pdUsername');
+        if (currentUser) {
+            const avatar = document.getElementById('sidebarAvatar');
+            if (avatar) avatar.title = currentUser.is_admin ? currentUser.username + ' (Админ)' : currentUser.username;
+            if (pdUsername) {
+                pdUsername.innerHTML = _esc(currentUser.username) +
+                    (currentUser.is_admin ? ' <span class="pd-admin-badge">Админ</span>' : '');
+            }
+        } else {
+            const avatar = document.getElementById('sidebarAvatar');
+            if (avatar) avatar.title = 'Войти';
+            if (pdUsername) pdUsername.textContent = '—';
+        }
+        _updateAvatarUI();
+        const adminNav = document.getElementById('sv2-nav-admin');
+        if (adminNav) adminNav.style.display = (currentUser && currentUser.is_admin) ? 'flex' : 'none';
+        const riskBtn = document.getElementById('riskCalcBtn');
+        if (riskBtn) riskBtn.style.display = currentUser ? '' : 'none';
+    }
+
+    function openAuthModal(tab) {
+        document.getElementById('authModal').style.display = 'flex';
+        switchAuthTab(tab || 'login');
+    }
+
+    function togglePwVis(id, btn) {
+        const inp = document.getElementById(id);
+        if (inp.type === 'password') { inp.type = 'text'; btn.textContent = '\uD83D\uDD12'; }
+        else { inp.type = 'password'; btn.innerHTML = '&#128065;'; }
+    }
+
+    function closeAuthModal() {
+        document.getElementById('authModal').style.display = 'none';
+    }
+
+    function toggleProfileDropdown() {
+        if (!currentUser) { openAuthModal('login'); return; }
+        const dd = document.getElementById('profileDropdown');
+        if (dd) dd.classList.toggle('hidden');
+    }
+
+    function switchAuthTab(tab) {
+        document.getElementById('loginForm').style.display = tab === 'login' ? 'flex' : 'none';
+        document.getElementById('registerForm').style.display = tab === 'register' ? 'flex' : 'none';
+        document.getElementById('tabLogin').classList.toggle('active', tab === 'login');
+        document.getElementById('tabRegister').classList.toggle('active', tab === 'register');
+    }
+
+    async function syncSettingsFromServer() {
+        if (!authToken) return;
+        try {
+            const r = await _authFetch('/user/settings');
+            if (!r.ok) return;
+            const { settings } = await r.json();
+            if (settings && Object.keys(settings).length > 0) {
+                localStorage.setItem('cryptoSettings', JSON.stringify(settings));
+                if (typeof applySettings === 'function') applySettings(settings);
+            }
+        } catch {}
+    }
+
+    async function syncWatchlistFromServer() {
+        if (!authToken) return;
+        try {
+            const r = await _authFetch('/user/watchlist');
+            if (!r.ok) return;
+            const { items } = await r.json();
+            if (items && items.length > 0) {
+                const byMarket = {};
+                items.forEach(it => {
+                    if (!byMarket[it.market]) byMarket[it.market] = [];
+                    byMarket[it.market].push(it.symbol);
+                });
+                Object.entries(byMarket).forEach(([market, syms]) => {
+                    localStorage.setItem('watchlist_' + market, JSON.stringify(syms));
+                });
+                if (typeof wlRender === 'function') wlRender();
+            }
+        } catch {}
+    }
+
+    async function pushWatchlistToServer() {
+        if (!authToken) return;
+        try {
+            const markets = ['crypto', 'moex'];
+            const items = [];
+            markets.forEach(market => {
+                const list = JSON.parse(localStorage.getItem('watchlist_' + market) || '[]');
+                list.forEach((sym, pos) => items.push({ symbol: sym, market, position: pos }));
+            });
+            await _authFetch('/user/watchlist', { method: 'PUT', body: { items } });
+        } catch {}
+    }
+
+    async function pushSettingsToServer() {
+        if (!authToken) return;
+        try {
+            const settings = JSON.parse(localStorage.getItem('cryptoSettings') || '{}');
+            await _authFetch('/user/settings', { method: 'PUT', body: { settings } });
+        } catch {}
+    }
+
+    // ── Chat ─────────────────────────────────────────────────────────
+
+    function openChat() {
+        if (!currentUser) { openAuthModal('login'); return; }
+        document.getElementById('chatPanel').classList.add('open');
+        document.getElementById('chatInputRow').style.display = 'flex';
+        document.getElementById('chatGuestMsg').style.display = 'none';
+        _connectChatWS();
+    }
+
+    function closeChat() {
+        document.getElementById('chatPanel').classList.remove('open');
+        if (_chatWS) { _chatWS.close(); _chatWS = null; }
+    }
+
+    function _connectChatWS() {
+        if (_chatWS && _chatWS.readyState < 2) return;
+        const proto = location.protocol === 'https:' ? 'wss' : 'ws';
+        _chatWS = new WebSocket(`${proto}://${location.host}/ws/chat?token=${authToken}`);
+        _chatWS.onmessage = (e) => {
+            const msg = JSON.parse(e.data);
+            if (msg.type === 'history') {
+                const container = document.getElementById('chatMessages');
+                container.innerHTML = '';
+                msg.messages.forEach(m => _appendChatMessage(m));
+                container.scrollTop = container.scrollHeight;
+            } else if (msg.type === 'message') {
+                _appendChatMessage(msg);
+                const container = document.getElementById('chatMessages');
+                container.scrollTop = container.scrollHeight;
+            } else if (msg.type === 'online') {
+                const el = document.getElementById('chatOnline');
+                if (el) el.textContent = 'Онлайн: ' + msg.count;
+            } else if (msg.type === 'delete_message') {
+                const el = document.getElementById('chat-msg-' + msg.id);
+                if (el) el.remove();
+            }
+        };
+        _chatWS.onclose = () => { _chatWS = null; };
+    }
+
+    function _appendChatMessage(msg) {
+        const container = document.getElementById('chatMessages');
+        if (!container) return;
+        const div = document.createElement('div');
+        div.className = 'chat-msg';
+        div.id = 'chat-msg-' + msg.id;
+        const time = new Date(msg.timestamp).toLocaleTimeString('ru', { hour: '2-digit', minute: '2-digit' });
+        const adminBadge = msg.is_admin ? '<span class="chat-admin-badge">Админ</span>' : '';
+        const delBtn = (currentUser && currentUser.is_admin)
+            ? '<button class="chat-del-btn" title="Удалить" onclick="_deleteChatMsg(' + msg.id + ')">&#10005;</button>'
+            : '';
+        div.innerHTML = '<span class="chat-msg-author">' + _esc(msg.username) + '</span>' +
+                        adminBadge +
+                        '<span class="chat-msg-text">' + _esc(msg.text) + '</span>' +
+                        '<span class="chat-msg-time">' + time + '</span>' +
+                        delBtn;
+        container.appendChild(div);
+    }
+
+    async function _deleteChatMsg(msgId) {
+        if (!authToken || !currentUser || !currentUser.is_admin) return;
+        try {
+            await fetch('/chat/message/' + msgId + '?token=' + encodeURIComponent(authToken), { method: 'DELETE' });
+        } catch {}
+    }
+
+    function sendChatMessage() {
+        const input = document.getElementById('chatInput');
+        const text = input.value.trim();
+        if (!text || !_chatWS || _chatWS.readyState !== 1) return;
+        _chatWS.send(JSON.stringify({ type: 'message', text }));
+        input.value = '';
+    }
+
+    function _esc(s) {
+        return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    }
+
+    // ============================================================
+    // Мобильные выдвигаемые панели
+    // ============================================================
+    function mobTogglePanel(side) {
+        const panel = document.querySelector(side === 'left' ? '.left-panel' : '.right-panel');
+        const other = document.querySelector(side === 'left' ? '.right-panel' : '.left-panel');
+        const backdrop = document.getElementById('mobBackdrop');
+        const isOpen = panel.classList.toggle('mob-open');
+        other.classList.remove('mob-open');
+        backdrop.classList.toggle('active', isOpen);
+    }
+
+    function mobCloseAll() {
+        document.querySelector('.left-panel').classList.remove('mob-open');
+        document.querySelector('.right-panel').classList.remove('mob-open');
+        document.getElementById('mobBackdrop').classList.remove('active');
+    }
+
+    function openInfoModal() {
+        document.getElementById('infoModal').classList.add('open');
+        document.body.style.overflow = 'hidden';
+    }
+    function closeInfoModal() {
+        document.getElementById('infoModal').classList.remove('open');
+        document.body.style.overflow = '';
+    }
+
+    async function adminLoadUsers() {
+        if (!authToken) return;
+        const el = document.getElementById('adminUsersList');
+        if (!el) return;
+        el.innerHTML = '<div style="color:var(--text-secondary);font-size:12px">Загрузка...</div>';
+        try {
+            const r = await fetch('/user/admin/users', { headers: { 'Authorization': 'Bearer ' + authToken } });
+            if (!r.ok) { el.innerHTML = '<div style="color:#e91e63">Ошибка ' + r.status + ' — ' + (await r.text()) + '</div>'; return; }
+            const data = await r.json();
+            if (!data.users.length) { el.innerHTML = '<div style="color:var(--text-secondary);font-size:12px">Нет пользователей</div>'; return; }
+            el.innerHTML = '<table style="width:100%;border-collapse:collapse;font-size:12px">'
+                + '<thead><tr style="color:var(--text-secondary);border-bottom:1px solid var(--border-color)">'
+                + '<th style="text-align:left;padding:6px 8px">ID</th>'
+                + '<th style="text-align:left;padding:6px 8px">Имя</th>'
+                + '<th style="text-align:left;padding:6px 8px">Email</th>'
+                + '<th style="text-align:left;padding:6px 8px">Дата</th>'
+                + '<th style="text-align:left;padding:6px 8px">Роль</th>'
+                + '<th></th></tr></thead><tbody>'
+                + data.users.map(function(u) {
+                    return '<tr style="border-bottom:1px solid var(--border-color)">'
+                        + '<td style="padding:6px 8px;color:var(--text-secondary)">' + u.id + '</td>'
+                        + '<td style="padding:6px 8px">' + _esc(u.username) + '</td>'
+                        + '<td style="padding:6px 8px;color:var(--text-secondary)">' + _esc(u.email || '—') + '</td>'
+                        + '<td style="padding:6px 8px;color:var(--text-secondary)">' + u.created_at.slice(0, 10) + '</td>'
+                        + '<td style="padding:6px 8px">' + (u.is_admin ? '<span class="pd-admin-badge">Админ</span>' : '') + '</td>'
+                        + '<td style="padding:6px 8px">' + (u.id !== currentUser.id ? '<button onclick="adminDeleteUser(' + u.id + ')" style="background:#e91e6322;border:none;color:#e91e63;border-radius:4px;padding:3px 8px;cursor:pointer;font-size:11px">Удалить</button>' : '') + '</td>'
+                        + '</tr>';
+                }).join('') + '</tbody></table>';
+        } catch(e) { el.innerHTML = '<div style="color:#e91e63">Ошибка соединения</div>'; }
+    }
+
+    async function adminDeleteUser(id) {
+        if (!authToken || !currentUser || !currentUser.is_admin) return;
+        if (!confirm('Удалить пользователя?')) return;
+        await fetch('/user/admin/users/' + id, { method: 'DELETE', headers: { 'Authorization': 'Bearer ' + authToken } });
+        adminLoadUsers();
+    }
+
+    // ── Журнал автора ─────────────────────────────────────────────
+    function openNews() {
+        document.getElementById('newsPanel').classList.add('open');
+        const form = document.getElementById('newsAdminForm');
+        if (form) form.style.display = (currentUser && currentUser.is_admin) ? 'flex' : 'none';
+        loadNewsFeed();
+    }
+    function closeNews() { document.getElementById('newsPanel').classList.remove('open'); }
+
+    async function loadNewsFeed() {
+        const feed = document.getElementById('newsFeed');
+        try {
+            const r = await fetch('/news');
+            const data = await r.json();
+            const posts = data.posts;
+            const cnt = document.getElementById('newsPostCount');
+            if (cnt) cnt.textContent = posts.length ? posts.length + ' записей' : '';
+            if (!posts.length) { feed.innerHTML = '<div style="text-align:center;color:var(--text-secondary);font-size:12px;margin-top:20px">Записей пока нет</div>'; return; }
+            feed.innerHTML = posts.map(p => _renderNewsPost(p)).join('');
+        } catch { feed.innerHTML = '<div style="color:#e91e63;font-size:12px;text-align:center">Ошибка загрузки</div>'; }
+    }
+
+    function _renderNewsPost(p) {
+        const date = new Date(p.created_at).toLocaleString('ru-RU', {day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'});
+        const media = p.media || [];
+        const imgs = media.filter(m => m.type === 'image');
+        const audios = media.filter(m => m.type === 'audio');
+        const docs = media.filter(m => m.type === 'doc');
+        const deleteBtn = (currentUser && currentUser.is_admin) ? `<button class="news-delete-btn" onclick="deleteNewsPost(${p.id})">Удалить</button>` : '';
+        const imgGrid = imgs.length ? `<div class="news-media-grid">${imgs.map(m => `<img src="${m.url}" onclick="window.open('${m.url}','_blank')" alt="${_esc(m.original_name)}">`).join('')}</div>` : '';
+        const audioBlock = audios.map(m => `<audio class="news-audio" controls src="${m.url}"></audio>`).join('');
+        const docLinks = docs.map(m => `<a class="news-doc-link" href="${m.url}" download="${_esc(m.original_name)}"><svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z"/></svg>${_esc(m.original_name)}</a>`).join('');
+        return `<div class="news-post" id="news-${p.id}">
+            <div class="news-post-meta">${date}</div>
+            <div class="news-post-text">${_esc(p.content)}</div>
+            ${imgGrid}${audioBlock}${docLinks}
+            ${deleteBtn}
+        </div>`;
+    }
+
+    function newsFilesChanged(input) {
+        const el = document.getElementById('newsFilesCount');
+        if (el) el.textContent = input.files.length ? `${input.files.length} файл(ов)` : '';
+    }
+
+    async function submitNewsPost() {
+        if (!currentUser || !currentUser.is_admin) return;
+        const text = document.getElementById('newsText').value.trim();
+        const filesInput = document.getElementById('newsFiles');
+        if (!text && !filesInput.files.length) return;
+        const fd = new FormData();
+        fd.append('content', text || ' ');
+        for (const f of filesInput.files) fd.append('files', f);
+        try {
+            const r = await fetch('/news', { method: 'POST', headers: { 'Authorization': 'Bearer ' + authToken }, body: fd });
+            if (!r.ok) { alert('Ошибка публикации'); return; }
+            document.getElementById('newsText').value = '';
+            filesInput.value = '';
+            document.getElementById('newsFilesCount').textContent = '';
+            loadNewsFeed();
+        } catch { alert('Ошибка соединения'); }
+    }
+
+    async function deleteNewsPost(id) {
+        if (!currentUser || !currentUser.is_admin || !confirm('Удалить запись?')) return;
+        await fetch('/news/' + id, { method: 'DELETE', headers: { 'Authorization': 'Bearer ' + authToken } });
+        const el = document.getElementById('news-' + id);
+        if (el) el.remove();
+        loadNewsFeed();
+    }
+
+    // ── Сортировка списка пар ──────────────────────────────────────
+    let currentPairsSort = 'default';
+    let _defaultPairsOrder = [];
+
+    function setPairsSort(mode) {
+        currentPairsSort = mode;
+        ['sortDefault', 'sortAsc', 'sortDesc'].forEach(id => document.getElementById(id)?.classList.remove('active'));
+        const map = { default: 'sortDefault', asc: 'sortAsc', desc: 'sortDesc' };
+        document.getElementById(map[mode])?.classList.add('active');
+        applyPairsSort();
+    }
+
+    function applyPairsSort() {
+        const container = document.getElementById('pairsList');
+        if (!container) return;
+        const items = Array.from(container.querySelectorAll('.pair-item'));
+        if (!items.length) return;
+        if (currentPairsSort === 'default') {
+            _defaultPairsOrder.forEach(sym => {
+                const el = container.querySelector(`[data-symbol="${sym}"]`);
+                if (el) container.appendChild(el);
+            });
+            return;
+        }
+        items.sort((a, b) => {
+            const av = parseFloat(a.dataset.changeVal || '0');
+            const bv = parseFloat(b.dataset.changeVal || '0');
+            return currentPairsSort === 'asc' ? bv - av : av - bv;
+        });
+        items.forEach(el => container.appendChild(el));
+    }
+
+    // ── Аватар профиля ────────────────────────────────────────────
+    function _updateAvatarUI() {
+        const el = document.getElementById('sidebarAvatar');
+        if (!el) return;
+        if (currentUser?.avatar_url) {
+            el.innerHTML = `<img src="${currentUser.avatar_url}?t=${Date.now()}" alt="">`;
+        } else if (currentUser) {
+            el.textContent = currentUser.username[0].toUpperCase();
+        } else {
+            el.innerHTML = '<svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M12 12c2.7 0 4.8-2.1 4.8-4.8S14.7 2.4 12 2.4 7.2 4.5 7.2 7.2 9.3 12 12 12zm0 2.4c-3.2 0-9.6 1.6-9.6 4.8v2.4h19.2v-2.4c0-3.2-6.4-4.8-9.6-4.8z"/></svg>';
+        }
+    }
+
+    async function uploadAvatar(input) {
+        if (!input.files[0] || !authToken) return;
+        const fd = new FormData();
+        fd.append('file', input.files[0]);
+        try {
+            const r = await fetch('/user/avatar', { method: 'POST', headers: { 'Authorization': 'Bearer ' + authToken }, body: fd });
+            if (!r.ok) { alert('Ошибка загрузки'); return; }
+            const data = await r.json();
+            currentUser.avatar_url = data.avatar_url;
+            _updateAvatarUI();
+        } catch { alert('Ошибка соединения'); }
+        input.value = '';
+    }
 </script>
     <!-- Журнал: модал результатов Келли/RoR -->
     <div class="modal-overlay" id="kellyModal" style="display:none" onclick="if(event.target===this)this.style.display='none'">
@@ -4274,6 +5129,10 @@
                         <svg viewBox="0 0 24 24"><path d="M20 5H4c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm-9 3h2v2h-2V8zm0 3h2v2h-2v-2zM8 8h2v2H8V8zm0 3h2v2H8v-2zm-1 5H5v-2h2v2zm9 0H8v-2h8v2zm0-3h-2v-2h2v2zm0-3h-2V8h2v2zm3 6h-2v-2h2v2z"/></svg>
                         Горячие кл.
                     </div>
+                    <div class="sv2-nav-item" id="sv2-nav-admin" style="display:none" onclick="switchSettingsTab('admin')" data-tab="admin">
+                        <svg viewBox="0 0 24 24"><path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4zm0 4l5 2.18V11c0 3.5-2.33 6.79-5 7.93-2.67-1.14-5-4.43-5-7.93V7.18L12 5zm-1 3v4h2V8h-2zm0 6v2h2v-2h-2z"/></svg>
+                        Администрирование
+                    </div>
                 </nav>
                 <div class="sv2-content">
 
@@ -4285,11 +5144,11 @@
                             <div class="sv2-group-title">Цвета свечей</div>
                             <div class="sv2-row" data-search="цвет бычья свеча рост">
                                 <div><div class="sv2-label">Бычья (рост)</div></div>
-                                <input type="color" class="sv2-color" id="s_candleUp" value="#26a69a" oninput="applySettingsLive()">
+                                <input type="color" class="sv2-swatch" id="s_candleUp" value="#26a69a" oninput="applySettingsLive()">
                             </div>
                             <div class="sv2-row" data-search="цвет медвежья свеча падение">
                                 <div><div class="sv2-label">Медвежья (падение)</div></div>
-                                <input type="color" class="sv2-color" id="s_candleDown" value="#ef5350" oninput="applySettingsLive()">
+                                <input type="color" class="sv2-swatch" id="s_candleDown" value="#ef5350" oninput="applySettingsLive()">
                             </div>
                         </div>
                         <div class="sv2-group">
@@ -4351,40 +5210,25 @@
                             </div>
                             <div class="sv2-row" data-search="порог волатильность moex биржа">
                                 <div class="sv2-label">Порог MOEX (%)</div>
-                                <input type="number" class="sv2-num" id="s_volMoex" value="1" min="0.1" max="50" step="0.5">
-                            </div>
-                            <div class="sv2-row" data-search="макс результаты количество">
-                                <div><div class="sv2-label">Макс. результатов</div></div>
-                                <select class="sv2-select" id="s_volMaxResults">
-                                    <option value="10">10</option>
-                                    <option value="20" selected>20</option>
-                                    <option value="30">30</option>
-                                    <option value="50">50</option>
-                                </select>
+                                <input type="number" class="sv2-num" id="s_volMoex" value="3" min="0.1" max="50" step="0.5">
                             </div>
                         </div>
                         <div class="sv2-group">
                             <div class="sv2-group-title">Автообновление</div>
                             <div class="sv2-row" data-search="автообновление авто">
                                 <div><div class="sv2-label">Автообновлять сканер</div></div>
-                                <label class="sv2-toggle"><input type="checkbox" id="s_volAutoRefresh"><span class="sv2-toggle-slider"></span></label>
-                            </div>
-                            <div class="sv2-row" data-search="интервал секунды минута">
-                                <div class="sv2-label">Интервал</div>
-                                <select class="sv2-select" id="s_volInterval">
-                                    <option value="30">30 сек</option>
-                                    <option value="60" selected>1 мин</option>
-                                    <option value="300">5 мин</option>
-                                </select>
+                                <label class="sv2-toggle"><input type="checkbox" id="s_volAutoRefresh" onchange="applySettingsLive()"><span class="sv2-toggle-slider"></span></label>
                             </div>
                         </div>
                         <div class="sv2-group">
-                            <div class="sv2-group-title">Клик по результату</div>
-                            <div class="sv2-row" data-search="клик результат перейти">
-                                <div class="sv2-label">Переключить инструмент</div>
-                                <select class="sv2-select" id="s_scanClick">
-                                    <option value="current" selected>В текущем графике</option>
-                                    <option value="auto">Автоматически</option>
+                            <div class="sv2-group-title">Сканер дивергенций</div>
+                            <div class="sv2-row" data-search="дивергенция таймфрейм">
+                                <div class="sv2-label">Таймфрейм</div>
+                                <select class="sv2-select" id="s_divTimeframe" onchange="applySettingsLive()">
+                                    <option value="15m">15 мин</option>
+                                    <option value="1h">1 час</option>
+                                    <option value="4h">4 часа</option>
+                                    <option value="1d" selected>1 день</option>
                                 </select>
                             </div>
                         </div>
@@ -4399,33 +5243,33 @@
                             <div class="sv2-group-title">Alligator <label class="sv2-toggle"><input type="checkbox" id="s_showAlligator" checked onchange="applySettingsLive()"><span class="sv2-toggle-slider"></span></label></div>
                             <div class="sv2-row" data-search="alligator аллигатор jaw челюсть">
                                 <div class="sv2-label">Jaw (челюсть)</div>
-                                <input type="color" class="sv2-color" id="s_jawColor" value="#2962ff" oninput="applySettingsLive()">
+                                <input type="color" class="sv2-swatch" id="s_jawColor" value="#2962ff" oninput="applySettingsLive()">
                             </div>
                             <div class="sv2-row" data-search="alligator аллигатор teeth зубы">
                                 <div class="sv2-label">Teeth (зубы)</div>
-                                <input type="color" class="sv2-color" id="s_teethColor" value="#ef5350" oninput="applySettingsLive()">
+                                <input type="color" class="sv2-swatch" id="s_teethColor" value="#ef5350" oninput="applySettingsLive()">
                             </div>
                             <div class="sv2-row" data-search="alligator аллигатор lips губы">
                                 <div class="sv2-label">Lips (губы)</div>
-                                <input type="color" class="sv2-color" id="s_lipsColor" value="#26a69a" oninput="applySettingsLive()">
+                                <input type="color" class="sv2-swatch" id="s_lipsColor" value="#26a69a" oninput="applySettingsLive()">
                             </div>
                         </div>
                         <div class="sv2-group">
                             <div class="sv2-group-title">Bollinger Bands <label class="sv2-toggle"><input type="checkbox" id="s_showBB" checked onchange="applySettingsLive()"><span class="sv2-toggle-slider"></span></label></div>
                             <div class="sv2-row" data-search="bollinger боллинджер полосы цвет">
                                 <div class="sv2-label">Цвет полос</div>
-                                <input type="color" class="sv2-color" id="s_bbColor" value="#2196f3" oninput="applySettingsLive()">
+                                <input type="color" class="sv2-swatch" id="s_bbColor" value="#2196f3" oninput="applySettingsLive()">
                             </div>
                         </div>
                         <div class="sv2-group">
                             <div class="sv2-group-title">Awesome Oscillator <label class="sv2-toggle"><input type="checkbox" id="s_showAO" checked onchange="applySettingsLive()"><span class="sv2-toggle-slider"></span></label></div>
                             <div class="sv2-row" data-search="ao awesome oscillator рост">
                                 <div class="sv2-label">Цвет роста</div>
-                                <input type="color" class="sv2-color" id="s_aoUp" value="#26a69a" oninput="applySettingsLive()">
+                                <input type="color" class="sv2-swatch" id="s_aoUp" value="#26a69a" oninput="applySettingsLive()">
                             </div>
                             <div class="sv2-row" data-search="ao awesome oscillator падение">
                                 <div class="sv2-label">Цвет падения</div>
-                                <input type="color" class="sv2-color" id="s_aoDown" value="#ef5350" oninput="applySettingsLive()">
+                                <input type="color" class="sv2-swatch" id="s_aoDown" value="#ef5350" oninput="applySettingsLive()">
                             </div>
                         </div>
                         <button class="sv2-reset-btn" onclick="resetSection('indicators')">&#x21BA; Сбросить раздел</button>
@@ -4504,6 +5348,16 @@
                         <p style="font-size:11px;color:var(--text-secondary);margin-top:16px">Кастомизация горячих клавиш — в будущих версиях</p>
                     </div>
 
+                    <!-- Администрирование -->
+                    <div class="sv2-section" id="sv2-admin">
+                        <div class="sv2-section-title">Администрирование</div>
+                        <div class="sv2-section-desc">Зарегистрированные пользователи</div>
+                        <div style="margin-bottom:10px">
+                            <button class="sv2-btn-save" onclick="adminLoadUsers()" style="padding:5px 14px;font-size:12px">Обновить список</button>
+                        </div>
+                        <div id="adminUsersList"></div>
+                    </div>
+
                     <div class="sv2-no-results" id="sv2NoResults">Ничего не найдено</div>
                 </div>
             </div>
@@ -4549,6 +5403,368 @@
         </div>
         <div class="mc-grid" id="mcGrid"></div>
     </div>
+
+<!-- ── Auth Modal ────────────────────────────────────────────── -->
+<div class="auth-overlay" id="authModal" style="display:none" onclick="if(event.target===this)closeAuthModal()">
+    <div class="auth-box" onclick="event.stopPropagation()">
+        <div class="auth-title">Аккаунт</div>
+        <div class="auth-tabs">
+            <button class="auth-tab active" id="tabLogin" onclick="switchAuthTab('login')">Войти</button>
+            <button class="auth-tab" id="tabRegister" onclick="switchAuthTab('register')">Регистрация</button>
+        </div>
+        <div id="loginForm" class="auth-form">
+            <input class="auth-input" id="loginUsername" type="text" placeholder="Имя пользователя" autocomplete="username">
+            <div class="auth-pw-wrap">
+                <input class="auth-input" id="loginPassword" type="password" placeholder="Пароль" autocomplete="current-password" onkeydown="if(event.key==='Enter')submitLogin()">
+                <button type="button" class="auth-eye" onclick="togglePwVis('loginPassword',this)" tabindex="-1">&#128065;</button>
+            </div>
+            <div class="auth-error" id="loginError"></div>
+            <button class="auth-btn" onclick="submitLogin()">Войти</button>
+            <button class="auth-btn-ghost" onclick="closeAuthModal()">Продолжить без входа</button>
+        </div>
+        <div id="registerForm" class="auth-form" style="display:none">
+            <input class="auth-input" id="regUsername" type="text" placeholder="Имя пользователя" autocomplete="username">
+            <input class="auth-input" id="regEmail" type="email" placeholder="Email" autocomplete="email">
+            <div class="auth-pw-wrap">
+                <input class="auth-input" id="regPassword" type="password" placeholder="Пароль (мин. 6 символов)" autocomplete="new-password">
+                <button type="button" class="auth-eye" onclick="togglePwVis('regPassword',this)" tabindex="-1">&#128065;</button>
+            </div>
+            <div class="auth-pw-wrap">
+                <input class="auth-input" id="regPassword2" type="password" placeholder="Повторите пароль" autocomplete="new-password" onkeydown="if(event.key==='Enter')submitRegister()">
+                <button type="button" class="auth-eye" onclick="togglePwVis('regPassword2',this)" tabindex="-1">&#128065;</button>
+            </div>
+            <div class="auth-error" id="registerError"></div>
+            <button class="auth-btn" onclick="submitRegister()">Зарегистрироваться</button>
+            <button class="auth-btn-ghost" onclick="closeAuthModal()">Продолжить без входа</button>
+        </div>
+    </div>
+</div>
+
+<!-- ── Chat Panel ─────────────────────────────────────────────── -->
+<div class="chat-panel" id="chatPanel">
+    <div class="chat-header">
+        <div>
+            <div class="chat-header-title">Чат сообщества</div>
+            <div class="chat-online" id="chatOnline"></div>
+        </div>
+        <button class="chat-close" onclick="closeChat()">&#10005;</button>
+    </div>
+    <div class="chat-messages" id="chatMessages"></div>
+    <div class="chat-input-row" id="chatInputRow">
+        <input class="chat-input" id="chatInput" type="text" placeholder="Написать сообщение..." maxlength="1000" onkeydown="if(event.key==='Enter')sendChatMessage()">
+        <button class="chat-send-btn" onclick="sendChatMessage()">&#10148;</button>
+    </div>
+    <div class="chat-guest-msg" id="chatGuestMsg" style="display:none">Войдите, чтобы писать в чат</div>
+</div>
+
+<!-- Журнал автора — панель -->
+<div class="news-panel" id="newsPanel">
+  <div class="chat-header">
+    <div>
+      <div class="chat-header-title">Журнал автора</div>
+      <div class="chat-online" id="newsPostCount"></div>
+    </div>
+    <button class="chat-close" onclick="closeNews()">&#10005;</button>
+  </div>
+  <!-- Форма для admin -->
+  <div class="news-admin-form" id="newsAdminForm" style="display:none">
+    <textarea class="news-admin-textarea" id="newsText" placeholder="Текст записи..." rows="3"></textarea>
+    <div class="news-admin-row">
+      <label style="cursor:pointer;font-size:12px;color:#2196f3;display:flex;align-items:center;gap:4px">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="#2196f3"><path d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z"/></svg>
+        Прикрепить файлы
+        <input type="file" id="newsFiles" multiple accept="image/*,audio/*,.pdf,.doc,.docx,.xlsx,.zip" style="display:none" onchange="newsFilesChanged(this)">
+      </label>
+      <span id="newsFilesCount" style="font-size:11px;color:var(--text-secondary)"></span>
+      <button class="chat-send-btn" style="margin-left:auto" onclick="submitNewsPost()">&#10148;</button>
+    </div>
+  </div>
+  <div class="news-feed" id="newsFeed">
+    <div style="text-align:center;color:var(--text-secondary);font-size:12px;margin-top:20px">Загрузка...</div>
+  </div>
+</div>
+
+<!-- Затемнение для мобильных выдвигаемых панелей -->
+<div id="mobBackdrop" class="mob-backdrop" onclick="mobCloseAll()"></div>
+
+<!-- ============================================================
+     Информация — презентация платформы TradeAxis
+     ============================================================ -->
+<div id="infoModal" class="info-overlay" onclick="if(event.target===this)closeInfoModal()">
+  <div class="info-panel">
+
+    <!-- Hero -->
+    <div class="info-hero">
+      <button class="info-close-btn" onclick="closeInfoModal()">&#x00d7;</button>
+      <div class="info-logo-row">
+        <div class="info-logo-icon">
+          <svg viewBox="0 0 32 32" width="32" height="32" fill="none">
+            <path d="M4 24 L16 8 L28 24" stroke="#2962FF" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M10 24 L16 16 L22 24" stroke="#00BCD4" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </div>
+        <div>
+          <div class="info-platform-name">TradeAxis</div>
+          <div class="info-platform-sub">Интеллектуальная торговая система</div>
+        </div>
+      </div>
+      <p class="info-hero-desc">Профессиональная платформа для дискреционной торговли на криптовалютных и фондовых рынках с расширенной системой фильтрации сигналов и управления рисками.</p>
+      <div class="info-hero-tags">
+        <span class="info-tag" style="background:rgba(41,98,255,.2);color:#2962ff;border:1px solid rgba(41,98,255,.4)">Дискреционные стратегии</span>
+        <span class="info-tag" style="background:rgba(0,188,212,.2);color:#00bcd4;border:1px solid rgba(0,188,212,.4)">Риск-менеджмент</span>
+        <span class="info-tag" style="background:rgba(76,175,80,.2);color:#4caf50;border:1px solid rgba(76,175,80,.4)">Real-time сканеры</span>
+        <span class="info-tag" style="background:rgba(156,39,176,.2);color:#9c27b0;border:1px solid rgba(156,39,176,.4)">Авторские индикаторы</span>
+      </div>
+    </div>
+
+    <!-- Body -->
+    <div class="info-body">
+
+      <!-- Секция 1: Дивергентные бары -->
+      <div class="info-section">
+        <div class="info-section-title">
+          <span class="info-section-num" style="background:linear-gradient(135deg,#2962ff,#00bcd4)">1</span>
+          Дивергентные бары
+        </div>
+        <p class="info-section-desc">Дивербар — разворотный бар, определяемый по расхождению (дивергенции) между движением цены и гистограммой Awesome Oscillator (AO).</p>
+        <div class="info-cards">
+          <div class="info-card accent-green">
+            <div class="info-card-header">
+              <span style="font-size:20px;margin-right:8px">&#11044;</span>
+              <span class="info-badge badge-green">Бычий дивербар</span>
+            </div>
+            <div class="info-steps">
+              <div class="info-step"><span class="info-step-num">1.</span><span>Цена обновляет локальный <strong>минимум</strong> (идёт вниз)</span></div>
+              <div class="info-step"><span class="info-step-num">2.</span><span>Гистограмма AO при этом показывает <strong>более высокий минимум</strong> (идёт вверх)</span></div>
+              <div class="info-step"><span class="info-step-num">✦</span><span>На графике маркируется <strong style="color:#00bcd4">голубым кружком с плюсом</strong></span></div>
+            </div>
+          </div>
+          <div class="info-card accent-red">
+            <div class="info-card-header">
+              <span style="font-size:20px;margin-right:8px;color:#9c27b0">&#11044;</span>
+              <span class="info-badge badge-red">Медвежий дивербар</span>
+            </div>
+            <div class="info-steps">
+              <div class="info-step"><span class="info-step-num">1.</span><span>Цена обновляет локальный <strong>максимум</strong> (идёт вверх)</span></div>
+              <div class="info-step"><span class="info-step-num">2.</span><span>Гистограмма AO при этом показывает <strong>более низкий максимум</strong> (идёт вниз)</span></div>
+              <div class="info-step"><span class="info-step-num">✦</span><span>На графике маркируется <strong style="color:#9c27b0">фиолетовым кружком с плюсом</strong></span></div>
+            </div>
+          </div>
+        </div>
+        <div class="info-formula">AO(n) = SMA(5, HL/2)<sub>n</sub> &minus; SMA(34, HL/2)<sub>n</sub></div>
+        <div class="info-highlight" style="border-left-color:#ff9800;background:rgba(255,152,0,.06)">
+          <div class="info-highlight-title" style="color:#ff9800">Сильная точка входа</div>
+          <p>Пересечение дивербара со сформированным фракталом в этой же точке (с зафиксированным объёмом) в <strong>90% случаев означает разворот тенденции</strong> и является сильной точкой входа.</p>
+        </div>
+      </div>
+
+      <!-- Секция 2: Пробой Боллинджера -->
+      <div class="info-section">
+        <div class="info-section-title">
+          <span class="info-section-num" style="background:linear-gradient(135deg,#9c27b0,#e91e63)">2</span>
+          Пробой Лент Боллинджера
+        </div>
+        <p class="info-section-desc">Паттерн «Импульс на продолжение тренда» — ищет поглощение противоположной силы на границах канала в моменты всплеска волатильности и объёмов.</p>
+        <div class="info-cards">
+          <div class="info-card" style="border-left:3px solid #e91e63">
+            <div class="info-card-header">
+              <span class="info-badge" style="background:rgba(233,30,99,.2);color:#e91e63">Сценарий вниз — продолжение Short</span>
+            </div>
+            <div class="info-steps">
+              <div class="info-step"><span class="info-step-num">1.</span><span>Цена находится у <strong>нижней границы</strong> Лент Боллинджера</span></div>
+              <div class="info-step"><span class="info-step-num">2.</span><span>Появляется <strong style="color:#00bcd4">бычий дивербар</strong> (голубой кружок с плюсом), но фрактал под ним <strong>НЕ формируется</strong></span></div>
+              <div class="info-step"><span class="info-step-num">3.</span><span>Цена пробивает <strong>Low</strong> этого дивербара и уходит ниже</span></div>
+              <div class="info-step"><span class="info-step-num">4.</span><span>Ленты BB начинают <strong>расширяться</strong> — бычья сила поглощена, открывается Short</span></div>
+            </div>
+          </div>
+          <div class="info-card accent-blue">
+            <div class="info-card-header">
+              <span class="info-badge" style="background:rgba(41,98,255,.2);color:#2962ff">Сценарий вверх — продолжение Long</span>
+            </div>
+            <div class="info-steps">
+              <div class="info-step"><span class="info-step-num">1.</span><span>Цена находится у <strong>верхней границы</strong> Лент Боллинджера</span></div>
+              <div class="info-step"><span class="info-step-num">2.</span><span>Появляется <strong style="color:#9c27b0">медвежий дивербар</strong> (фиолетовый кружок с плюсом), но фрактал над ним <strong>НЕ образуется</strong></span></div>
+              <div class="info-step"><span class="info-step-num">3.</span><span>Цена пробивает <strong>High</strong> этого дивербара вверх</span></div>
+              <div class="info-step"><span class="info-step-num">4.</span><span>Ленты BB <strong>расширяются</strong> — медвежье сопротивление сломлено, открывается Long</span></div>
+            </div>
+          </div>
+        </div>
+        <div class="info-formula">BB = SMA(20) &plusmn; 2&sigma; &nbsp;|&nbsp; Расширение лент = подтверждение импульса</div>
+        <div class="info-highlight" style="border-left-color:#9c27b0;background:rgba(156,39,176,.06)">
+          <div class="info-highlight-title" style="color:#9c27b0">Ключевое условие</div>
+          <p>Отсутствие фрактала — принципиально важно. Если фрактал сформировался, это уже другой паттерн (разворот). Здесь дивербар поглощается рынком и служит топливом для продолжения движения.</p>
+        </div>
+      </div>
+
+      <!-- Секция 3: Фильтр Аллигатора -->
+      <div class="info-section">
+        <div class="info-section-title">
+          <span class="info-section-num" style="background:linear-gradient(135deg,#ff6d00,#ff9800)">3</span>
+          Фильтрация через Аллигатор и Ангуляцию
+        </div>
+        <p class="info-section-desc">Аллигатор используется для оценки силы разворота через понятие <strong>ангуляции</strong> — угла и расстояния расхождения между ценой и линиями Аллигатора.</p>
+        <div class="info-cards">
+          <div class="info-card" style="border-left:3px solid #e91e63">
+            <div class="info-card-header">
+              <span class="info-badge" style="background:rgba(233,30,99,.2);color:#e91e63">Идеальный Short-разворот</span>
+            </div>
+            <div class="info-steps">
+              <div class="info-step"><span class="info-step-num">1.</span><span>Цена резко уходит <strong>вверх</strong>, сильно отдаляясь от линий Аллигатора — высокая ангуляция / перекупленность</span></div>
+              <div class="info-step"><span class="info-step-num">2.</span><span>На пике формируется <strong style="color:#9c27b0">медвежий дивербар</strong> (фиолетовый кружок с плюсом)</span></div>
+              <div class="info-step"><span class="info-step-num">3.</span><span>Дивербар подтверждён <strong>верхним фракталом</strong></span></div>
+              <div class="info-step"><span class="info-step-num">4.</span><span>Сильный сигнал на <strong>разворот вниз</strong></span></div>
+            </div>
+          </div>
+          <div class="info-card accent-blue">
+            <div class="info-card-header">
+              <span class="info-badge" style="background:rgba(41,98,255,.2);color:#2962ff">Идеальный Long-разворот</span>
+            </div>
+            <div class="info-steps">
+              <div class="info-step"><span class="info-step-num">1.</span><span>Цена импульсно <strong>падает</strong> далеко вниз от линий Аллигатора — высокая ангуляция / перепроданность</span></div>
+              <div class="info-step"><span class="info-step-num">2.</span><span>На дне формируется <strong style="color:#00bcd4">бычий дивербар</strong> (голубой кружок с плюсом)</span></div>
+              <div class="info-step"><span class="info-step-num">3.</span><span>Одновременно подтверждён <strong>нижним фракталом</strong></span></div>
+              <div class="info-step"><span class="info-step-num">4.</span><span>Сильный сигнал на <strong>разворот вверх</strong></span></div>
+            </div>
+          </div>
+        </div>
+        <div class="info-col3">
+          <div class="info-mini-card"><div class="info-mini-label">Jaw (Челюсть)</div><div class="info-mini-val">SMMA(13)</div><div style="color:#2196f3;font-size:11px">синяя линия</div></div>
+          <div class="info-mini-card"><div class="info-mini-label">Teeth (Зубы)</div><div class="info-mini-val">SMMA(8)</div><div style="color:#f44336;font-size:11px">красная линия</div></div>
+          <div class="info-mini-card"><div class="info-mini-label">Lips (Губы)</div><div class="info-mini-val">SMMA(5)</div><div style="color:#4caf50;font-size:11px">зелёная линия</div></div>
+        </div>
+      </div>
+
+      <!-- Секция 4: Система сканеров -->
+      <div class="info-section">
+        <div class="info-section-title">
+          <span class="info-section-num" style="background:linear-gradient(135deg,#00bcd4,#009688)">4</span>
+          Система сканеров
+        </div>
+        <p class="info-section-desc">TradeAxis автоматически сканирует весь рынок, выявляя инструменты с активными сигналами по трём независимым каналам.</p>
+        <div class="info-cards">
+          <div class="info-card accent-blue">
+            <div class="info-card-header">
+              <span class="info-badge" style="background:rgba(41,98,255,.2);color:#2962ff">1. Сканер дивергенций (D1)</span>
+            </div>
+            <p style="font-size:13px;color:var(--text-secondary);margin:8px 0 0">Отслеживает появление дивербаров на <strong>дневных графиках</strong>. Выводит активы с метками:</p>
+            <div style="margin-top:10px;display:flex;flex-direction:column;gap:6px">
+              <div style="display:flex;align-items:center;gap:8px;font-size:13px"><span style="color:#e91e63;font-size:16px">▼</span><span><strong style="color:#e91e63">Красная стрелка вниз</strong> — сформирован бычий дивербар (сигнал на покупку)</span></div>
+              <div style="display:flex;align-items:center;gap:8px;font-size:13px"><span style="color:#4caf50;font-size:16px">▲</span><span><strong style="color:#4caf50">Зелёная стрелка вверх</strong> — сформирован медвежий дивербар (сигнал на продажу)</span></div>
+            </div>
+          </div>
+          <div class="info-card accent-green">
+            <div class="info-card-header">
+              <span class="info-badge badge-green">2. Сканер волатильности (30m)</span>
+            </div>
+            <p style="font-size:13px;color:var(--text-secondary);margin:8px 0 0">Опрашивает рынок каждые <strong>5 минут</strong>. Рассчитывает изменение цены на основе 5-минутных свечей за последние полчаса.</p>
+            <div style="margin-top:10px;padding:8px 12px;background:rgba(76,175,80,.1);border-radius:6px;font-size:13px">
+              Если изменение <strong>&gt; 3%</strong> — актив попадает в блок высокой волатильности
+            </div>
+          </div>
+          <div class="info-card" style="border-left:3px solid #ff9800">
+            <div class="info-card-header">
+              <span class="info-badge" style="background:rgba(255,152,0,.2);color:#ff9800">3. Сканер спредов (15m)</span>
+            </div>
+            <p style="font-size:13px;color:var(--text-secondary);margin:8px 0 0">Анализирует разницу между верхней и нижней точками свечи за 15 минут:</p>
+            <div class="info-formula" style="margin:10px 0 8px">Спред = (High &minus; Low) / Low &times; 100%</div>
+            <p style="font-size:13px;color:var(--text-secondary);margin:0">Хорошо работает в связке с дивербаром — широкий спред подтверждает силу движения.</p>
+          </div>
+        </div>
+        <div class="info-highlight" style="border-left-color:#ff9800;background:rgba(255,152,0,.06)">
+          <div class="info-highlight-title" style="color:#ff9800">Супер-сигнал — «Изюминка» стратегии</div>
+          <p>Если монета <strong>одновременно</strong> выдаёт сигнал по дневному сканеру дивергенций <em>и</em> попадает в 30-минутный сканер высокой волатильности — этот сетап имеет <strong>наивысший приоритет</strong> для отработки. Совпадение двух независимых фильтров многократно повышает вероятность успешного входа.</p>
+        </div>
+      </div>
+
+      <!-- Секция 5: Риск-менеджмент -->
+      <div class="info-section">
+        <div class="info-section-title">
+          <span class="info-section-num" style="background:linear-gradient(135deg,#4caf50,#8bc34a)">5</span>
+          Риск-менеджмент и Критерий Келли
+        </div>
+        <p class="info-section-desc">Строгое управление капиталом — основа долгосрочной прибыльности. TradeAxis рассчитывает оптимальный размер позиции на основе статистики ваших сделок.</p>
+        <div class="info-cards">
+
+          <!-- Калькулятор лимитов -->
+          <div class="info-card" style="border-left:3px solid #4caf50">
+            <div class="info-card-header">
+              <span class="info-badge badge-green">Калькулятор позиции</span>
+            </div>
+            <p style="font-size:13px;color:var(--text-secondary);margin:8px 0 10px">Введите размер капитала — калькулятор автоматически рассчитает допустимый лимит на каждую сделку. Система ограничивает количество активных сделок до <strong>3 в день</strong>: это позволяет торговать осознанно, без «перегрева» и эмоциональных решений.</p>
+            <div class="info-formula">Лимит на сделку = Капитал × f*</div>
+            <div class="info-formula" style="margin-top:6px">f* = W &minus; (1&minus;W) / R</div>
+            <div style="margin-top:10px;display:flex;flex-direction:column;gap:5px;font-size:12px;color:var(--text-secondary)">
+              <div><strong style="color:var(--text-primary)">W</strong> — win rate, доля прибыльных сделок</div>
+              <div><strong style="color:var(--text-primary)">R</strong> — среднее соотношение прибыли к убытку</div>
+              <div><strong style="color:var(--text-primary)">f*</strong> — оптимальная доля капитала по Келли</div>
+            </div>
+          </div>
+
+          <!-- Стоп-лосс и счётчик сессии -->
+          <div class="info-card" style="border-left:3px solid #2196f3">
+            <div class="info-card-header">
+              <span class="info-badge" style="background:rgba(33,150,243,.2);color:#2196f3">Стоп и счётчик сессии</span>
+            </div>
+            <div class="info-steps">
+              <div class="info-step"><span class="info-step-num">1.</span><span>Выбирается <strong>кредитное плечо</strong> (рекомендуется 5–20×) либо торговля без плеча, тип позиции (Long/Short) и цена входа</span></div>
+              <div class="info-step"><span class="info-step-num">2.</span><span>Указывается <strong>объём позиции</strong> (сумма сделки) или размер маржи (залога). Оптимальный R:R — <strong>3–5%</strong> от стоп‑лосса</span></div>
+              <div class="info-step"><span class="info-step-num">3.</span><span><strong>Лимит сделок</strong>: в идеале одна сделка в сессии, максимум — три. Лимит потерь рассчитывается на три сделки, что защищает баланс при серии неудачных входов</span></div>
+            </div>
+          </div>
+
+          <!-- Стиль торговли -->
+          <div class="info-card" style="border-left:3px solid #9c27b0">
+            <div class="info-card-header">
+              <span class="info-badge" style="background:rgba(156,39,176,.2);color:#9c27b0">Стиль торговли</span>
+            </div>
+            <div class="info-steps">
+              <div class="info-step"><span><strong>Скальпинг</strong> — для краткосрочных импульсных сделок внутри мелких таймфреймов</span></div>
+              <div class="info-step"><span><strong>Интрадей</strong> — оптимальный режим, удержание позиции в течение одной торговой сессии (дня)</span></div>
+              <div class="info-step"><span><strong>Свинг</strong> — для позиций, переносимых на несколько дней или недель</span></div>
+            </div>
+          </div>
+
+        </div>
+        <div class="info-highlight" style="border-left-color:#4caf50;background:rgba(76,175,80,.06)">
+          <div class="info-highlight-title" style="color:#4caf50">Журнал сделок</div>
+          <p>Встроенный журнал фиксирует каждую сделку: точку входа, стоп-лосс, тейк-профит и результат в R-кратных. Накопленная статистика автоматически пересчитывает оптимальный размер позиции по Келли, обеспечивая самоадаптирующуюся систему управления риском.</p>
+        </div>
+      </div>
+
+      <!-- Секция 6: Связь с автором -->
+      <div class="info-section" style="border-top:1px solid var(--border-color);margin-top:8px;padding-top:24px">
+        <div class="info-section-title">
+          <span class="info-section-num" style="background:linear-gradient(135deg,#e91e63,#9c27b0)">6</span>
+          Связь с автором
+        </div>
+        <p class="info-section-desc">По всем вопросам — работа с платформой, торговые стратегии, сотрудничество или доверительное управление капиталом — пишите напрямую.</p>
+        <div class="info-cards">
+          <div class="info-card" style="border-left:3px solid #2196f3">
+            <div class="info-card-header">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="#2196f3" style="margin-right:8px;flex-shrink:0"><path d="M20 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4l-8 5-8-5V6l8 5 8-5v2z"/></svg>
+              <span class="info-badge" style="background:rgba(33,150,243,.2);color:#2196f3">Email</span>
+            </div>
+            <a href="mailto:vladimir.olegovish@gmail.com" style="color:#2196f3;text-decoration:none;font-size:14px;font-weight:500;display:block;margin-top:6px">vladimir.olegovish@gmail.com</a>
+          </div>
+          <div class="info-card" style="border-left:3px solid #29b6f6">
+            <div class="info-card-header">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="#29b6f6" style="margin-right:8px;flex-shrink:0"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm4.64 6.8l-1.7 8.02c-.12.57-.46.71-.93.44l-2.57-1.89-1.24 1.19c-.14.14-.25.25-.5.25l.18-2.57 4.64-4.19c.2-.18-.04-.28-.31-.1L7.97 15.1l-2.52-.79c-.55-.17-.56-.55.11-.81l9.84-3.79c.46-.17.86.11.71.8-.01.01-.01.01-.01 0z"/></svg>
+              <span class="info-badge" style="background:rgba(41,182,246,.2);color:#29b6f6">Telegram</span>
+            </div>
+            <a href="https://t.me/Vlabimir_Olegovich" target="_blank" style="color:#29b6f6;text-decoration:none;font-size:14px;font-weight:500;display:block;margin-top:6px">@Vlabimir_Olegovich</a>
+          </div>
+        </div>
+        <!-- Подпись автора -->
+        <div style="margin-top:28px;padding:20px 24px;background:linear-gradient(135deg,rgba(233,30,99,.08),rgba(156,39,176,.08));border:1px solid rgba(156,39,176,.25);border-radius:12px;text-align:center">
+          <div style="font-size:11px;letter-spacing:2px;text-transform:uppercase;color:var(--text-secondary);margin-bottom:10px">Автор платформы</div>
+          <div style="font-size:22px;font-weight:700;background:linear-gradient(135deg,#e91e63,#9c27b0,#2962ff);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;margin-bottom:4px">Хорев Владимир Олегович</div>
+          <div style="font-size:12px;color:var(--text-secondary)">TradeAxis</div>
+        </div>
+      </div>
+
+    </div><!-- /info-body -->
+  </div><!-- /info-panel -->
+</div><!-- /infoModal -->
 
 </body>
 </html>
