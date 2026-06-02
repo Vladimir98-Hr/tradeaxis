@@ -50,7 +50,7 @@ async def _warm_cache():
         # Прогрев тикеров
         data = await async_fetch_all_tickers()
         key = get_cache_key("", "", 0, "tickers_all")
-        await set_cached_data(key, {"tickers": data}, ttl=5)
+        await set_cached_data(key, {"tickers": data}, ttl=30)
         # Прогрев главного чарта BTC/USDT 1h
         df = await async_fetch_ohlcv_df("BTCUSDT", "1h", 200)
         if df is not None and not df.empty:

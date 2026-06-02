@@ -690,7 +690,7 @@ async def get_tickers(symbols: str = ""):
             return sym, cached
         try:
             data = await async_fetch_ticker(sym)
-            await set_cached_data(key, data, ttl=5)
+            await set_cached_data(key, data, ttl=30)
             return sym, data
         except Exception:
             return sym, None
@@ -709,7 +709,7 @@ async def get_all_tickers():
     try:
         data = await async_fetch_all_tickers()
         result = {"tickers": data}
-        await set_cached_data(key, result, ttl=5)
+        await set_cached_data(key, result, ttl=30)
         return result
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Tickers: {str(e)}")
