@@ -4,6 +4,7 @@
 Запуск: python main.py
 """
 
+import asyncio
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
@@ -39,12 +40,44 @@ app.include_router(user_router)
 app.include_router(news_router)
 
 
+async def _warm_cache():
+    """Прогрев Redis кэша после старта — тикеры и главный чарт грузятся заранее."""
+    await asyncio.sleep(3)
+    try:
+        from exchange import async_fetch_all_tickers, async_fetch_ohlcv_df
+        from cache import get_cache_key, set_cached_data
+        from indicators import calculate_alligator, calculate_ao, calculate_bw_mfi, find_fractals, find_divergences, calculate_bollinger_bands
+        # Прогрев тикеров
+        data = await async_fetch_all_tickers()
+        key = get_cache_key("", "", 0, "tickers_all")
+        await set_cached_data(key, {"tickers": data}, ttl=5)
+        # Прогрев главного чарта BTC/USDT 1h
+        df = await async_fetch_ohlcv_df("BTCUSDT", "1h", 200)
+        if df is not None and not df.empty:
+            alligator = calculate_alligator(df)
+            ao = calculate_ao(df)
+            bwmfi = calculate_bw_mfi(df)
+            fractals = find_fractals(df)
+            divergences = find_divergences(df)
+            bb = calculate_bollinger_bands(df)
+            result = {
+                "ohlcv": df[["timestamp","open","high","low","close","volume"]].tail(200).to_dict("records"),
+                "alligator": alligator, "ao": ao, "bwmfi": bwmfi,
+                "fractals": fractals, "divergences": divergences, "bollinger": bb,
+            }
+            chart_key = get_cache_key("BTCUSDT", "1h", 200, "chart_data")
+            await set_cached_data(chart_key, result, ttl=300)
+    except Exception:
+        pass
+
+
 @app.on_event("startup")
 async def startup():
     """Инициализация БД при запуске приложения."""
     import os
     os.makedirs("uploads/news", exist_ok=True)
     await init_db()
+    asyncio.create_task(_warm_cache())
 
 # Создаём папку uploads заранее (StaticFiles требует существующую директорию)
 import os as _os
