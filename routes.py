@@ -55,7 +55,7 @@ async def get_ticker(symbol: str = "BTCUSDT"):
 @router.get("/health")
 async def health():
     """Проверка работоспособности API."""
-    return {"status": "TradingView Clone API - Все индикаторы работают!"}
+    return {"status": "Force of Momentum API - Все индикаторы работают!"}
 
 
 @router.get("/symbols")

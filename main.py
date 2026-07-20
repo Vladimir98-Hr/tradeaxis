@@ -19,7 +19,7 @@ from news_routes import router as news_router
 from database import init_db
 
 # Создание приложения
-app = FastAPI(title="TradingView Clone API")
+app = FastAPI(title="Force of Momentum API")
 
 # Настройка CORS (разрешенные источники)
 app.add_middleware(

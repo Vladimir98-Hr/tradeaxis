@@ -1,7 +1,7 @@
-# TradingView Clone — Финальный план разработки
+# Force of Momentum — Финальный план разработки
 
 ## Контекст
-Проект — клон TradingView для криптовалют и российских акций.
+Проект — Force of Momentum, платформа для трейдинга криптовалют и российских акций в стиле TradingView.
 **Текущее состояние:** Бэкенд на FastAPI с модульной структурой готов (main.py, config.py, exchange.py, indicators.py, cache.py, routes.py, websocket.py, static/index.html). Биржа — OKX через ccxt. Фронтенд — vanilla JS (Lightweight Charts). Мобильного приложения нет. MOEX нет. CI/CD нет.
 **Цель:** Пройти от текущего состояния до полноценного приложения с веб-фронтом на React, мобильным приложением на React Native, российскими данными (Tinkoff Invest API) и автодеплоем.
 

@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-TradingView-like web application for cryptocurrency charting with technical indicators. Python/FastAPI backend serving REST API and WebSocket endpoints, with a vanilla JS frontend using Lightweight Charts.
+Force of Momentum — a TradingView-style web application for cryptocurrency charting with technical indicators. Python/FastAPI backend serving REST API and WebSocket endpoints, with a vanilla JS frontend using Lightweight Charts.
 
 ## Commands
 
@@ -32,7 +32,7 @@ The backend is a FastAPI async application with modular separation:
 - **cache.py** — Async Redis caching layer with MD5-based keys and configurable TTL.
 - **routes.py** — REST endpoints (`/health`, `/ohlcv`, `/alligator`, `/ao`, `/bwmfi`). Each endpoint checks cache first, then fetches and computes. Rate-limited.
 - **websocket.py** — `WS /ws/{symbol}` streams live ticker data (price, 24h stats) every 1 second.
-- **static/index.html** — Single-page frontend with dark TradingView-like UI, three synchronized charts (candlestick+Alligator, AO histogram, BW MFI histogram), symbol/timeframe selectors, and WebSocket price ticker. UI is in Russian.
+- **static/index.html** — Single-page frontend with dark TradingView-style UI, three synchronized charts (candlestick+Alligator, AO histogram, BW MFI histogram), symbol/timeframe selectors, and WebSocket price ticker. UI is in Russian.
 
 ### Data flow
 Request → routes.py (check Redis cache) → exchange.py (fetch OHLCV from OKX via CCXT) → indicators.py (compute indicators on DataFrame) → JSON response (last 100 records) → cache result in Redis.
