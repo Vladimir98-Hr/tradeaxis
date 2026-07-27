@@ -741,6 +741,21 @@
             transition: opacity .15s;
         }
         .rc-calc-btn:hover { opacity: .88; }
+        .rc-mic-btn {
+            border: 1px solid var(--border-color);
+            background: var(--bg-color);
+            color: var(--text-secondary);
+            border-radius: 6px;
+            width: 26px;
+            height: 22px;
+            font-size: 12px;
+            cursor: pointer;
+            line-height: 1;
+            transition: all .15s;
+        }
+        .rc-mic-btn:hover { border-color: var(--accent-color); color: var(--accent-color); }
+        .rc-mic-btn.recording { border-color: #e05252; color: #e05252; background: rgba(224,82,82,.1); animation: rcMicPulse 1s infinite; }
+        @keyframes rcMicPulse { 0%,100% { opacity: 1; } 50% { opacity: .4; } }
         .rc-calc-btn:disabled { opacity: .35; cursor: not-allowed; }
         /* Карточки результатов */
         .rc-cards { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
@@ -1553,7 +1568,17 @@
             </div>
             <div style="padding:4px 4px 0;display:flex;gap:6px">
                 <button class="div-scan-btn" onclick="showKellyModal(null)" style="flex:1">&#x25b6; Рассчитать Келли</button>
-                <button class="div-scan-btn" onclick="jSave([]);jRender()" style="color:var(--text-secondary)">&#x21ba; Сброс</button>
+                <button class="div-scan-btn" onclick="showDisciplineModal()" style="flex:1">&#x1F4CA; Дисциплина</button>
+                <button class="div-scan-btn" onclick="jResetAll()" style="color:var(--text-secondary)">&#x21ba; Сброс</button>
+            </div>
+        </div>
+        <!-- Открытые планы (ожидают пост-разбора) -->
+        <div class="card div-scan-card">
+            <div class="div-scan-header">
+                <span>Открытые планы</span>
+            </div>
+            <div class="div-scan-list" id="openPlansList">
+                <div class="div-scan-empty">Нет открытых планов</div>
             </div>
         </div>
     </aside>
@@ -1633,12 +1658,10 @@
                     </div>
                 </div>
                 <div>
-                    <div class="rc-label">Кредитное плечо</div>
-                    <div class="rc-radio-group" id="rcLevGroup">
-                        <button class="rc-radio-btn active" data-val="1"  onclick="setRcLeverage(this)">Без плеча</button>
-                        <button class="rc-radio-btn"        data-val="5"  onclick="setRcLeverage(this)">×5</button>
-                        <button class="rc-radio-btn"        data-val="10" onclick="setRcLeverage(this)">×10</button>
-                        <button class="rc-radio-btn"        data-val="20" onclick="setRcLeverage(this)">×20</button>
+                    <div class="rc-label">Кредитное плечо: <span id="rcLevVal" style="color:var(--text-primary);font-weight:600">1×</span></div>
+                    <div style="display:flex;align-items:center;gap:10px">
+                        <input type="range" id="rcLevSlider" min="1" max="100" step="1" value="1" style="flex:1" oninput="setRcLeverage(this.value)">
+                        <input type="number" id="rcLevInput" min="1" max="100" step="1" value="1" class="rc-input" style="width:64px" oninput="setRcLeverage(this.value)">
                     </div>
                 </div>
                 <div>
@@ -1711,6 +1734,38 @@
                             &#9888; Стоп ниже цены ликвидации — позиция будет принудительно закрыта раньше стопа
                         </div>
                     </div>
+
+                    <hr class="rc-divider">
+
+                    <div class="rc-label">Тип сетапа</div>
+                    <div class="rc-radio-group" id="rcSetupGroup">
+                        <button class="rc-radio-btn active" data-setup="Дивербар" onclick="setRcSetup(this)">Дивербар</button>
+                        <button class="rc-radio-btn" data-setup="Пробой Боллинджера" onclick="setRcSetup(this)">Пробой Боллинджера</button>
+                        <button class="rc-radio-btn" data-setup="Фильтр Аллигатора" onclick="setRcSetup(this)">Фильтр Аллигатора</button>
+                    </div>
+                    <div style="margin-top:8px">
+                        <div class="rc-label" style="display:flex;align-items:center;justify-content:space-between">
+                            <span>Причина входа</span>
+                            <button type="button" class="rc-mic-btn" id="rcReason_mic" onclick="startVoiceInput('rcReason', this)" title="Голосовой ввод">&#127908;</button>
+                        </div>
+                        <textarea class="rc-input" id="rcReason" rows="2" style="resize:vertical;font-family:inherit" placeholder="Почему вхожу именно сейчас"></textarea>
+                    </div>
+                    <div style="margin-top:8px">
+                        <div class="rc-label" style="display:flex;align-items:center;justify-content:space-between">
+                            <span>Что подтверждает идею</span>
+                            <button type="button" class="rc-mic-btn" id="rcConfirms_mic" onclick="startVoiceInput('rcConfirms', this)" title="Голосовой ввод">&#127908;</button>
+                        </div>
+                        <textarea class="rc-input" id="rcConfirms" rows="2" style="resize:vertical;font-family:inherit" placeholder="Дивербар + фрактал, ангуляция от Аллигатора..."></textarea>
+                    </div>
+                    <div style="margin-top:8px">
+                        <div class="rc-label" style="display:flex;align-items:center;justify-content:space-between">
+                            <span>Что отменяет идею</span>
+                            <button type="button" class="rc-mic-btn" id="rcInvalidates_mic" onclick="startVoiceInput('rcInvalidates', this)" title="Голосовой ввод">&#127908;</button>
+                        </div>
+                        <textarea class="rc-input" id="rcInvalidates" rows="2" style="resize:vertical;font-family:inherit" placeholder="Пробой стопа без реакции, разворот старшего ТФ..."></textarea>
+                    </div>
+                    <button class="rc-calc-btn" style="margin-top:8px" onclick="saveTradePlan()">&#128190; Сохранить как план</button>
+                    <div id="rcPlanMsg" style="font-size:12px;margin-top:6px;min-height:16px"></div>
                 </div>
 
                 <hr class="rc-divider">
@@ -1747,6 +1802,54 @@
                 <button class="rc-calc-btn" style="background:var(--bg-color);color:var(--text-secondary);border:1px solid var(--border-color)" onclick="resetSession()">Сбросить сессию</button>
 
 
+            </div>
+        </div>
+    </div>
+
+    <!-- Пост-разбор сделки — модальное окно -->
+    <div class="modal-overlay" id="postReviewModal">
+        <div class="rc-box">
+            <div class="rc-header">
+                <span>Разбор сделки</span>
+                <button class="rc-close" onclick="closePostReview()">×</button>
+            </div>
+            <div class="rc-body">
+                <div id="prPlanInfo" style="font-size:12px;color:var(--text-secondary);margin-bottom:10px"></div>
+
+                <div class="rc-label">План соблюдён?</div>
+                <div class="rc-radio-group" id="pr_followedPlan"><button class="rc-radio-btn active" data-val="yes" onclick="setReviewToggle('followedPlan','yes',this)">Да</button><button class="rc-radio-btn" data-val="no" onclick="setReviewToggle('followedPlan','no',this)">Нет</button></div>
+
+                <div class="rc-label" style="margin-top:8px">Ранний выход?</div>
+                <div class="rc-radio-group" id="pr_earlyExit"><button class="rc-radio-btn" data-val="yes" onclick="setReviewToggle('earlyExit','yes',this)">Да</button><button class="rc-radio-btn active" data-val="no" onclick="setReviewToggle('earlyExit','no',this)">Нет</button></div>
+
+                <div class="rc-label" style="margin-top:8px">Перенос стопа?</div>
+                <div class="rc-radio-group" id="pr_stopMoved"><button class="rc-radio-btn" data-val="yes" onclick="setReviewToggle('stopMoved','yes',this)">Да</button><button class="rc-radio-btn active" data-val="no" onclick="setReviewToggle('stopMoved','no',this)">Нет</button></div>
+
+                <div class="rc-label" style="margin-top:8px">Усреднение?</div>
+                <div class="rc-radio-group" id="pr_averaging"><button class="rc-radio-btn" data-val="yes" onclick="setReviewToggle('averaging','yes',this)">Да</button><button class="rc-radio-btn active" data-val="no" onclick="setReviewToggle('averaging','no',this)">Нет</button></div>
+
+                <div class="rc-label" style="margin-top:8px">Эмоциональная ошибка?</div>
+                <div class="rc-radio-group" id="pr_emotionalMistake"><button class="rc-radio-btn" data-val="yes" onclick="setReviewToggle('emotionalMistake','yes',this)">Да</button><button class="rc-radio-btn active" data-val="no" onclick="setReviewToggle('emotionalMistake','no',this)">Нет</button></div>
+
+                <div class="rc-label" style="margin-top:8px">Вход без подтверждения?</div>
+                <div class="rc-radio-group" id="pr_noConfirmation"><button class="rc-radio-btn" data-val="yes" onclick="setReviewToggle('noConfirmation','yes',this)">Да</button><button class="rc-radio-btn active" data-val="no" onclick="setReviewToggle('noConfirmation','no',this)">Нет</button></div>
+
+                <div class="rc-label" style="margin-top:8px">Вход против старшего ТФ?</div>
+                <div class="rc-radio-group" id="pr_againstHigherTF"><button class="rc-radio-btn" data-val="yes" onclick="setReviewToggle('againstHigherTF','yes',this)">Да</button><button class="rc-radio-btn active" data-val="no" onclick="setReviewToggle('againstHigherTF','no',this)">Нет</button></div>
+
+                <div class="rc-2col" style="margin-top:10px">
+                    <div>
+                        <div class="rc-label">Результат, R</div>
+                        <input class="rc-input" id="prResultR" type="number" step="any" placeholder="напр. 1.8 или -1">
+                    </div>
+                    <div>
+                        <div class="rc-label">Результат, $</div>
+                        <input class="rc-input" id="prResultUsd" type="number" step="any" placeholder="напр. 45">
+                    </div>
+                </div>
+
+                <button class="rc-calc-btn" style="margin-top:10px" onclick="savePostReview()">&#128190; Сохранить разбор</button>
+                <div id="prMsg" style="font-size:12px;margin-top:6px;min-height:16px"></div>
             </div>
         </div>
     </div>
@@ -3383,6 +3486,7 @@
     window.onload = async () => {
         requestAnimationFrame(async () => {
             await initAuth();
+            await jRender();
             initCharts();
             initDrawingOverlay();
             setupResizeObserver();
@@ -3433,6 +3537,8 @@
     let _rcRR       = 1.5;  // R:R для тейк-профита
     let _rcTradeRisk = 0;   // $ риск на 1 сделку (после блока А)
     let _rcSessLimit = 0;   // $ лимит сессии (после блока А)
+    let _rcSetup     = 'Дивербар';
+    let _rcLastCalc  = null; // последний расчёт блока Б — используется для "Сохранить как план"
 
     function openRiskCalc() {
         document.getElementById('riskCalcModal').style.display = 'flex';
@@ -3459,10 +3565,14 @@
         document.querySelectorAll('#rcCatGroup .rc-radio-btn').forEach(b => b.classList.remove('active'));
         btn.classList.add('active');
     }
-    function setRcLeverage(btn) {
-        _rcLeverage = parseInt(btn.dataset.val);
-        document.querySelectorAll('#rcLevGroup .rc-radio-btn').forEach(b => b.classList.remove('active'));
-        btn.classList.add('active');
+    function setRcLeverage(val) {
+        let lev = Math.round(parseFloat(val));
+        if (!lev || lev < 1) lev = 1;
+        if (lev > 100) lev = 100;
+        _rcLeverage = lev;
+        document.getElementById('rcLevSlider').value = lev;
+        document.getElementById('rcLevInput').value  = lev;
+        document.getElementById('rcLevVal').textContent = lev + '×';
         // Менять лейбл поля объёма: без плеча — "Объём позиции", с плечом — "Маржа (залог)"
         document.getElementById('rcPosLabel').textContent = _rcLeverage > 1 ? 'Маржа / залог ($)' : 'Объём позиции ($)';
         // Сбросить результат при смене плеча
@@ -3594,6 +3704,102 @@
         document.getElementById('rcB_rrLabel').textContent  = 'R:R ' + rr + ':1';
 
         document.getElementById('rcResB').style.display = 'block';
+
+        _rcLastCalc = {
+            sym: currentSymbol, dir: _rcDir, entry, stop: stopPrice, tp: tpPrice,
+            riskUsd: _rcTradeRisk, rr, coins, ts: Date.now()
+        };
+        document.getElementById('rcPlanMsg').textContent = '';
+    }
+
+    // ── Голосовой ввод (Web Speech API) ──────────────────────
+    let _voiceRecognizer = null;
+    let _voiceActiveBtn = null;
+
+    function startVoiceInput(fieldId, btnEl) {
+        const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
+        if (!SpeechRec) {
+            alert('Голосовой ввод не поддерживается в этом браузере. Попробуйте Chrome.');
+            return;
+        }
+        // Если уже идёт запись в это же поле — остановить
+        if (_voiceRecognizer && _voiceActiveBtn === btnEl) {
+            _voiceRecognizer.stop();
+            return;
+        }
+        // Если идёт запись в другое поле — остановить её
+        if (_voiceRecognizer) _voiceRecognizer.stop();
+
+        const rec = new SpeechRec();
+        rec.lang = 'ru-RU';
+        rec.interimResults = false;
+        rec.maxAlternatives = 1;
+
+        _voiceRecognizer = rec;
+        _voiceActiveBtn = btnEl;
+        btnEl.classList.add('recording');
+        btnEl.innerHTML = '&#9210;';
+
+        rec.onresult = (e) => {
+            const text = e.results[0][0].transcript;
+            const field = document.getElementById(fieldId);
+            field.value = field.value ? field.value.trim() + ' ' + text : text;
+        };
+        rec.onerror = (e) => {
+            const messages = {
+                'no-speech': 'Речь не распознана — попробуйте говорить громче и ближе к микрофону',
+                'audio-capture': 'Микрофон не найден. Проверьте, что он подключён и выбран как устройство записи по умолчанию в Windows',
+                'not-allowed': 'Доступ к микрофону заблокирован. Проверьте разрешения сайта и настройки приватности Windows (Параметры → Конфиденциальность → Микрофон)',
+                'network': 'Нет соединения с сервисом распознавания речи (нужен доступ в интернет к серверам Google)',
+                'aborted': null,
+            };
+            const msg = messages[e.error] !== undefined ? messages[e.error] : ('Ошибка распознавания: ' + e.error);
+            if (msg) alert(msg);
+        };
+        rec.onend = () => {
+            btnEl.classList.remove('recording');
+            btnEl.innerHTML = '&#127908;';
+            _voiceRecognizer = null;
+            _voiceActiveBtn = null;
+        };
+        rec.start();
+    }
+
+    function setRcSetup(btn) {
+        _rcSetup = btn.dataset.setup;
+        document.querySelectorAll('#rcSetupGroup .rc-radio-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+    }
+
+    async function saveTradePlan() {
+        const msgEl = document.getElementById('rcPlanMsg');
+        if (!authToken) {
+            msgEl.textContent = 'Войдите в аккаунт, чтобы сохранить план сделки';
+            msgEl.style.color = '#e05252';
+            return;
+        }
+        if (!_rcLastCalc) {
+            msgEl.textContent = 'Сначала рассчитайте стоп и тейк (блок Б)';
+            msgEl.style.color = '#e05252';
+            return;
+        }
+        const reason = document.getElementById('rcReason').value.trim();
+        const confirms = document.getElementById('rcConfirms').value.trim();
+        const invalidates = document.getElementById('rcInvalidates').value.trim();
+        const r = await _authFetch(`${API_BASE}/user/journal`, {
+            method: 'POST',
+            body: { data: { type: 'plan', ..._rcLastCalc, setup: _rcSetup, reason, confirms, invalidates } }
+        });
+        if (r.ok) {
+            msgEl.textContent = '✓ План сохранён';
+            msgEl.style.color = '#4caf82';
+            document.getElementById('rcReason').value = '';
+            document.getElementById('rcConfirms').value = '';
+            document.getElementById('rcInvalidates').value = '';
+        } else {
+            msgEl.textContent = 'Не удалось сохранить план, попробуйте ещё раз';
+            msgEl.style.color = '#e05252';
+        }
     }
 
     // ── БЛОК В: счётчик сессии ────────────────────────────────
@@ -3633,15 +3839,28 @@
         document.getElementById('jBtnLoss').classList.toggle('active', r === 'loss');
     }
 
-    function jLoad() {
-        return JSON.parse(localStorage.getItem('tradeJournal') || '[]');
+    let _journalCache = [];
+
+    async function jLoad() {
+        if (authToken) {
+            try {
+                const r = await _authFetch(`${API_BASE}/user/journal`);
+                if (r.ok) {
+                    const data = await r.json();
+                    _journalCache = data.trades.map(t => ({ id: t.id, ...t.data }));
+                    return _journalCache;
+                }
+            } catch {}
+        }
+        _journalCache = JSON.parse(localStorage.getItem('tradeJournal') || '[]');
+        return _journalCache;
     }
 
     function jSave(trades) {
         localStorage.setItem('tradeJournal', JSON.stringify(trades));
     }
 
-    function jAddTrade() {
+    async function jAddTrade() {
         const sym = document.getElementById('jSym').value.trim().toUpperCase() || '—';
         const rVal = parseFloat(document.getElementById('jR').value);
         const win = _jResult === 'win';
@@ -3649,23 +3868,36 @@
             alert('Введите R-множитель для прибыльной сделки (напр. 2.0)');
             return;
         }
-        const trades = jLoad();
-        trades.unshift({ sym, win, r: win ? rVal : 0, ts: Date.now() });
-        jSave(trades);
+        const newTrade = { sym, win, r: win ? rVal : 0, ts: Date.now() };
+        let total;
+        if (authToken) {
+            await _authFetch(`${API_BASE}/user/journal`, { method: 'POST', body: { data: newTrade } });
+            const trades = await jLoad();
+            total = trades.length;
+        } else {
+            const trades = jLoad_local();
+            trades.unshift(newTrade);
+            jSave(trades);
+            total = trades.length;
+            if (total >= 60) {
+                jSave([]);
+            }
+        }
         document.getElementById('jSym').value = '';
         document.getElementById('jR').value = '';
-        jRender();
-        if (trades.length === 30) {
-            setTimeout(() => showKellyModal(trades), 400);
-        }
-        if (trades.length >= 60) {
-            jSave([]);
-            jRender();
+        await jRender();
+        if (total === 30) {
+            setTimeout(async () => showKellyModal(await jLoad()), 400);
         }
     }
 
-    function jRender() {
-        const trades = jLoad();
+    function jLoad_local() {
+        return JSON.parse(localStorage.getItem('tradeJournal') || '[]');
+    }
+
+    async function jRender() {
+        const all = await jLoad();
+        const trades = all.filter(t => !t.type);
         const total = trades.length;
         const pct = Math.min(total / 30 * 100, 100);
         document.getElementById('jProgressFill').style.width = pct + '%';
@@ -3674,29 +3906,174 @@
         const list = document.getElementById('journalList');
         if (!trades.length) {
             list.innerHTML = '<div class="div-scan-empty">Добавьте первую сделку</div>';
+        } else {
+            list.innerHTML = trades.map((t) => `
+                <div class="journal-item">
+                    <div class="journal-item-left">
+                        <span class="journal-badge ${t.win ? 'win' : 'loss'}">${t.win ? 'WIN' : 'LOSS'}</span>
+                        <span style="color:var(--text-primary);font-weight:500">${t.sym}</span>
+                        ${t.win ? `<span class="journal-item-r">&times;${t.r}</span>` : ''}
+                    </div>
+                    <button class="journal-del" onclick="jDel(${_journalCache.indexOf(t)})">&#x2715;</button>
+                </div>
+            `).join('');
+        }
+        jRenderPlans(all);
+    }
+
+    // ── Открытые планы / пост-разбор ──────────────────────────
+    let _reviewPlanId = null;
+    let _reviewAnswers = {};
+
+    function jRenderPlans(all) {
+        const plans = all.filter(t => t.type === 'plan');
+        const reviewedIds = new Set(all.filter(t => t.type === 'review').map(t => t.planId));
+        const open = plans.filter(p => !reviewedIds.has(p.id));
+        const list = document.getElementById('openPlansList');
+        if (!open.length) {
+            list.innerHTML = '<div class="div-scan-empty">Нет открытых планов</div>';
             return;
         }
-        list.innerHTML = trades.map((t, i) => `
+        list.innerHTML = open.map(p => `
             <div class="journal-item">
                 <div class="journal-item-left">
-                    <span class="journal-badge ${t.win ? 'win' : 'loss'}">${t.win ? 'WIN' : 'LOSS'}</span>
-                    <span style="color:var(--text-primary);font-weight:500">${t.sym}</span>
-                    ${t.win ? `<span class="journal-item-r">&times;${t.r}</span>` : ''}
+                    <span style="color:var(--text-primary);font-weight:500">${p.sym || '—'}</span>
+                    <span style="color:var(--text-secondary);font-size:11px">${p.setup || ''} · ${p.dir === 'short' ? 'ШОРТ' : 'ЛОНГ'}</span>
                 </div>
-                <button class="journal-del" onclick="jDel(${i})">&#x2715;</button>
+                <button class="div-scan-btn" style="padding:2px 8px;font-size:11px" onclick="openPostReview(${p.id})">Закрыть сделку</button>
             </div>
         `).join('');
     }
 
-    function jDel(idx) {
-        const trades = jLoad();
-        trades.splice(idx, 1);
-        jSave(trades);
-        jRender();
+    function openPostReview(planId) {
+        _reviewPlanId = planId;
+        _reviewAnswers = { followedPlan: 'yes', earlyExit: 'no', stopMoved: 'no', averaging: 'no', emotionalMistake: 'no', noConfirmation: 'no', againstHigherTF: 'no' };
+        document.querySelectorAll('#postReviewModal .rc-radio-group').forEach(g => {
+            g.querySelectorAll('.rc-radio-btn').forEach(b => b.classList.toggle('active', b.dataset.val === (g.id === 'pr_followedPlan' ? 'yes' : 'no')));
+        });
+        document.getElementById('prResultR').value = '';
+        document.getElementById('prResultUsd').value = '';
+        document.getElementById('prMsg').textContent = '';
+        const plan = _journalCache.find(t => t.id === planId);
+        document.getElementById('prPlanInfo').textContent = plan ? `${plan.sym || '—'} · ${plan.setup || ''} · вход ${plan.entry ?? '—'}` : '';
+        document.getElementById('postReviewModal').style.display = 'flex';
     }
 
-    function showKellyModal(trades) {
-        if (!trades) trades = jLoad();
+    function closePostReview() {
+        document.getElementById('postReviewModal').style.display = 'none';
+    }
+
+    function setReviewToggle(field, val, btn) {
+        _reviewAnswers[field] = val;
+        document.getElementById('pr_' + field).querySelectorAll('.rc-radio-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+    }
+
+    async function savePostReview() {
+        const msgEl = document.getElementById('prMsg');
+        if (!authToken) { msgEl.textContent = 'Войдите в аккаунт, чтобы сохранить разбор'; msgEl.style.color = '#e05252'; return; }
+        const resultR = parseFloat(document.getElementById('prResultR').value) || 0;
+        const resultUsd = parseFloat(document.getElementById('prResultUsd').value) || 0;
+        const r = await _authFetch(`${API_BASE}/user/journal`, {
+            method: 'POST',
+            body: { data: { type: 'review', planId: _reviewPlanId, ..._reviewAnswers, resultR, resultUsd, ts: Date.now() } }
+        });
+        if (r.ok) {
+            closePostReview();
+            await jRender();
+        } else {
+            msgEl.textContent = 'Не удалось сохранить разбор, попробуйте ещё раз';
+            msgEl.style.color = '#e05252';
+        }
+    }
+
+    // ── Статистика по дисциплине ──────────────────────────────
+    async function showDisciplineModal() {
+        const all = await jLoad();
+        const reviews = all.filter(t => t.type === 'review');
+        const body = document.getElementById('disciplineBody');
+        if (!reviews.length) {
+            body.innerHTML = '<div class="div-scan-empty">Пока нет разобранных сделок</div>';
+            document.getElementById('disciplineModal').style.display = 'flex';
+            return;
+        }
+        const plansById = {};
+        all.filter(t => t.type === 'plan').forEach(p => { plansById[p.id] = p; });
+
+        const total = reviews.length;
+        const pct = (field) => Math.round(reviews.filter(r => r[field] === 'yes').length / total * 100);
+
+        const bySetup = {};
+        reviews.forEach(r => {
+            const plan = plansById[r.planId];
+            const key = plan ? `${plan.sym || '—'} · ${plan.setup || '—'}` : '—';
+            if (!bySetup[key]) bySetup[key] = { count: 0, wins: 0, sumR: 0 };
+            bySetup[key].count++;
+            if (r.resultR > 0) bySetup[key].wins++;
+            bySetup[key].sumR += (r.resultR || 0);
+        });
+        const setupRows = Object.entries(bySetup)
+            .map(([key, s]) => ({ key, count: s.count, winRate: Math.round(s.wins / s.count * 100), avgR: (s.sumR / s.count).toFixed(2) }))
+            .sort((a, b) => b.avgR - a.avgR);
+
+        body.innerHTML = `
+            <div class="rc-cards">
+                <div class="rc-card"><div class="rc-card-label">Сделок разобрано</div><div class="rc-card-val">${total}</div></div>
+                <div class="rc-card"><div class="rc-card-label">По плану</div><div class="rc-card-val">${pct('followedPlan')}%</div></div>
+            </div>
+            <div class="rc-cards" style="margin-top:8px">
+                <div class="rc-card"><div class="rc-card-label">Ранний выход</div><div class="rc-card-val">${pct('earlyExit')}%</div></div>
+                <div class="rc-card"><div class="rc-card-label">Перенос стопа</div><div class="rc-card-val">${pct('stopMoved')}%</div></div>
+            </div>
+            <div class="rc-cards" style="margin-top:8px">
+                <div class="rc-card"><div class="rc-card-label">Усреднение</div><div class="rc-card-val">${pct('averaging')}%</div></div>
+                <div class="rc-card"><div class="rc-card-label">Эмоц. ошибка</div><div class="rc-card-val">${pct('emotionalMistake')}%</div></div>
+            </div>
+            <div class="rc-cards" style="margin-top:8px">
+                <div class="rc-card"><div class="rc-card-label">Без подтверждения</div><div class="rc-card-val">${pct('noConfirmation')}%</div></div>
+                <div class="rc-card"><div class="rc-card-label">Против старшего ТФ</div><div class="rc-card-val">${pct('againstHigherTF')}%</div></div>
+            </div>
+            <div style="margin-top:12px;font-size:12px;color:var(--text-secondary)">По сетапам (лучший сверху)</div>
+            <div style="margin-top:6px;display:flex;flex-direction:column;gap:4px">
+                ${setupRows.map(s => `
+                    <div class="journal-item">
+                        <div class="journal-item-left">
+                            <span style="color:var(--text-primary);font-weight:500">${s.key}</span>
+                            <span style="color:var(--text-secondary);font-size:11px">${s.count} сд. · winrate ${s.winRate}%</span>
+                        </div>
+                        <span style="font-weight:600;color:${s.avgR >= 0 ? '#4caf82' : '#e05252'}">${s.avgR >= 0 ? '+' : ''}${s.avgR}R</span>
+                    </div>
+                `).join('')}
+            </div>
+        `;
+        document.getElementById('disciplineModal').style.display = 'flex';
+    }
+
+    async function jDel(idx) {
+        const trade = _journalCache[idx];
+        if (authToken && trade && trade.id != null) {
+            await _authFetch(`${API_BASE}/user/journal/${trade.id}`, { method: 'DELETE' });
+        } else {
+            const trades = jLoad_local();
+            trades.splice(idx, 1);
+            jSave(trades);
+        }
+        await jRender();
+    }
+
+    async function jResetAll() {
+        if (authToken) {
+            for (const t of _journalCache) {
+                if (t.id != null) await _authFetch(`${API_BASE}/user/journal/${t.id}`, { method: 'DELETE' });
+            }
+        } else {
+            jSave([]);
+        }
+        await jRender();
+    }
+
+    async function showKellyModal(trades) {
+        if (!trades) trades = await jLoad();
         const total = trades.length;
         if (total === 0) return;
         const wins = trades.filter(t => t.win);
@@ -3750,8 +4127,6 @@
         document.getElementById('km_verdict').textContent = verdict;
         document.getElementById('kellyModal').style.display = 'flex';
     }
-
-    jRender();
 
     // ---- Watchlist (список наблюдения) ----
     function wlLoad() { return JSON.parse(localStorage.getItem('watchlist_' + currentMarket) || '[]'); }
@@ -5068,6 +5443,19 @@
                     </div>
                 </div>
                 <div id="km_verdict" style="margin-top:10px;font-size:12px;padding:8px 10px;border-radius:8px;background:var(--hover-bg);line-height:1.6"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Статистика по дисциплине -->
+    <div class="modal-overlay" id="disciplineModal" style="display:none" onclick="if(event.target===this)this.style.display='none'">
+        <div class="rc-box" style="width:480px">
+            <div class="rc-header">
+                <span>Статистика по дисциплине</span>
+                <button class="rc-close" onclick="document.getElementById('disciplineModal').style.display='none'">&#x00d7;</button>
+            </div>
+            <div class="rc-body" id="disciplineBody">
+                <div class="div-scan-empty">Пока нет разобранных сделок</div>
             </div>
         </div>
     </div>
