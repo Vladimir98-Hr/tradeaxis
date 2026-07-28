@@ -168,6 +168,28 @@ async def add_trade(
     return {"id": trade.id, "created_at": trade.created_at.isoformat()}
 
 
+@router.put("/journal/{trade_id}")
+async def update_trade(
+    trade_id: int,
+    body: TradeBody,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Обновляет данные сделки (только свою)."""
+    result = await db.execute(
+        select(TradeJournal).where(
+            TradeJournal.id == trade_id,
+            TradeJournal.user_id == current_user.id,
+        )
+    )
+    trade = result.scalar_one_or_none()
+    if not trade:
+        raise HTTPException(status_code=404, detail="Сделка не найдена")
+    trade.data_json = json.dumps(body.data, ensure_ascii=False)
+    await db.commit()
+    return {"ok": True}
+
+
 @router.delete("/journal/{trade_id}")
 async def delete_trade(
     trade_id: int,

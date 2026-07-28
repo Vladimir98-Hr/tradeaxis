@@ -1391,7 +1391,7 @@
         <!-- Сканер спреда 15m -->
         <div class="card div-scan-card">
             <div class="div-scan-header">
-                <span id="spreadScanTitle">Спред 15м · Крипто</span>
+                <span id="spreadScanTitle">Сканер спреда</span>
                 <span class="vol-timer" id="spreadScanTimer"></span>
             </div>
             <div class="div-scan-info" id="spreadScanInfo"></div>
@@ -1524,7 +1524,7 @@
         <!-- Сканер волатильности -->
         <div class="card div-scan-card">
             <div class="div-scan-header">
-                <span id="volScanTitle">Волатильность 30m · Крипто</span>
+                <span id="volScanTitle">Сканер волатильности</span>
                 <span class="vol-timer" id="volScanTimer"></span>
             </div>
             <div class="div-scan-info" id="volScanInfo"></div>
@@ -1789,7 +1789,7 @@
     <div class="modal-overlay" id="postReviewModal">
         <div class="rc-box">
             <div class="rc-header">
-                <span>Разбор сделки</span>
+                <span id="prModalTitle">Разбор сделки</span>
                 <button class="rc-close" onclick="closePostReview()">×</button>
             </div>
             <div class="rc-body">
@@ -2528,13 +2528,11 @@
             document.getElementById('divScanTitle').textContent = 'Дивергенции 1D · MOEX';
             document.getElementById('divScanList').innerHTML = '<div class="div-scan-empty">Нажмите «Сканировать»</div>';
             document.getElementById('divScanInfo').textContent = '';
-            document.getElementById('volScanTitle').textContent = 'Волатильность 30m · MOEX';
             document.getElementById('volScanList').innerHTML = '<div class="div-scan-empty">Сканирование...</div>';
             volNextRefresh = 0;
             updateTimeframesForMarket('moex', currentMoexCategory);
             fetchMoexSymbols(currentMoexCategory);
             fetchVolScan();
-            document.getElementById('spreadScanTitle').textContent = 'Спред 15м · MOEX';
             spreadNextRefresh = 0;
             fetchSpreadScan();
         
@@ -2544,14 +2542,12 @@
             document.getElementById('divScanTitle').textContent = 'Дивергенции 1D · Крипто';
             document.getElementById('divScanList').innerHTML = '<div class="div-scan-empty">Нажмите «Сканировать»</div>';
             document.getElementById('divScanInfo').textContent = '';
-            document.getElementById('volScanTitle').textContent = 'Волатильность 30m · Крипто';
             volNextRefresh = 0;
             currentSymbol = 'BTCUSDT';
             document.getElementById('chartSymbolName').textContent = 'BTC/USDT';
             updateTimeframesForMarket('crypto');
             fetchSymbolsList().then(() => { fetchAll(); startTicker(); });
             fetchVolScan();
-            document.getElementById('spreadScanTitle').textContent = 'Спред 15м · Крипто';
             spreadNextRefresh = 0;
             fetchSpreadScan();
             wlRender();
@@ -2943,7 +2939,7 @@
             if (!res.ok) throw new Error(json.detail || 'Ошибка');
             const THRESHOLD = isMoex ? _vs.volThresholdMoex : _vs.volThresholdCrypto;
             const filtered = (json.pairs ?? []).filter(p => Math.abs(p.change_30m ?? 0) >= THRESHOLD);
-            info.textContent = `Найдено: ${filtered.length} ${isMoex ? 'инструментов' : 'пар'} (скачок за 30м > ${THRESHOLD}%)`;
+            info.textContent = `Найдено: ${filtered.length} ${isMoex ? 'инструментов' : 'пар'}`;
             list.innerHTML = filtered.length
                 ? filtered.map(p => {
                     const chg = p.change_30m ?? 0;
@@ -2990,7 +2986,7 @@
             if (myGen !== _spreadGen) return;
             if (!res.ok) throw new Error(json.detail || 'Ошибка');
             const pairs = json.pairs ?? [];
-            info.textContent = `Найдено: ${pairs.length} ${isMoex ? 'инструментов' : 'пар'} (спред 15м > 1%)`;
+            info.textContent = `Найдено: ${pairs.length} ${isMoex ? 'инструментов' : 'пар'}`;
             list.innerHTML = pairs.length
                 ? pairs.map(p => `<div class="div-scan-item" onclick="selectPair({symbol:'${p.symbol}',name:'${p.name}',base:'${p.base}'})">
                     <span class="div-scan-badge vol-pos">${p.spread}%</span>
@@ -3862,6 +3858,7 @@
     // ── Открытые планы / пост-разбор ──────────────────────────
     let _reviewPlanId = null;
     let _reviewAnswers = {};
+    let _editingReviewId = null;
 
     function jRenderPlans(all) {
         const plans = all.filter(t => t.type === 'plan');
@@ -3923,9 +3920,19 @@
                 <div><b style="color:var(--text-primary)">Без подтверждения:</b> ${yn(review.noConfirmation)} &nbsp; <b style="color:var(--text-primary)">Против старшего ТФ:</b> ${yn(review.againstHigherTF)}</div>
                 ${review.comment ? `<div style="margin-top:4px"><b style="color:var(--text-primary)">Комментарий:</b> ${review.comment}</div>` : ''}
                 <div style="margin-top:6px;font-weight:600;color:${win ? '#4caf82' : '#e05252'}">Результат: ${(review.resultR || 0) > 0 ? '+' : ''}${review.resultR ?? 0}R / ${review.resultUsd ?? 0}$</div>
+                <div style="margin-top:12px;text-align:right">
+                    <button class="div-scan-btn" onclick="editClosedTradeFromConspect(${reviewId})">&#9998; Изменить данные</button>
+                </div>
             </div>
         `;
         document.getElementById('tradeViewModal').style.display = 'flex';
+    }
+
+    function editClosedTradeFromConspect(reviewId) {
+        const review = _journalCache.find(t => t.id === reviewId);
+        if (!review) return;
+        document.getElementById('tradeViewModal').style.display = 'none';
+        openPostReview(review.planId, review);
     }
 
     // ── Журнал закрытых сделок ─────────────────────────────────
@@ -3966,16 +3973,26 @@
         await jRender();
     }
 
-    function openPostReview(planId) {
+    function openPostReview(planId, existingReview = null) {
         _reviewPlanId = planId;
-        _reviewAnswers = { followedPlan: 'yes', earlyExit: 'no', stopMoved: 'no', averaging: 'no', emotionalMistake: 'no', noConfirmation: 'no', againstHigherTF: 'no' };
+        _editingReviewId = existingReview ? existingReview.id : null;
+        _reviewAnswers = existingReview
+            ? {
+                followedPlan: existingReview.followedPlan, earlyExit: existingReview.earlyExit,
+                stopMoved: existingReview.stopMoved, averaging: existingReview.averaging,
+                emotionalMistake: existingReview.emotionalMistake, noConfirmation: existingReview.noConfirmation,
+                againstHigherTF: existingReview.againstHigherTF,
+            }
+            : { followedPlan: 'yes', earlyExit: 'no', stopMoved: 'no', averaging: 'no', emotionalMistake: 'no', noConfirmation: 'no', againstHigherTF: 'no' };
         document.querySelectorAll('#postReviewModal .rc-radio-group').forEach(g => {
-            g.querySelectorAll('.rc-radio-btn').forEach(b => b.classList.toggle('active', b.dataset.val === (g.id === 'pr_followedPlan' ? 'yes' : 'no')));
+            const field = g.id.replace('pr_', '');
+            g.querySelectorAll('.rc-radio-btn').forEach(b => b.classList.toggle('active', b.dataset.val === _reviewAnswers[field]));
         });
-        document.getElementById('prResultR').value = '';
-        document.getElementById('prResultUsd').value = '';
-        document.getElementById('prComment').value = '';
+        document.getElementById('prResultR').value = existingReview ? (existingReview.resultR ?? '') : '';
+        document.getElementById('prResultUsd').value = existingReview ? (existingReview.resultUsd ?? '') : '';
+        document.getElementById('prComment').value = existingReview ? (existingReview.comment || '') : '';
         document.getElementById('prMsg').textContent = '';
+        document.getElementById('prModalTitle').textContent = existingReview ? 'Изменить разбор сделки' : 'Разбор сделки';
         const plan = _journalCache.find(t => t.id === planId) || {};
         document.getElementById('prPlanInfo').innerHTML = _planConspectHtml(plan);
         document.getElementById('postReviewModal').style.display = 'flex';
@@ -3983,6 +4000,7 @@
 
     function closePostReview() {
         document.getElementById('postReviewModal').style.display = 'none';
+        _editingReviewId = null;
     }
 
     function setReviewToggle(field, val, btn) {
@@ -3997,10 +4015,19 @@
         const resultR = parseFloat(document.getElementById('prResultR').value) || 0;
         const resultUsd = parseFloat(document.getElementById('prResultUsd').value) || 0;
         const comment = document.getElementById('prComment').value.trim();
-        const r = await _authFetch(`${API_BASE}/user/journal`, {
-            method: 'POST',
-            body: { data: { type: 'review', planId: _reviewPlanId, ..._reviewAnswers, comment, resultR, resultUsd, ts: Date.now() } }
-        });
+        let r;
+        if (_editingReviewId) {
+            const existing = _journalCache.find(t => t.id === _editingReviewId) || {};
+            r = await _authFetch(`${API_BASE}/user/journal/${_editingReviewId}`, {
+                method: 'PUT',
+                body: { data: { type: 'review', planId: _reviewPlanId, ..._reviewAnswers, comment, resultR, resultUsd, ts: existing.ts || Date.now() } }
+            });
+        } else {
+            r = await _authFetch(`${API_BASE}/user/journal`, {
+                method: 'POST',
+                body: { data: { type: 'review', planId: _reviewPlanId, ..._reviewAnswers, comment, resultR, resultUsd, ts: Date.now() } }
+            });
+        }
         if (r.ok) {
             closePostReview();
             await jRender();
@@ -4188,7 +4215,7 @@
         showAlligator: true, jawColor: '#2962ff', teethColor: '#ef5350', lipsColor: '#26a69a',
         showBB: true, bbColor: '#2196f3',
         showAO: true, aoUp: '#26a69a', aoDown: '#ef5350',
-        volThresholdCrypto: 3, volThresholdMoex: 3,
+        volThresholdCrypto: 2, volThresholdMoex: 3,
         volAutoRefresh: true,
         // Новые ключи
         showGrid: true, logScale: false, autoScale: true,
@@ -5666,7 +5693,7 @@
                             <div class="sv2-group-title">Сканер волатильности</div>
                             <div class="sv2-row" data-search="порог волатильность крипто процент">
                                 <div class="sv2-label">Порог крипто (%)</div>
-                                <input type="number" class="sv2-num" id="s_volCrypto" value="3" min="0.1" max="50" step="0.5">
+                                <input type="number" class="sv2-num" id="s_volCrypto" value="2" min="0.1" max="50" step="0.5">
                             </div>
                             <div class="sv2-row" data-search="порог волатильность moex биржа">
                                 <div class="sv2-label">Порог MOEX (%)</div>
