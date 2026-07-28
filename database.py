@@ -30,6 +30,8 @@ class User(Base):
     hashed_password: Mapped[str] = mapped_column(String(200), nullable=False)
     is_admin: Mapped[bool] = mapped_column(Boolean, default=False)
     avatar_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    reset_token: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    reset_token_expires: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
     settings: Mapped["UserSettings"] = relationship("UserSettings", back_populates="user", uselist=False)
@@ -110,5 +112,13 @@ async def init_db():
             pass  # Колонка уже существует
         try:
             await conn.execute(text("ALTER TABLE users ADD COLUMN avatar_url VARCHAR(500)"))
+        except Exception:
+            pass  # Колонка уже существует
+        try:
+            await conn.execute(text("ALTER TABLE users ADD COLUMN reset_token VARCHAR(200)"))
+        except Exception:
+            pass  # Колонка уже существует
+        try:
+            await conn.execute(text("ALTER TABLE users ADD COLUMN reset_token_expires DATETIME"))
         except Exception:
             pass  # Колонка уже существует

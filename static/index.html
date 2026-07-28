@@ -579,25 +579,15 @@
         .vol-pos { color: var(--green); }
         .vol-neg { color: var(--red); }
         /* Журнал сделок */
-        .journal-add-form { display:flex; flex-direction:column; gap:6px; padding:6px 4px; border-bottom:1px solid var(--border-color); }
-        .journal-add-row { display:flex; gap:6px; align-items:center; }
-        .journal-sym-input { flex:1; min-width:0; background:var(--bg-color); border:1px solid var(--border-color); border-radius:6px; color:var(--text-primary); font-size:12px; padding:5px 8px; font-family:inherit; }
-        .journal-r-input { width:48px; box-sizing:border-box; background:var(--bg-color); border:1px solid var(--border-color); border-radius:6px; color:var(--text-primary); font-size:12px; padding:5px 6px; font-family:inherit; }
-        .journal-win-btn, .journal-loss-btn { flex:1; padding:5px; border:1px solid var(--border-color); border-radius:6px; cursor:pointer; font-size:12px; font-weight:600; font-family:inherit; transition:all 0.15s; background:var(--hover-bg); color:var(--text-secondary); }
-        .journal-win-btn.active { background:rgba(76,175,130,0.25); color:var(--green); border-color:var(--green); }
-        .journal-loss-btn.active { background:rgba(224,82,82,0.25); color:var(--red); border-color:var(--red); }
-        .journal-add-btn { background:var(--accent-color); border:none; border-radius:6px; color:#fff; font-size:12px; font-weight:600; padding:5px 10px; cursor:pointer; font-family:inherit; white-space:nowrap; }
-        .journal-progress { display:flex; gap:6px; align-items:center; padding:4px 4px 2px; font-size:11px; color:var(--text-secondary); }
-        .journal-progress-bar { flex:1; height:3px; background:var(--border-color); border-radius:2px; overflow:hidden; }
-        .journal-progress-fill { height:100%; background:var(--accent-color); border-radius:2px; transition:width 0.3s; }
-        .journal-item { display:flex; justify-content:space-between; align-items:center; padding:5px 8px; border-radius:6px; font-size:12px; }
+        .journal-item { display:flex; justify-content:space-between; align-items:center; padding:5px 8px; border-radius:6px; font-size:12px; gap:8px; }
         .journal-item:hover { background:var(--hover-bg); }
-        .journal-item-left { display:flex; gap:8px; align-items:center; }
-        .journal-badge { font-weight:700; font-size:11px; }
+        .journal-item-left { display:flex; gap:8px; align-items:center; min-width:0; flex:1; }
+        .journal-item-left > span:nth-child(2) { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+        .journal-badge { font-weight:700; font-size:11px; min-width:40px; text-align:center; display:inline-block; flex-shrink:0; }
         .journal-badge.win { color:var(--green); }
         .journal-badge.loss { color:var(--red); }
         .journal-item-r { color:var(--text-secondary); font-size:11px; }
-        .journal-del { background:none; border:none; color:var(--text-secondary); cursor:pointer; font-size:13px; padding:0 2px; line-height:1; }
+        .journal-del { background:none; border:none; color:var(--text-secondary); cursor:pointer; font-size:13px; padding:0 2px; line-height:1; flex-shrink:0; }
         .journal-del:hover { color:var(--red); }
 
         /* Watchlist */
@@ -1542,36 +1532,6 @@
                 <div class="div-scan-empty">Загрузка...</div>
             </div>
         </div>
-        <!-- Журнал сделок -->
-        <div class="card div-scan-card">
-            <div class="div-scan-header">
-                <span>Журнал сделок</span>
-                <span id="journalCounter" style="font-size:11px;font-weight:400;color:var(--text-secondary)">0 / 30</span>
-            </div>
-            <div class="journal-add-form">
-                <div class="journal-add-row">
-                    <input class="journal-sym-input" id="jSym" type="text" placeholder="Символ (необяз.)" maxlength="12">
-                    <input class="journal-r-input" id="jR" type="number" min="0.1" step="any" placeholder="R&#xd7;">
-                </div>
-                <div class="journal-add-row">
-                    <button class="journal-win-btn active" id="jBtnWin" onclick="jSetResult('win')">Win &#x2713;</button>
-                    <button class="journal-loss-btn" id="jBtnLoss" onclick="jSetResult('loss')">Loss &#x2717;</button>
-                    <button class="journal-add-btn" onclick="jAddTrade()">+ Добавить</button>
-                </div>
-            </div>
-            <div class="journal-progress">
-                <div class="journal-progress-bar"><div class="journal-progress-fill" id="jProgressFill" style="width:0%"></div></div>
-                <span id="jProgressLabel">0 / 30</span>
-            </div>
-            <div class="div-scan-list" id="journalList" style="max-height:260px">
-                <div class="div-scan-empty">Добавьте первую сделку</div>
-            </div>
-            <div style="padding:4px 4px 0;display:flex;gap:6px">
-                <button class="div-scan-btn" onclick="showKellyModal(null)" style="flex:1">&#x25b6; Рассчитать Келли</button>
-                <button class="div-scan-btn" onclick="showDisciplineModal()" style="flex:1">&#x1F4CA; Дисциплина</button>
-                <button class="div-scan-btn" onclick="jResetAll()" style="color:var(--text-secondary)">&#x21ba; Сброс</button>
-            </div>
-        </div>
         <!-- Открытые планы (ожидают пост-разбора) -->
         <div class="card div-scan-card">
             <div class="div-scan-header">
@@ -1579,6 +1539,23 @@
             </div>
             <div class="div-scan-list" id="openPlansList">
                 <div class="div-scan-empty">Нет открытых планов</div>
+            </div>
+        </div>
+        <!-- Журнал сделок (закрытые, с полным разбором) -->
+        <div class="card div-scan-card">
+            <div class="div-scan-header">
+                <span>Журнал сделок</span>
+                <span id="journalCounter" style="font-size:11px;font-weight:400;color:var(--text-secondary)">0 закрыто</span>
+            </div>
+            <div class="div-scan-list" id="journalList" style="max-height:320px">
+                <div class="div-scan-empty">Нет закрытых сделок</div>
+            </div>
+            <div style="padding:4px 4px 0;display:flex;flex-direction:column;gap:6px">
+                <div style="display:flex;gap:6px">
+                    <button class="div-scan-btn" onclick="showKellyModal(null)" style="flex:1;min-width:0">&#x25b6; Келли</button>
+                    <button class="div-scan-btn" onclick="showDisciplineModal()" style="flex:1;min-width:0">&#x1F4CA; Дисциплина</button>
+                </div>
+                <button class="div-scan-btn" onclick="jResetAll()" style="color:var(--text-secondary)">&#x21ba; Сбросить журнал</button>
             </div>
         </div>
     </aside>
@@ -1738,11 +1715,13 @@
                     <hr class="rc-divider">
 
                     <div class="rc-label">Тип сетапа</div>
-                    <div class="rc-radio-group" id="rcSetupGroup">
-                        <button class="rc-radio-btn active" data-setup="Дивербар" onclick="setRcSetup(this)">Дивербар</button>
-                        <button class="rc-radio-btn" data-setup="Пробой Боллинджера" onclick="setRcSetup(this)">Пробой Боллинджера</button>
-                        <button class="rc-radio-btn" data-setup="Фильтр Аллигатора" onclick="setRcSetup(this)">Фильтр Аллигатора</button>
+                    <div class="rc-radio-group" id="rcSetupGroup" style="flex-wrap:wrap">
+                        <button class="rc-radio-btn active" data-setup="Дивербар" onclick="setRcSetup(this)" style="flex:1 1 45%">Дивербар</button>
+                        <button class="rc-radio-btn" data-setup="Пробой Боллинджера" onclick="setRcSetup(this)" style="flex:1 1 45%">Пробой Боллинджера</button>
+                        <button class="rc-radio-btn" data-setup="Фильтр Аллигатора" onclick="setRcSetup(this)" style="flex:1 1 45%">Фильтр Аллигатора</button>
+                        <button class="rc-radio-btn" data-setup="__custom__" onclick="setRcSetup(this)" style="flex:1 1 45%">Своя стратегия</button>
                     </div>
+                    <input class="rc-input" id="rcSetupCustom" type="text" placeholder="Название своей стратегии" style="display:none;margin-top:6px" oninput="_rcSetup = this.value.trim() || 'Своя стратегия'">
                     <div style="margin-top:8px">
                         <div class="rc-label" style="display:flex;align-items:center;justify-content:space-between">
                             <span>Причина входа</span>
@@ -1837,6 +1816,9 @@
                 <div class="rc-label" style="margin-top:8px">Вход против старшего ТФ?</div>
                 <div class="rc-radio-group" id="pr_againstHigherTF"><button class="rc-radio-btn" data-val="yes" onclick="setReviewToggle('againstHigherTF','yes',this)">Да</button><button class="rc-radio-btn active" data-val="no" onclick="setReviewToggle('againstHigherTF','no',this)">Нет</button></div>
 
+                <div class="rc-label" style="margin-top:8px">Комментарий к сделке</div>
+                <textarea class="rc-input" id="prComment" rows="3" style="resize:vertical;font-family:inherit" placeholder="Как прошла сделка, что запомнить..."></textarea>
+
                 <div class="rc-2col" style="margin-top:10px">
                     <div>
                         <div class="rc-label">Результат, R</div>
@@ -1850,6 +1832,19 @@
 
                 <button class="rc-calc-btn" style="margin-top:10px" onclick="savePostReview()">&#128190; Сохранить разбор</button>
                 <div id="prMsg" style="font-size:12px;margin-top:6px;min-height:16px"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Просмотр конспекта плана / разбора сделки -->
+    <div class="modal-overlay" id="tradeViewModal">
+        <div class="rc-box">
+            <div class="rc-header">
+                <span id="tvTitle">Конспект сделки</span>
+                <button class="rc-close" onclick="document.getElementById('tradeViewModal').style.display='none'">×</button>
+            </div>
+            <div class="rc-body">
+                <div id="tvBody" style="font-size:12px;color:var(--text-secondary);line-height:1.6"></div>
             </div>
         </div>
     </div>
@@ -3486,6 +3481,7 @@
     window.onload = async () => {
         requestAnimationFrame(async () => {
             await initAuth();
+            _checkResetPwLink();
             await jRender();
             initCharts();
             initDrawingOverlay();
@@ -3766,9 +3762,17 @@
     }
 
     function setRcSetup(btn) {
-        _rcSetup = btn.dataset.setup;
         document.querySelectorAll('#rcSetupGroup .rc-radio-btn').forEach(b => b.classList.remove('active'));
         btn.classList.add('active');
+        const customInput = document.getElementById('rcSetupCustom');
+        if (btn.dataset.setup === '__custom__') {
+            customInput.style.display = 'block';
+            _rcSetup = customInput.value.trim() || 'Своя стратегия';
+            customInput.focus();
+        } else {
+            customInput.style.display = 'none';
+            _rcSetup = btn.dataset.setup;
+        }
     }
 
     async function saveTradePlan() {
@@ -3796,6 +3800,7 @@
             document.getElementById('rcReason').value = '';
             document.getElementById('rcConfirms').value = '';
             document.getElementById('rcInvalidates').value = '';
+            await jRender();
         } else {
             msgEl.textContent = 'Не удалось сохранить план, попробуйте ещё раз';
             msgEl.style.color = '#e05252';
@@ -3831,14 +3836,6 @@
     }
 
     // ── Журнал сделок ──────────────────────────────────────────
-    let _jResult = 'win';
-
-    function jSetResult(r) {
-        _jResult = r;
-        document.getElementById('jBtnWin').classList.toggle('active', r === 'win');
-        document.getElementById('jBtnLoss').classList.toggle('active', r === 'loss');
-    }
-
     let _journalCache = [];
 
     async function jLoad() {
@@ -3852,73 +3849,14 @@
                 }
             } catch {}
         }
-        _journalCache = JSON.parse(localStorage.getItem('tradeJournal') || '[]');
+        _journalCache = [];
         return _journalCache;
-    }
-
-    function jSave(trades) {
-        localStorage.setItem('tradeJournal', JSON.stringify(trades));
-    }
-
-    async function jAddTrade() {
-        const sym = document.getElementById('jSym').value.trim().toUpperCase() || '—';
-        const rVal = parseFloat(document.getElementById('jR').value);
-        const win = _jResult === 'win';
-        if (win && (!rVal || rVal <= 0)) {
-            alert('Введите R-множитель для прибыльной сделки (напр. 2.0)');
-            return;
-        }
-        const newTrade = { sym, win, r: win ? rVal : 0, ts: Date.now() };
-        let total;
-        if (authToken) {
-            await _authFetch(`${API_BASE}/user/journal`, { method: 'POST', body: { data: newTrade } });
-            const trades = await jLoad();
-            total = trades.length;
-        } else {
-            const trades = jLoad_local();
-            trades.unshift(newTrade);
-            jSave(trades);
-            total = trades.length;
-            if (total >= 60) {
-                jSave([]);
-            }
-        }
-        document.getElementById('jSym').value = '';
-        document.getElementById('jR').value = '';
-        await jRender();
-        if (total === 30) {
-            setTimeout(async () => showKellyModal(await jLoad()), 400);
-        }
-    }
-
-    function jLoad_local() {
-        return JSON.parse(localStorage.getItem('tradeJournal') || '[]');
     }
 
     async function jRender() {
         const all = await jLoad();
-        const trades = all.filter(t => !t.type);
-        const total = trades.length;
-        const pct = Math.min(total / 30 * 100, 100);
-        document.getElementById('jProgressFill').style.width = pct + '%';
-        document.getElementById('jProgressLabel').textContent = total + ' / 30';
-        document.getElementById('journalCounter').textContent = total + ' / 30';
-        const list = document.getElementById('journalList');
-        if (!trades.length) {
-            list.innerHTML = '<div class="div-scan-empty">Добавьте первую сделку</div>';
-        } else {
-            list.innerHTML = trades.map((t) => `
-                <div class="journal-item">
-                    <div class="journal-item-left">
-                        <span class="journal-badge ${t.win ? 'win' : 'loss'}">${t.win ? 'WIN' : 'LOSS'}</span>
-                        <span style="color:var(--text-primary);font-weight:500">${t.sym}</span>
-                        ${t.win ? `<span class="journal-item-r">&times;${t.r}</span>` : ''}
-                    </div>
-                    <button class="journal-del" onclick="jDel(${_journalCache.indexOf(t)})">&#x2715;</button>
-                </div>
-            `).join('');
-        }
         jRenderPlans(all);
+        jRenderClosed(all);
     }
 
     // ── Открытые планы / пост-разбор ──────────────────────────
@@ -3936,13 +3874,96 @@
         }
         list.innerHTML = open.map(p => `
             <div class="journal-item">
-                <div class="journal-item-left">
+                <div class="journal-item-left" style="cursor:pointer" onclick="openPlanConspect(${p.id})">
+                    <span class="journal-badge ${p.dir === 'short' ? 'loss' : 'win'}">${p.dir === 'short' ? 'ШОРТ' : 'ЛОНГ'}</span>
                     <span style="color:var(--text-primary);font-weight:500">${p.sym || '—'}</span>
-                    <span style="color:var(--text-secondary);font-size:11px">${p.setup || ''} · ${p.dir === 'short' ? 'ШОРТ' : 'ЛОНГ'}</span>
                 </div>
-                <button class="div-scan-btn" style="padding:2px 8px;font-size:11px" onclick="openPostReview(${p.id})">Закрыть сделку</button>
+                <button class="div-scan-btn" style="padding:2px 8px;font-size:11px" onclick="event.stopPropagation();openPostReview(${p.id})">Закрыть сделку</button>
             </div>
         `).join('');
+    }
+
+    function _fmtJDate(ts) {
+        return ts ? new Date(ts).toLocaleString('ru-RU', { day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit' }) : '—';
+    }
+
+    // ── Общий конспект плана (переиспользуется в разборе и в просмотре) ──
+    function _planConspectHtml(plan) {
+        return `
+            <div style="font-size:13px;color:var(--text-primary);font-weight:600;margin-bottom:4px">${plan.sym || '—'} · ${plan.dir === 'short' ? 'ШОРТ' : 'ЛОНГ'} · ${plan.setup || '—'}</div>
+            <div>Открыта: ${_fmtJDate(plan.ts)}</div>
+            <div>Вход ${plan.entry ?? '—'} &nbsp; Стоп ${plan.stop ?? '—'} &nbsp; Тейк ${plan.tp ?? '—'} &nbsp; Риск $${plan.riskUsd ?? '—'}</div>
+            <div style="margin-top:6px"><b style="color:var(--text-primary)">Причина входа:</b> ${plan.reason || '—'}</div>
+            <div><b style="color:var(--text-primary)">Подтверждает:</b> ${plan.confirms || '—'}</div>
+            <div><b style="color:var(--text-primary)">Отменяет:</b> ${plan.invalidates || '—'}</div>
+        `;
+    }
+
+    // Клик по валютной паре в "Открытые планы" — открыть график и показать конспект без вопросов
+    function openPlanConspect(planId) {
+        const plan = _journalCache.find(t => t.id === planId) || {};
+        if (plan.sym) selectPair({ symbol: plan.sym, name: plan.sym });
+        document.getElementById('tvTitle').textContent = 'План сделки';
+        document.getElementById('tvBody').innerHTML = _planConspectHtml(plan);
+        document.getElementById('tradeViewModal').style.display = 'flex';
+    }
+
+    // Клик по сделке в "Журнал сделок" — конспект + полный разбор в отдельном окне
+    function openClosedConspect(reviewId) {
+        const review = _journalCache.find(t => t.id === reviewId) || {};
+        const plan = _journalCache.find(t => t.id === review.planId) || {};
+        const win = (review.resultR || 0) > 0;
+        const yn = v => v === 'yes' ? 'Да' : 'Нет';
+        document.getElementById('tvTitle').textContent = 'Разбор сделки';
+        document.getElementById('tvBody').innerHTML = _planConspectHtml(plan) + `
+            <div style="margin-top:8px;padding-top:8px;border-top:1px solid var(--border-color)">
+                <div><b style="color:var(--text-primary)">Закрыта:</b> ${_fmtJDate(review.ts)}</div>
+                <div style="margin-top:4px"><b style="color:var(--text-primary)">План соблюдён:</b> ${yn(review.followedPlan)} &nbsp; <b style="color:var(--text-primary)">Ранний выход:</b> ${yn(review.earlyExit)} &nbsp; <b style="color:var(--text-primary)">Перенос стопа:</b> ${yn(review.stopMoved)}</div>
+                <div><b style="color:var(--text-primary)">Усреднение:</b> ${yn(review.averaging)} &nbsp; <b style="color:var(--text-primary)">Эмоц. ошибка:</b> ${yn(review.emotionalMistake)}</div>
+                <div><b style="color:var(--text-primary)">Без подтверждения:</b> ${yn(review.noConfirmation)} &nbsp; <b style="color:var(--text-primary)">Против старшего ТФ:</b> ${yn(review.againstHigherTF)}</div>
+                ${review.comment ? `<div style="margin-top:4px"><b style="color:var(--text-primary)">Комментарий:</b> ${review.comment}</div>` : ''}
+                <div style="margin-top:6px;font-weight:600;color:${win ? '#4caf82' : '#e05252'}">Результат: ${(review.resultR || 0) > 0 ? '+' : ''}${review.resultR ?? 0}R / ${review.resultUsd ?? 0}$</div>
+            </div>
+        `;
+        document.getElementById('tradeViewModal').style.display = 'flex';
+    }
+
+    // ── Журнал закрытых сделок ─────────────────────────────────
+    function jRenderClosed(all) {
+        const reviews = all.filter(t => t.type === 'review').sort((a, b) => (b.ts || 0) - (a.ts || 0));
+        document.getElementById('journalCounter').textContent = reviews.length + ' закрыто';
+        const list = document.getElementById('journalList');
+        if (!reviews.length) {
+            list.innerHTML = '<div class="div-scan-empty">Нет закрытых сделок</div>';
+            return;
+        }
+        const plansById = {};
+        all.filter(t => t.type === 'plan').forEach(p => { plansById[p.id] = p; });
+        list.innerHTML = reviews.map(r => {
+            const plan = plansById[r.planId] || {};
+            const win = (r.resultR || 0) > 0;
+            return `
+            <div class="journal-item" style="cursor:pointer" onclick="openClosedConspect(${r.id})">
+                <div class="journal-item-left">
+                    <span class="journal-badge ${win ? 'win' : 'loss'}">${win ? 'WIN' : 'LOSS'}</span>
+                    <span style="color:var(--text-primary);font-weight:500">${plan.sym || '—'}</span>
+                    <span style="color:var(--text-secondary);font-size:11px">${plan.dir === 'short' ? 'ШОРТ' : 'ЛОНГ'}</span>
+                </div>
+                <div style="display:flex;align-items:center;gap:8px;flex-shrink:0">
+                    <span style="font-weight:600;color:${win ? '#4caf82' : '#e05252'}">${(r.resultR || 0) > 0 ? '+' : ''}${r.resultR ?? 0}R</span>
+                    <button class="journal-del" onclick="event.stopPropagation();jDelClosed(${r.id},${plan.id ?? 'null'})">&#x2715;</button>
+                </div>
+            </div>`;
+        }).join('');
+    }
+
+    async function jDelClosed(reviewId, planId) {
+        if (!confirm('Удалить эту сделку из журнала?')) return;
+        if (authToken) {
+            await _authFetch(`${API_BASE}/user/journal/${reviewId}`, { method: 'DELETE' });
+            if (planId != null) await _authFetch(`${API_BASE}/user/journal/${planId}`, { method: 'DELETE' });
+        }
+        await jRender();
     }
 
     function openPostReview(planId) {
@@ -3953,9 +3974,10 @@
         });
         document.getElementById('prResultR').value = '';
         document.getElementById('prResultUsd').value = '';
+        document.getElementById('prComment').value = '';
         document.getElementById('prMsg').textContent = '';
-        const plan = _journalCache.find(t => t.id === planId);
-        document.getElementById('prPlanInfo').textContent = plan ? `${plan.sym || '—'} · ${plan.setup || ''} · вход ${plan.entry ?? '—'}` : '';
+        const plan = _journalCache.find(t => t.id === planId) || {};
+        document.getElementById('prPlanInfo').innerHTML = _planConspectHtml(plan);
         document.getElementById('postReviewModal').style.display = 'flex';
     }
 
@@ -3974,9 +3996,10 @@
         if (!authToken) { msgEl.textContent = 'Войдите в аккаунт, чтобы сохранить разбор'; msgEl.style.color = '#e05252'; return; }
         const resultR = parseFloat(document.getElementById('prResultR').value) || 0;
         const resultUsd = parseFloat(document.getElementById('prResultUsd').value) || 0;
+        const comment = document.getElementById('prComment').value.trim();
         const r = await _authFetch(`${API_BASE}/user/journal`, {
             method: 'POST',
-            body: { data: { type: 'review', planId: _reviewPlanId, ..._reviewAnswers, resultR, resultUsd, ts: Date.now() } }
+            body: { data: { type: 'review', planId: _reviewPlanId, ..._reviewAnswers, comment, resultR, resultUsd, ts: Date.now() } }
         });
         if (r.ok) {
             closePostReview();
@@ -4049,33 +4072,22 @@
         document.getElementById('disciplineModal').style.display = 'flex';
     }
 
-    async function jDel(idx) {
-        const trade = _journalCache[idx];
-        if (authToken && trade && trade.id != null) {
-            await _authFetch(`${API_BASE}/user/journal/${trade.id}`, { method: 'DELETE' });
-        } else {
-            const trades = jLoad_local();
-            trades.splice(idx, 1);
-            jSave(trades);
-        }
-        await jRender();
-    }
-
     async function jResetAll() {
-        if (authToken) {
-            for (const t of _journalCache) {
-                if (t.id != null) await _authFetch(`${API_BASE}/user/journal/${t.id}`, { method: 'DELETE' });
-            }
-        } else {
-            jSave([]);
+        if (!authToken) return;
+        if (!confirm('Удалить весь журнал сделок и все планы?')) return;
+        for (const t of _journalCache) {
+            if (t.id != null) await _authFetch(`${API_BASE}/user/journal/${t.id}`, { method: 'DELETE' });
         }
         await jRender();
     }
 
     async function showKellyModal(trades) {
-        if (!trades) trades = await jLoad();
+        if (!trades) {
+            const all = await jLoad();
+            trades = all.filter(t => t.type === 'review').map(r => ({ win: (r.resultR || 0) > 0, r: Math.abs(r.resultR || 0) }));
+        }
         const total = trades.length;
-        if (total === 0) return;
+        if (total === 0) { alert('Нет закрытых сделок для расчёта. Сначала закройте хотя бы одну сделку через «Закрыть сделку».'); return; }
         const wins = trades.filter(t => t.win);
         const losses = trades.filter(t => !t.win);
         const p = wins.length / total;
@@ -5061,8 +5073,68 @@
     function switchAuthTab(tab) {
         document.getElementById('loginForm').style.display = tab === 'login' ? 'flex' : 'none';
         document.getElementById('registerForm').style.display = tab === 'register' ? 'flex' : 'none';
+        document.getElementById('forgotForm').style.display = tab === 'forgot' ? 'flex' : 'none';
         document.getElementById('tabLogin').classList.toggle('active', tab === 'login');
         document.getElementById('tabRegister').classList.toggle('active', tab === 'register');
+        document.querySelector('.auth-tabs').style.display = tab === 'forgot' ? 'none' : 'flex';
+        if (tab === 'forgot') {
+            document.getElementById('forgotError').textContent = '';
+            document.getElementById('forgotMsg').textContent = '';
+            document.getElementById('forgotEmail').value = '';
+        }
+    }
+
+    async function submitForgotPassword() {
+        const email = document.getElementById('forgotEmail').value.trim();
+        const err = document.getElementById('forgotError');
+        const msg = document.getElementById('forgotMsg');
+        err.textContent = '';
+        msg.textContent = '';
+        if (!email) { err.textContent = 'Введите email'; return; }
+        try {
+            const r = await fetch('/auth/forgot-password', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email })
+            });
+            const data = await r.json();
+            msg.textContent = data.message || 'Если такой email зарегистрирован, письмо отправлено';
+        } catch { err.textContent = 'Ошибка соединения'; }
+    }
+
+    async function submitResetPassword() {
+        const p1 = document.getElementById('resetPwNew').value;
+        const p2 = document.getElementById('resetPwNew2').value;
+        const err = document.getElementById('resetPwError');
+        err.textContent = '';
+        if (!p1 || p1.length < 6) { err.textContent = 'Пароль минимум 6 символов'; return; }
+        if (p1 !== p2) { err.textContent = 'Пароли не совпадают'; return; }
+        try {
+            const r = await fetch('/auth/reset-password', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ token: _resetPwToken, password: p1 })
+            });
+            const data = await r.json();
+            if (!r.ok) { err.textContent = data.detail || 'Не удалось изменить пароль'; return; }
+            document.getElementById('resetPwModal').style.display = 'none';
+            alert('Пароль изменён. Теперь войдите с новым паролем.');
+            openAuthModal('login');
+        } catch { err.textContent = 'Ошибка соединения'; }
+    }
+
+    let _resetPwToken = null;
+
+    function _checkResetPwLink() {
+        const params = new URLSearchParams(window.location.search);
+        const token = params.get('reset_token');
+        if (token) {
+            _resetPwToken = token;
+            document.getElementById('resetPwModal').style.display = 'flex';
+            params.delete('reset_token');
+            const qs = params.toString();
+            history.replaceState({}, '', window.location.pathname + (qs ? '?' + qs : ''));
+        }
     }
 
     async function syncSettingsFromServer() {
@@ -5808,7 +5880,16 @@
             </div>
             <div class="auth-error" id="loginError"></div>
             <button class="auth-btn" onclick="submitLogin()">Войти</button>
+            <button type="button" onclick="switchAuthTab('forgot')" style="background:none;border:none;color:var(--accent-color);font-size:12px;cursor:pointer;padding:2px 0">Забыли пароль?</button>
             <button class="auth-btn-ghost" onclick="closeAuthModal()">Продолжить без входа</button>
+        </div>
+        <div id="forgotForm" class="auth-form" style="display:none">
+            <div style="font-size:12px;color:var(--text-secondary)">Введите email, указанный при регистрации — пришлём ссылку для сброса пароля</div>
+            <input class="auth-input" id="forgotEmail" type="email" placeholder="Email" autocomplete="email" onkeydown="if(event.key==='Enter')submitForgotPassword()">
+            <div class="auth-error" id="forgotError"></div>
+            <div id="forgotMsg" style="font-size:12px;color:#4caf82"></div>
+            <button class="auth-btn" onclick="submitForgotPassword()">Отправить ссылку</button>
+            <button class="auth-btn-ghost" onclick="switchAuthTab('login')">Назад ко входу</button>
         </div>
         <div id="registerForm" class="auth-form" style="display:none">
             <input class="auth-input" id="regUsername" type="text" placeholder="Имя пользователя" autocomplete="username">
@@ -5824,6 +5905,25 @@
             <div class="auth-error" id="registerError"></div>
             <button class="auth-btn" onclick="submitRegister()">Зарегистрироваться</button>
             <button class="auth-btn-ghost" onclick="closeAuthModal()">Продолжить без входа</button>
+        </div>
+    </div>
+</div>
+
+<!-- ── Reset Password Modal ──────────────────────────────────── -->
+<div class="auth-overlay" id="resetPwModal" style="display:none">
+    <div class="auth-box" onclick="event.stopPropagation()">
+        <div class="auth-title">Новый пароль</div>
+        <div class="auth-form">
+            <div class="auth-pw-wrap">
+                <input class="auth-input" id="resetPwNew" type="password" placeholder="Новый пароль (мин. 6 символов)" autocomplete="new-password">
+                <button type="button" class="auth-eye" onclick="togglePwVis('resetPwNew',this)" tabindex="-1">&#128065;</button>
+            </div>
+            <div class="auth-pw-wrap">
+                <input class="auth-input" id="resetPwNew2" type="password" placeholder="Повторите пароль" autocomplete="new-password" onkeydown="if(event.key==='Enter')submitResetPassword()">
+                <button type="button" class="auth-eye" onclick="togglePwVis('resetPwNew2',this)" tabindex="-1">&#128065;</button>
+            </div>
+            <div class="auth-error" id="resetPwError"></div>
+            <button class="auth-btn" onclick="submitResetPassword()">Сохранить пароль</button>
         </div>
     </div>
 </div>

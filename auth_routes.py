@@ -1,14 +1,20 @@
 """
-Роутер аутентификации: регистрация, вход, текущий пользователь.
+Роутер аутентификации: регистрация, вход, текущий пользователь, сброс пароля.
 """
+
+from datetime import datetime, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, field_validator
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
 
+from config import RESET_TOKEN_EXPIRE_MINUTES
 from database import User, get_db
-from auth import hash_password, verify_password, create_access_token, get_current_user
+from auth import (
+    hash_password, verify_password, create_access_token, get_current_user,
+    generate_reset_token, send_reset_email,
+)
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -112,3 +118,48 @@ async def login(body: LoginRequest, db: AsyncSession = Depends(get_db)):
 async def me(current_user: User = Depends(get_current_user)):
     """Возвращает данные текущего авторизованного пользователя."""
     return current_user
+
+
+class ForgotPasswordRequest(BaseModel):
+    email: str
+
+
+class ResetPasswordRequest(BaseModel):
+    token: str
+    password: str
+
+    @field_validator("password")
+    @classmethod
+    def password_valid(cls, v: str) -> str:
+        if len(v) < 6:
+            raise ValueError("Пароль минимум 6 символов")
+        return v
+
+
+@router.post("/forgot-password")
+async def forgot_password(body: ForgotPasswordRequest, db: AsyncSession = Depends(get_db)):
+    """Запрос на восстановление пароля. Всегда возвращает один и тот же ответ,
+    чтобы не раскрывать, зарегистрирован ли такой email."""
+    result = await db.execute(select(User).where(User.email == body.email.strip().lower()))
+    user = result.scalar_one_or_none()
+    if user:
+        user.reset_token = generate_reset_token()
+        user.reset_token_expires = datetime.utcnow() + timedelta(minutes=RESET_TOKEN_EXPIRE_MINUTES)
+        await db.commit()
+        await send_reset_email(user.email, user.reset_token)
+    return {"message": "Если такой email зарегистрирован, на него отправлено письмо со ссылкой для сброса пароля"}
+
+
+@router.post("/reset-password")
+async def reset_password(body: ResetPasswordRequest, db: AsyncSession = Depends(get_db)):
+    """Устанавливает новый пароль по токену из письма."""
+    result = await db.execute(select(User).where(User.reset_token == body.token))
+    user = result.scalar_one_or_none()
+    if not user or not user.reset_token_expires or user.reset_token_expires < datetime.utcnow():
+        raise HTTPException(status_code=400, detail="Ссылка недействительна или устарела")
+
+    user.hashed_password = hash_password(body.password)
+    user.reset_token = None
+    user.reset_token_expires = None
+    await db.commit()
+    return {"message": "Пароль успешно изменён"}

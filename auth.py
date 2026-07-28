@@ -2,6 +2,11 @@
 Модуль аутентификации — JWT-токены и зависимости FastAPI.
 """
 
+import asyncio
+import logging
+import secrets
+import smtplib
+from email.message import EmailMessage
 from datetime import datetime, timedelta
 from typing import Optional
 
@@ -12,8 +17,13 @@ from passlib.context import CryptContext
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
-from config import JWT_SECRET, JWT_ALGORITHM, JWT_EXPIRE_DAYS
+from config import (
+    JWT_SECRET, JWT_ALGORITHM, JWT_EXPIRE_DAYS,
+    SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASSWORD, SMTP_FROM, FRONTEND_URL,
+)
 from database import User, get_db
+
+logger = logging.getLogger(__name__)
 
 # Контекст хеширования паролей (bcrypt, совместимость с bcrypt 4.x)
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto", bcrypt__truncate_error=False)
@@ -64,6 +74,41 @@ async def get_current_user(
     if not user:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Пользователь не найден")
     return user
+
+
+def generate_reset_token() -> str:
+    """Генерирует случайный токен сброса пароля."""
+    return secrets.token_urlsafe(32)
+
+
+def _send_email_sync(to_email: str, subject: str, body: str) -> None:
+    msg = EmailMessage()
+    msg["Subject"] = subject
+    msg["From"] = SMTP_FROM
+    msg["To"] = to_email
+    msg.set_content(body)
+    with smtplib.SMTP(SMTP_HOST, SMTP_PORT, timeout=15) as server:
+        server.starttls()
+        server.login(SMTP_USER, SMTP_PASSWORD)
+        server.send_message(msg)
+
+
+async def send_reset_email(to_email: str, token: str) -> None:
+    """Отправляет письмо со ссылкой сброса пароля. Если SMTP не настроен — логирует ссылку в консоль."""
+    link = f"{FRONTEND_URL}/?reset_token={token}"
+    subject = "Force of Momentum — восстановление пароля"
+    body = (
+        f"Вы запросили восстановление пароля.\n\n"
+        f"Перейдите по ссылке, чтобы задать новый пароль (действует 1 час):\n{link}\n\n"
+        f"Если вы не запрашивали восстановление — просто игнорируйте это письмо."
+    )
+    if not SMTP_HOST or not SMTP_USER or not SMTP_PASSWORD:
+        logger.warning("SMTP не настроен — ссылка сброса пароля для %s: %s", to_email, link)
+        return
+    try:
+        await asyncio.to_thread(_send_email_sync, to_email, subject, body)
+    except Exception:
+        logger.exception("Не удалось отправить письмо сброса пароля на %s", to_email)
 
 
 async def get_current_user_optional(

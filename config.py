@@ -41,6 +41,19 @@ JWT_SECRET = os.getenv("JWT_SECRET", "change-me-in-production-please")
 JWT_ALGORITHM = "HS256"
 JWT_EXPIRE_DAYS = 30
 
+# Настройки почты (для восстановления пароля). Пусто = письма не отправляются, только логируются.
+SMTP_HOST = os.getenv("SMTP_HOST", "")
+SMTP_PORT = int(os.getenv("SMTP_PORT", "587"))
+SMTP_USER = os.getenv("SMTP_USER", "")
+SMTP_PASSWORD = os.getenv("SMTP_PASSWORD", "")
+SMTP_FROM = os.getenv("SMTP_FROM", SMTP_USER)
+
+# Публичный адрес фронтенда — используется в ссылке сброса пароля
+FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:8000")
+
+# Время жизни токена сброса пароля (минуты)
+RESET_TOKEN_EXPIRE_MINUTES = 60
+
 # База данных пользователей (SQLite)
 DATABASE_URL = os.getenv("DATABASE_URL", "sqlite+aiosqlite:///./users.db")
 
