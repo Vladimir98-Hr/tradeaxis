@@ -1600,9 +1600,9 @@
                 <div>
                     <div class="rc-label">Горизонт сделки</div>
                     <div class="rc-radio-group" id="rcCatGroup">
-                        <button class="rc-radio-btn" data-val="0.3" onclick="setRcCat(this)">Скальп ×0.3</button>
-                        <button class="rc-radio-btn active" data-val="1" onclick="setRcCat(this)">Интрадей ×1</button>
-                        <button class="rc-radio-btn" data-val="1.5" onclick="setRcCat(this)">Свинг ×1.5</button>
+                        <button class="rc-radio-btn active" data-val="1" data-minrr="1.5" onclick="setRcCat(this)">Внутри дня</button>
+                        <button class="rc-radio-btn" data-val="1.5" data-minrr="2" onclick="setRcCat(this)">Среднесрочная</button>
+                        <button class="rc-radio-btn" data-val="2" data-minrr="3" onclick="setRcCat(this)">Долгосрочная</button>
                     </div>
                 </div>
                 <div class="rc-error" id="rcErrorA"></div>
@@ -1661,6 +1661,7 @@
                 <div>
                     <div class="rc-label">R:R (тейк / стоп)</div>
                     <input class="rc-input" id="rcRRInput" type="number" min="0.1" step="0.1" placeholder="2.0" value="1.5" oninput="document.getElementById('rcResB').style.display='none'">
+                    <div class="rc-section-sub" id="rcRRHint" style="margin-top:4px">Мин. R:R для «Внутри дня»: 1.5:1</div>
                 </div>
                 <div class="rc-error" id="rcErrorB"></div>
                 <button class="rc-calc-btn" id="rcCalcBBtn" onclick="calcPosition()" disabled>Рассчитать стоп и тейк</button>
@@ -1778,6 +1779,9 @@
                     <span style="color:var(--text-secondary)">Остаток бюджета сессии</span>
                     <span class="rc-remain-val ok" id="rcRemain">—</span>
                 </div>
+                <div id="rcSessionLockBanner" style="display:none;background:rgba(224,82,82,0.12);border:1px solid #e05252;border-radius:8px;padding:8px 10px;margin:8px 0;font-size:12px;color:#e05252;line-height:1.5">
+                    🛑 Лимит на сегодня исчерпан. Новые сделки заблокированы до сброса или следующего дня.
+                </div>
                 <button class="rc-calc-btn" style="background:var(--bg-color);color:var(--text-secondary);border:1px solid var(--border-color)" onclick="resetSession()">Сбросить сессию</button>
 
 
@@ -1819,6 +1823,10 @@
                 <div class="rc-label" style="margin-top:8px">Комментарий к сделке</div>
                 <textarea class="rc-input" id="prComment" rows="3" style="resize:vertical;font-family:inherit" placeholder="Как прошла сделка, что запомнить..."></textarea>
 
+                <div style="margin-top:10px">
+                    <div class="rc-label">Цена выхода</div>
+                    <input class="rc-input" id="prExitPrice" type="number" step="any" placeholder="фактическая цена закрытия" oninput="calcReviewResult()">
+                </div>
                 <div class="rc-2col" style="margin-top:10px">
                     <div>
                         <div class="rc-label">Результат, R</div>
@@ -3479,6 +3487,7 @@
             await initAuth();
             _checkResetPwLink();
             await jRender();
+            loadSessionState();
             initCharts();
             initDrawingOverlay();
             setupResizeObserver();
@@ -3525,6 +3534,7 @@
     let _rcDir      = 'long';
     let _rcStyle    = 1;
     let _rcCat      = 1;
+    let _rcMinRR    = 1.5;  // минимальный R:R для выбранного горизонта (правило преподавателя)
     let _rcLeverage = 1;    // кредитное плечо (1 = без плеча)
     let _rcRR       = 1.5;  // R:R для тейк-профита
     let _rcTradeRisk = 0;   // $ риск на 1 сделку (после блока А)
@@ -3534,6 +3544,7 @@
 
     function openRiskCalc() {
         document.getElementById('riskCalcModal').style.display = 'flex';
+        loadSessionState();
     }
     function closeRiskCalc() {
         document.getElementById('riskCalcModal').style.display = 'none';
@@ -3554,8 +3565,12 @@
     }
     function setRcCat(btn) {
         _rcCat = parseFloat(btn.dataset.val);
+        _rcMinRR = parseFloat(btn.dataset.minrr);
         document.querySelectorAll('#rcCatGroup .rc-radio-btn').forEach(b => b.classList.remove('active'));
         btn.classList.add('active');
+        document.getElementById('rcRRInput').value = _rcMinRR;
+        document.getElementById('rcRRHint').textContent = `Мин. R:R для «${btn.textContent}»: ${_rcMinRR}:1`;
+        document.getElementById('rcResB').style.display = 'none';
     }
     function setRcLeverage(val) {
         let lev = Math.round(parseFloat(val));
@@ -3592,6 +3607,7 @@
 
         _rcTradeRisk  = tradeRisk;
         _rcSessLimit  = sessLimit;
+        localStorage.setItem('rcCapitalPersist', capital);
 
         document.getElementById('rcA_tradeUsd').textContent = '$' + tradeRisk.toFixed(2);
         document.getElementById('rcA_tradePct').textContent = riskPct.toFixed(2) + '% от капитала';
@@ -3605,6 +3621,67 @@
         updateSession();
     }
 
+    // ── Персистентность сессии (localStorage по сегодняшней дате) ──
+    function _rcToday() {
+        return new Date().toISOString().slice(0, 10);
+    }
+
+    function saveSessionState() {
+        const slots = [0, 1, 2].map(i => document.getElementById('rcSlot' + i).value);
+        localStorage.setItem('rcSessionState', JSON.stringify({
+            date: _rcToday(),
+            capital: document.getElementById('rcCapital').value,
+            tradeRisk: _rcTradeRisk,
+            sessLimit: _rcSessLimit,
+            slots,
+        }));
+    }
+
+    function loadSessionState() {
+        let state;
+        try { state = JSON.parse(localStorage.getItem('rcSessionState')); } catch { state = null; }
+        if (state && state.date === _rcToday()) {
+            (state.slots || []).forEach((v, i) => {
+                const el = document.getElementById('rcSlot' + i);
+                if (el && v) el.value = v;
+            });
+        }
+        // Капитал переиспользуется изо дня в день — сбрасываются только слоты сессии.
+        const capitalEl = document.getElementById('rcCapital');
+        if (!capitalEl.value) {
+            const persisted = localStorage.getItem('rcCapitalPersist');
+            if (persisted) capitalEl.value = persisted;
+        }
+        if (capitalEl.value) {
+            calcLimits(); // пересчитает _rcTradeRisk/_rcSessLimit и вызовет updateSession()
+        } else {
+            updateSession();
+        }
+    }
+
+    // Сумма убытков по сделкам, закрытым сегодня через "Открытые планы → Закрыть сделку"
+    // (эти сделки не проходят через ручные слоты rcSlot0/1/2, поэтому их нужно учитывать отдельно)
+    function _rcJournalLossToday() {
+        const today = _rcToday();
+        return (_journalCache || [])
+            .filter(t => t.type === 'review' && (t.resultUsd || 0) < 0 && t.ts && new Date(t.ts).toISOString().slice(0, 10) === today)
+            .reduce((sum, t) => sum + Math.abs(t.resultUsd), 0);
+    }
+
+    function _rcSessionSpent() {
+        let spent = _rcJournalLossToday();
+        for (let i = 0; i < 3; i++) {
+            spent += parseFloat(document.getElementById('rcSlot' + i).value) || 0;
+        }
+        return spent;
+    }
+
+    function _rcSessionLocked() {
+        const budget = _rcSessLimit;
+        if (budget <= 0) return false;
+        return _rcSessionSpent() >= budget;
+    }
+
     // ── БЛОК Б: рассчитать стоп ──────────────────────────────
     function calcPosition() {
         const errEl = document.getElementById('rcErrorB');
@@ -3612,6 +3689,7 @@
         document.getElementById('rcResB').style.display = 'none';
 
         if (_rcTradeRisk <= 0) { errEl.textContent = 'Сначала рассчитайте лимиты (блок А)'; return; }
+        if (_rcSessionLocked()) { errEl.textContent = 'Лимит на сегодня исчерпан — сбросьте сессию или дождитесь следующего дня'; return; }
 
         const entry  = parseFloat(document.getElementById('rcEntry').value);
         const posUsd = parseFloat(document.getElementById('rcPosUsd').value);
@@ -3773,6 +3851,11 @@
 
     async function saveTradePlan() {
         const msgEl = document.getElementById('rcPlanMsg');
+        if (_rcSessionLocked()) {
+            msgEl.textContent = 'Лимит на сегодня исчерпан — сбросьте сессию или дождитесь следующего дня';
+            msgEl.style.color = '#e05252';
+            return;
+        }
         if (!authToken) {
             msgEl.textContent = 'Войдите в аккаунт, чтобы сохранить план сделки';
             msgEl.style.color = '#e05252';
@@ -3806,21 +3889,28 @@
     // ── БЛОК В: счётчик сессии ────────────────────────────────
     function updateSession() {
         const budget = _rcSessLimit;
-        let spent = 0;
         for (let i = 0; i < 3; i++) {
             const v = parseFloat(document.getElementById('rcSlot' + i).value) || 0;
-            spent += v;
             const stEl = document.getElementById('rcSlotSt' + i);
             if (v <= 0) { stEl.textContent = ''; continue; }
             const ok = v <= _rcTradeRisk;
             stEl.textContent = ok ? '✓ ок' : '⚠ превышен';
             stEl.className   = 'rc-slot-status ' + (ok ? 'ok' : 'over');
         }
+        const spent   = _rcSessionSpent();
         const remain  = budget - spent;
         const remEl   = document.getElementById('rcRemain');
-        if (budget <= 0) { remEl.textContent = '—'; remEl.className = 'rc-remain-val ok'; return; }
+        const lockBanner = document.getElementById('rcSessionLockBanner');
+        if (budget <= 0) {
+            remEl.textContent = '—'; remEl.className = 'rc-remain-val ok';
+            lockBanner.style.display = 'none';
+            saveSessionState();
+            return;
+        }
         remEl.textContent = (remain >= 0 ? '$' : '−$') + Math.abs(remain).toFixed(2);
         remEl.className   = 'rc-remain-val ' + (remain >= 0 ? 'ok' : 'over');
+        lockBanner.style.display = remain <= 0 ? 'block' : 'none';
+        saveSessionState();
     }
 
     function resetSession() {
@@ -3971,6 +4061,7 @@
             if (planId != null) await _authFetch(`${API_BASE}/user/journal/${planId}`, { method: 'DELETE' });
         }
         await jRender();
+        updateSession();
     }
 
     function openPostReview(planId, existingReview = null) {
@@ -3988,6 +4079,7 @@
             const field = g.id.replace('pr_', '');
             g.querySelectorAll('.rc-radio-btn').forEach(b => b.classList.toggle('active', b.dataset.val === _reviewAnswers[field]));
         });
+        document.getElementById('prExitPrice').value = existingReview ? (existingReview.exitPrice ?? '') : '';
         document.getElementById('prResultR').value = existingReview ? (existingReview.resultR ?? '') : '';
         document.getElementById('prResultUsd').value = existingReview ? (existingReview.resultUsd ?? '') : '';
         document.getElementById('prComment').value = existingReview ? (existingReview.comment || '') : '';
@@ -3996,6 +4088,27 @@
         const plan = _journalCache.find(t => t.id === planId) || {};
         document.getElementById('prPlanInfo').innerHTML = _planConspectHtml(plan);
         document.getElementById('postReviewModal').style.display = 'flex';
+        calcReviewResult();
+    }
+
+    function calcReviewResult() {
+        const exitEl = document.getElementById('prExitPrice');
+        const resultREl = document.getElementById('prResultR');
+        const resultUsdEl = document.getElementById('prResultUsd');
+        const exitPrice = parseFloat(exitEl.value);
+        const plan = _journalCache.find(t => t.id === _reviewPlanId);
+        if (exitEl.value && plan && plan.riskUsd) {
+            const profitPerCoin = plan.dir === 'long' ? (exitPrice - plan.entry) : (plan.entry - exitPrice);
+            const resultUsd = profitPerCoin * plan.coins;
+            const resultR = resultUsd / plan.riskUsd;
+            resultREl.value = resultR.toFixed(2);
+            resultUsdEl.value = resultUsd.toFixed(2);
+            resultREl.readOnly = true;
+            resultUsdEl.readOnly = true;
+        } else {
+            resultREl.readOnly = false;
+            resultUsdEl.readOnly = false;
+        }
     }
 
     function closePostReview() {
@@ -4012,6 +4125,7 @@
     async function savePostReview() {
         const msgEl = document.getElementById('prMsg');
         if (!authToken) { msgEl.textContent = 'Войдите в аккаунт, чтобы сохранить разбор'; msgEl.style.color = '#e05252'; return; }
+        const exitPrice = parseFloat(document.getElementById('prExitPrice').value) || null;
         const resultR = parseFloat(document.getElementById('prResultR').value) || 0;
         const resultUsd = parseFloat(document.getElementById('prResultUsd').value) || 0;
         const comment = document.getElementById('prComment').value.trim();
@@ -4020,17 +4134,18 @@
             const existing = _journalCache.find(t => t.id === _editingReviewId) || {};
             r = await _authFetch(`${API_BASE}/user/journal/${_editingReviewId}`, {
                 method: 'PUT',
-                body: { data: { type: 'review', planId: _reviewPlanId, ..._reviewAnswers, comment, resultR, resultUsd, ts: existing.ts || Date.now() } }
+                body: { data: { type: 'review', planId: _reviewPlanId, ..._reviewAnswers, exitPrice, comment, resultR, resultUsd, ts: existing.ts || Date.now() } }
             });
         } else {
             r = await _authFetch(`${API_BASE}/user/journal`, {
                 method: 'POST',
-                body: { data: { type: 'review', planId: _reviewPlanId, ..._reviewAnswers, comment, resultR, resultUsd, ts: Date.now() } }
+                body: { data: { type: 'review', planId: _reviewPlanId, ..._reviewAnswers, exitPrice, comment, resultR, resultUsd, ts: Date.now() } }
             });
         }
         if (r.ok) {
             closePostReview();
             await jRender();
+            updateSession();
         } else {
             msgEl.textContent = 'Не удалось сохранить разбор, попробуйте ещё раз';
             msgEl.style.color = '#e05252';
