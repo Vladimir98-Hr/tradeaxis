@@ -4,12 +4,12 @@
 
 from datetime import datetime, timedelta
 
-from fastapi import APIRouter, Depends, HTTPException, status
-from fastapi_limiter.depends import RateLimiter
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from pydantic import BaseModel, field_validator
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
 
+from cache import redis_client
 from config import RESET_TOKEN_EXPIRE_MINUTES
 from database import User, get_db
 from auth import (
@@ -18,6 +18,19 @@ from auth import (
 )
 
 router = APIRouter(prefix="/auth", tags=["auth"])
+
+
+def rate_limit(key_prefix: str, times: int = 5, seconds: int = 300):
+    """Ограничивает частоту запросов к эндпоинту по IP через Redis (защита от спама/перебора)."""
+    async def dependency(request: Request):
+        ip = request.client.host if request.client else "unknown"
+        key = f"ratelimit:{key_prefix}:{ip}"
+        current = await redis_client.incr(key)
+        if current == 1:
+            await redis_client.expire(key, seconds)
+        if current > times:
+            raise HTTPException(status_code=429, detail="Слишком много попыток, попробуйте позже")
+    return dependency
 
 
 # --- Схемы запросов/ответов ---
@@ -73,7 +86,7 @@ class AuthResponse(BaseModel):
 
 @router.post(
     "/register", response_model=AuthResponse, status_code=status.HTTP_201_CREATED,
-    dependencies=[Depends(RateLimiter(times=5, seconds=300))],
+    dependencies=[Depends(rate_limit("register"))],
 )
 async def register(body: RegisterRequest, db: AsyncSession = Depends(get_db)):
     """Регистрация нового пользователя."""
@@ -107,7 +120,7 @@ async def register(body: RegisterRequest, db: AsyncSession = Depends(get_db)):
 
 @router.post(
     "/login", response_model=AuthResponse,
-    dependencies=[Depends(RateLimiter(times=5, seconds=300))],
+    dependencies=[Depends(rate_limit("login"))],
 )
 async def login(body: LoginRequest, db: AsyncSession = Depends(get_db)):
     """Вход по username + password."""
@@ -145,7 +158,7 @@ class ResetPasswordRequest(BaseModel):
 
 @router.post(
     "/forgot-password",
-    dependencies=[Depends(RateLimiter(times=5, seconds=300))],
+    dependencies=[Depends(rate_limit("forgot-password"))],
 )
 async def forgot_password(body: ForgotPasswordRequest, db: AsyncSession = Depends(get_db)):
     """Запрос на восстановление пароля. Всегда возвращает один и тот же ответ,

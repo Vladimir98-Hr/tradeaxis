@@ -5,13 +5,11 @@
 """
 
 import asyncio
-import redis.asyncio as redis
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
-from fastapi_limiter import FastAPILimiter
-from config import CORS_ORIGINS, HOST, PORT, REDIS_URL
+from config import CORS_ORIGINS, HOST, PORT
 from routes import router as api_router
 from websocket import router as ws_router
 from auth_routes import router as auth_router
@@ -75,11 +73,10 @@ async def _warm_cache():
 
 @app.on_event("startup")
 async def startup():
-    """Инициализация БД и лимитера запросов при запуске приложения."""
+    """Инициализация БД при запуске приложения."""
     import os
     os.makedirs("uploads/news", exist_ok=True)
     await init_db()
-    await FastAPILimiter.init(redis.from_url(REDIS_URL, encoding="utf-8", decode_responses=True))
     asyncio.create_task(_warm_cache())
 
 # Создаём папку uploads заранее (StaticFiles требует существующую директорию)
