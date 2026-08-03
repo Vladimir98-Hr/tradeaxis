@@ -5,7 +5,6 @@
 from datetime import datetime, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from fastapi_limiter.depends import RateLimiter
 from pydantic import BaseModel, field_validator
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
@@ -71,10 +70,7 @@ class AuthResponse(BaseModel):
 
 # --- Endpoints ---
 
-@router.post(
-    "/register", response_model=AuthResponse, status_code=status.HTTP_201_CREATED,
-    dependencies=[Depends(RateLimiter(times=5, seconds=300))],
-)
+@router.post("/register", response_model=AuthResponse, status_code=status.HTTP_201_CREATED)
 async def register(body: RegisterRequest, db: AsyncSession = Depends(get_db)):
     """Регистрация нового пользователя."""
     # Проверка уникальности username
@@ -105,10 +101,7 @@ async def register(body: RegisterRequest, db: AsyncSession = Depends(get_db)):
     return AuthResponse(access_token=token, user=UserResponse.model_validate(user))
 
 
-@router.post(
-    "/login", response_model=AuthResponse,
-    dependencies=[Depends(RateLimiter(times=5, seconds=300))],
-)
+@router.post("/login", response_model=AuthResponse)
 async def login(body: LoginRequest, db: AsyncSession = Depends(get_db)):
     """Вход по username + password."""
     result = await db.execute(select(User).where(User.username == body.username))
@@ -143,10 +136,7 @@ class ResetPasswordRequest(BaseModel):
         return v
 
 
-@router.post(
-    "/forgot-password",
-    dependencies=[Depends(RateLimiter(times=5, seconds=300))],
-)
+@router.post("/forgot-password")
 async def forgot_password(body: ForgotPasswordRequest, db: AsyncSession = Depends(get_db)):
     """Запрос на восстановление пароля. Всегда возвращает один и тот же ответ,
     чтобы не раскрывать, зарегистрирован ли такой email."""
