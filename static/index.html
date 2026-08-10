@@ -1622,6 +1622,7 @@
                             <div class="rc-card-sub" id="rcA_sessPct">—</div>
                         </div>
                     </div>
+                    <div class="rc-section-sub" id="rcSessionAnchorNote" style="margin-top:8px;line-height:1.5"></div>
                 </div>
 
                 <hr class="rc-divider">
@@ -2856,6 +2857,19 @@
     // Обработчики событий
     // ============================================================
 
+    // После сна компьютера (или долгого сворачивания вкладки) браузер замораживает
+    // все таймеры; первый fetch() после пробуждения нередко падает с "Failed to fetch",
+    // пока сеть ещё не восстановилась. Раньше это оставляло сканеры зависшими с ошибкой
+    // до ручной перезагрузки страницы. Теперь при возврате на вкладку сразу форсируем
+    // повторный запрос — ошибка сама исчезает без перезагрузки.
+    document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState !== 'visible') return;
+        fetchCurrentTicker();
+        fetchVisibleTickers();
+        if (document.getElementById('volScanList')) fetchVolScan();
+        if (document.getElementById('spreadScanList')) fetchSpreadScan();
+    });
+
     // Поиск пар
     document.getElementById('pairsSearch').addEventListener('input', (e) => {
         const q = e.target.value.toLowerCase();
@@ -2963,6 +2977,9 @@
         } catch(e) {
             if (myGen !== _volGen) return;
             list.innerHTML = `<div class="div-scan-empty" style="color:var(--red)">${e.message}</div>`;
+            // Не оставляем сканер зависшим на ошибке (например, после сна компьютера) —
+            // сами повторим попытку через 15 сек, без перезагрузки страницы.
+            volNextRefresh = Date.now() + 15 * 1000;
         }
     }
 
@@ -3005,6 +3022,9 @@
         } catch(e) {
             if (myGen !== _spreadGen) return;
             list.innerHTML = `<div class="div-scan-empty" style="color:var(--red)">${e.message}</div>`;
+            // Не оставляем сканер зависшим на ошибке (например, после сна компьютера) —
+            // сами повторим попытку через 15 сек, без перезагрузки страницы.
+            spreadNextRefresh = Date.now() + 15 * 1000;
         }
     }
 
@@ -3539,6 +3559,7 @@
     let _rcRR       = 1.5;  // R:R для тейк-профита
     let _rcTradeRisk = 0;   // $ риск на 1 сделку (после блока А)
     let _rcSessLimit = 0;   // $ лимит сессии (после блока А)
+    let _rcSessionStartCapital = 0; // капитал на момент открытия сегодняшней сессии — лимиты считаются от него, а не от текущего ввода
     let _rcSetup     = 'Дивербар';
     let _rcLastCalc  = null; // последний расчёт блока Б — используется для "Сохранить как план"
 
@@ -3593,27 +3614,45 @@
     }
 
     // ── БЛОК А: рассчитать лимиты ────────────────────────────
+    // Лимиты (риск/сделку и лимит сессии) считаются от капитала на МОМЕНТ ОТКРЫТИЯ
+    // сегодняшней сессии, а не от текущего значения в поле "Капитал". Иначе после
+    // удачной сделки капитал в поле растёт, лимиты пересчитываются от большей суммы,
+    // и дневной лимит потерь незаметно "распухает" — ровно то, чего риск-менеджмент
+    // должен не допускать. Чтобы посчитать лимиты от новой суммы — «Сбросить сессию».
     function calcLimits() {
         const errEl = document.getElementById('rcErrorA');
         errEl.textContent = '';
         const capital = parseFloat(document.getElementById('rcCapital').value);
         if (!capital || capital <= 0) { errEl.textContent = 'Введите капитал'; return; }
 
-        const baseRisk   = capital < 2500 ? 5 : capital <= 25000 ? 2 : 1;
+        if (!_rcSessionStartCapital) {
+            _rcSessionStartCapital = capital;
+        }
+        const anchorCapital = _rcSessionStartCapital;
+
+        const baseRisk   = anchorCapital < 2500 ? 5 : anchorCapital <= 25000 ? 2 : 1;
         const riskPct    = _rcStyle * baseRisk * _rcCat;
-        const tradeRisk  = capital * riskPct / 100;
+        const tradeRisk  = anchorCapital * riskPct / 100;
         const sessPct    = riskPct * 3;
-        const sessLimit  = capital * sessPct / 100;
+        const sessLimit  = anchorCapital * sessPct / 100;
 
         _rcTradeRisk  = tradeRisk;
         _rcSessLimit  = sessLimit;
         localStorage.setItem('rcCapitalPersist', capital);
 
         document.getElementById('rcA_tradeUsd').textContent = '$' + tradeRisk.toFixed(2);
-        document.getElementById('rcA_tradePct').textContent = riskPct.toFixed(2) + '% от капитала';
+        document.getElementById('rcA_tradePct').textContent = riskPct.toFixed(2) + '% от капитала сессии';
         document.getElementById('rcA_sessUsd').textContent  = '$' + sessLimit.toFixed(2);
-        document.getElementById('rcA_sessPct').textContent  = sessPct.toFixed(2) + '% от капитала';
+        document.getElementById('rcA_sessPct').textContent  = sessPct.toFixed(2) + '% от капитала сессии';
         document.getElementById('rcResA').style.display     = 'block';
+
+        const noteEl = document.getElementById('rcSessionAnchorNote');
+        if (Math.abs(capital - anchorCapital) > 0.01) {
+            noteEl.innerHTML = `Сессия открыта сегодня с капиталом <b>$${anchorCapital.toFixed(2)}</b> — лимиты выше посчитаны от него, а не от введённых сейчас $${capital.toFixed(2)}. `
+                + `Чтобы пересчитать от нового капитала — нажмите «Сбросить сессию».`;
+        } else {
+            noteEl.innerHTML = `Капитал начала сессии на сегодня: <b>$${anchorCapital.toFixed(2)}</b>. Пока сессия открыта, лимиты не меняются, даже если капитал в поле выше — это и защищает от отдачи прибыли.`;
+        }
 
         // Разблокировать блок Б
         document.getElementById('rcCalcBBtn').disabled = false;
@@ -3631,6 +3670,7 @@
         localStorage.setItem('rcSessionState', JSON.stringify({
             date: _rcToday(),
             capital: document.getElementById('rcCapital').value,
+            sessionStartCapital: _rcSessionStartCapital,
             tradeRisk: _rcTradeRisk,
             sessLimit: _rcSessLimit,
             slots,
@@ -3645,6 +3685,11 @@
                 const el = document.getElementById('rcSlot' + i);
                 if (el && v) el.value = v;
             });
+            // Сессия за сегодня уже была открыта — переносим её якорь капитала,
+            // чтобы лимиты не пересчитались от текущего (возможно, уже другого) капитала.
+            if (state.sessionStartCapital) _rcSessionStartCapital = state.sessionStartCapital;
+        } else {
+            _rcSessionStartCapital = 0; // новый день — якорь сбрасывается сам
         }
         // Капитал переиспользуется изо дня в день — сбрасываются только слоты сессии.
         const capitalEl = document.getElementById('rcCapital');
@@ -3918,7 +3963,15 @@
             document.getElementById('rcSlot' + i).value = '';
             document.getElementById('rcSlotSt' + i).textContent = '';
         }
-        updateSession();
+        // Сброс якоря капитала — следующий "Рассчитать лимиты" откроет новую сессию
+        // от текущего значения в поле "Капитал".
+        _rcSessionStartCapital = 0;
+        const capitalEl = document.getElementById('rcCapital');
+        if (capitalEl.value) {
+            calcLimits();
+        } else {
+            updateSession();
+        }
     }
 
     // ── Журнал сделок ──────────────────────────────────────────
