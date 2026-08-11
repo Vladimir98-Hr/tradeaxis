@@ -1790,6 +1790,22 @@
         </div>
     </div>
 
+    <!-- Лимит сессии исчерпан — блокирующее модальное окно -->
+    <div class="modal-overlay" id="sessionLimitModal">
+        <div class="rc-box" style="width:420px">
+            <div class="rc-header">
+                <span>🛑 Лимит сессии исчерпан</span>
+            </div>
+            <div class="rc-body" style="padding:18px;line-height:1.6">
+                <p style="margin:0 0 14px">Бюджет риска на сегодняшнюю сессию исчерпан. Новые сделки заблокированы до сброса сессии или начала следующего дня.</p>
+                <div style="display:flex;gap:8px;margin-top:6px">
+                    <button class="rc-calc-btn" style="flex:1" onclick="resetSessionFromModal()">Сбросить сессию</button>
+                    <button class="rc-calc-btn" style="flex:1;background:var(--bg-color);color:var(--text-secondary);border:1px solid var(--border-color)" onclick="closeSessionLimitModal()">Понятно</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Пост-разбор сделки — модальное окно -->
     <div class="modal-overlay" id="postReviewModal">
         <div class="rc-box">
@@ -3560,6 +3576,7 @@
     let _rcTradeRisk = 0;   // $ риск на 1 сделку (после блока А)
     let _rcSessLimit = 0;   // $ лимит сессии (после блока А)
     let _rcSessionStartCapital = 0; // капитал на момент открытия сегодняшней сессии — лимиты считаются от него, а не от текущего ввода
+    let _rcSessionLockNotified = false; // показывали ли уже блокирующее окно для текущей блокировки сессии
     let _rcSetup     = 'Дивербар';
     let _rcLastCalc  = null; // последний расчёт блока Б — используется для "Сохранить как план"
 
@@ -3734,7 +3751,11 @@
         document.getElementById('rcResB').style.display = 'none';
 
         if (_rcTradeRisk <= 0) { errEl.textContent = 'Сначала рассчитайте лимиты (блок А)'; return; }
-        if (_rcSessionLocked()) { errEl.textContent = 'Лимит на сегодня исчерпан — сбросьте сессию или дождитесь следующего дня'; return; }
+        if (_rcSessionLocked()) {
+            errEl.textContent = 'Лимит на сегодня исчерпан — сбросьте сессию или дождитесь следующего дня';
+            showSessionLimitModal();
+            return;
+        }
 
         const entry  = parseFloat(document.getElementById('rcEntry').value);
         const posUsd = parseFloat(document.getElementById('rcPosUsd').value);
@@ -3899,6 +3920,7 @@
         if (_rcSessionLocked()) {
             msgEl.textContent = 'Лимит на сегодня исчерпан — сбросьте сессию или дождитесь следующего дня';
             msgEl.style.color = '#e05252';
+            showSessionLimitModal();
             return;
         }
         if (!authToken) {
@@ -3949,13 +3971,34 @@
         if (budget <= 0) {
             remEl.textContent = '—'; remEl.className = 'rc-remain-val ok';
             lockBanner.style.display = 'none';
+            _rcSessionLockNotified = false;
             saveSessionState();
             return;
         }
         remEl.textContent = (remain >= 0 ? '$' : '−$') + Math.abs(remain).toFixed(2);
         remEl.className   = 'rc-remain-val ' + (remain >= 0 ? 'ok' : 'over');
-        lockBanner.style.display = remain <= 0 ? 'block' : 'none';
+        const locked = remain <= 0;
+        lockBanner.style.display = locked ? 'block' : 'none';
+        if (locked && !_rcSessionLockNotified) {
+            _rcSessionLockNotified = true;
+            showSessionLimitModal();
+        } else if (!locked) {
+            _rcSessionLockNotified = false;
+        }
         saveSessionState();
+    }
+
+    function showSessionLimitModal() {
+        document.getElementById('sessionLimitModal').style.display = 'flex';
+    }
+
+    function closeSessionLimitModal() {
+        document.getElementById('sessionLimitModal').style.display = 'none';
+    }
+
+    function resetSessionFromModal() {
+        closeSessionLimitModal();
+        resetSession();
     }
 
     function resetSession() {
