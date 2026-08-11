@@ -757,6 +757,8 @@
         }
         .rc-card-label { font-size: 10px; color: var(--text-secondary); text-transform: uppercase; letter-spacing: .4px; }
         .rc-card-val { font-size: 15px; font-weight: 700; }
+        .rc-card-val.ok   { color: #26a69a; }
+        .rc-card-val.over { color: #ef5350; }
         .rc-card-sub { font-size: 11px; color: var(--text-secondary); }
         .rc-card.highlight { border: 1px solid var(--accent-color); }
         .rc-card.danger { border: 1px solid #ef5350; }
@@ -773,42 +775,6 @@
         }
         .rc-stop-price.long  { color: #26a69a; }
         .rc-stop-price.short { color: #ef5350; }
-        /* Счётчик сессии */
-        .rc-session-slots { display: flex; gap: 6px; }
-        .rc-slot {
-            flex: 1;
-            background: var(--bg-color);
-            border: 1px solid var(--border-color);
-            border-radius: 8px;
-            padding: 8px;
-            display: flex; flex-direction: column; gap: 4px;
-        }
-        .rc-slot-label { font-size: 10px; color: var(--text-secondary); text-align: center; }
-        .rc-slot input {
-            width: 100%; box-sizing: border-box;
-            background: transparent;
-            border: none;
-            border-bottom: 1px solid var(--border-color);
-            color: var(--text-primary);
-            font-size: 13px; font-weight: 600;
-            text-align: center;
-            outline: none;
-            padding: 2px 0;
-        }
-        .rc-slot input::placeholder { color: var(--text-secondary); font-weight: 400; }
-        .rc-slot-status { font-size: 10px; text-align: center; }
-        .rc-slot-status.ok   { color: #26a69a; }
-        .rc-slot-status.over { color: #ef5350; }
-        .rc-session-remain {
-            display: flex; justify-content: space-between; align-items: center;
-            background: var(--bg-color);
-            border-radius: 8px;
-            padding: 8px 12px;
-            font-size: 12px;
-        }
-        .rc-remain-val { font-size: 15px; font-weight: 700; }
-        .rc-remain-val.ok   { color: #26a69a; }
-        .rc-remain-val.over { color: #ef5350; }
         .rc-error {
             color: #ef5350;
             font-size: 12px;
@@ -1587,7 +1553,7 @@
                 </div>
                 <div>
                     <div class="rc-label">Ваш капитал ($)</div>
-                    <input class="rc-input" id="rcCapital" type="number" min="0" placeholder="10 000">
+                    <input class="rc-input" id="rcCapital" type="number" min="0" placeholder="10 000" oninput="if (_rcSessionStartCapital) _rcRecomputeTrailing()">
                 </div>
                 <div>
                     <div class="rc-label">Стиль торговли</div>
@@ -1755,30 +1721,34 @@
                 <div class="rc-section">
                     <div class="rc-section-num">В</div>
                     <div>
-                        <div class="rc-section-title">Счётчик сессии</div>
-                        <div class="rc-section-sub">Введите фактический убыток по каждой сделке</div>
+                        <div class="rc-section-title">Трейлинг стоп-аут сессии</div>
+                        <div class="rc-section-sub">Считается автоматически — вручную ничего вводить не нужно</div>
                     </div>
                 </div>
-                <div class="rc-session-slots">
-                    <div class="rc-slot">
-                        <div class="rc-slot-label">Сделка 1</div>
-                        <input type="number" min="0" placeholder="$ убыток" id="rcSlot0" oninput="updateSession()">
-                        <div class="rc-slot-status" id="rcSlotSt0"></div>
-                    </div>
-                    <div class="rc-slot">
-                        <div class="rc-slot-label">Сделка 2</div>
-                        <input type="number" min="0" placeholder="$ убыток" id="rcSlot1" oninput="updateSession()">
-                        <div class="rc-slot-status" id="rcSlotSt1"></div>
-                    </div>
-                    <div class="rc-slot">
-                        <div class="rc-slot-label">Сделка 3</div>
-                        <input type="number" min="0" placeholder="$ убыток" id="rcSlot2" oninput="updateSession()">
-                        <div class="rc-slot-status" id="rcSlotSt2"></div>
-                    </div>
+                <div class="rc-section-sub" style="line-height:1.6;margin:2px 0 10px">
+                    Бюджет риска на сессию (карточка «Лимит сессии» в блоке А) фиксируется от капитала на момент открытия сессии и не меняется весь день.
+                    Поле «Ваш капитал» выше — это ваш <b>текущий</b> капитал: оно обновляется само при закрытии сделки через журнал («Открытые планы → Закрыть сделку»),
+                    а если сделка не проведена через журнал (например, тестовая) — просто впишите туда актуальную сумму вручную, оба источника складываются, не конфликтуя.
+                    «Пиковый капитал» — максимум, которого капитал достигал сегодня; «Уровень стоп-аута» = пик минус бюджет риска и всегда трейлится только вверх, вслед за пиком.
+                    Как только текущий капитал опускается до уровня стоп-аута — сессия блокируется до сброса или следующего дня.
                 </div>
-                <div class="rc-session-remain">
-                    <span style="color:var(--text-secondary)">Остаток бюджета сессии</span>
-                    <span class="rc-remain-val ok" id="rcRemain">—</span>
+                <div class="rc-cards">
+                    <div class="rc-card">
+                        <div class="rc-card-label">Пиковый капитал</div>
+                        <div class="rc-card-val" id="rcPeakVal">—</div>
+                    </div>
+                    <div class="rc-card">
+                        <div class="rc-card-label">Текущий капитал</div>
+                        <div class="rc-card-val" id="rcCurrentVal">—</div>
+                    </div>
+                    <div class="rc-card danger">
+                        <div class="rc-card-label">Уровень стоп-аута</div>
+                        <div class="rc-card-val" id="rcStopOutVal">—</div>
+                    </div>
+                    <div class="rc-card highlight">
+                        <div class="rc-card-label">Остаток бюджета на потери</div>
+                        <div class="rc-card-val" id="rcRemain">—</div>
+                    </div>
                 </div>
                 <div id="rcSessionLockBanner" style="display:none;background:rgba(224,82,82,0.12);border:1px solid #e05252;border-radius:8px;padding:8px 10px;margin:8px 0;font-size:12px;color:#e05252;line-height:1.5">
                     🛑 Лимит на сегодня исчерпан. Новые сделки заблокированы до сброса или следующего дня.
@@ -3576,6 +3546,8 @@
     let _rcTradeRisk = 0;   // $ риск на 1 сделку (после блока А)
     let _rcSessLimit = 0;   // $ лимит сессии (после блока А)
     let _rcSessionStartCapital = 0; // капитал на момент открытия сегодняшней сессии — лимиты считаются от него, а не от текущего ввода
+    let _rcPeakCapital = 0; // максимум, которого достигал капитал за сегодняшнюю сессию — трейлинг-уровень стоп-аута считается от него
+    let _rcAppliedJournalPnl = {}; // {reviewId: resultUsd} — сегодняшние сделки из журнала, уже учтённые в поле "Ваш капитал" (для диффа при повторных рендерах)
     let _rcSessionLockNotified = false; // показывали ли уже блокирующее окно для текущей блокировки сессии
     let _rcSetup     = 'Дивербар';
     let _rcLastCalc  = null; // последний расчёт блока Б — используется для "Сохранить как план"
@@ -3642,8 +3614,13 @@
         const capital = parseFloat(document.getElementById('rcCapital').value);
         if (!capital || capital <= 0) { errEl.textContent = 'Введите капитал'; return; }
 
-        if (!_rcSessionStartCapital) {
+        const isNewSession = !_rcSessionStartCapital;
+        if (isNewSession) {
             _rcSessionStartCapital = capital;
+            _rcPeakCapital = capital;
+            // Снимок сегодняшнего журнала на момент открытия сессии — это база отсчёта,
+            // а не дельта: введённый капитал уже её учитывает, повторно прибавлять не нужно.
+            _rcAppliedJournalPnl = _rcTodayReviewMap();
         }
         const anchorCapital = _rcSessionStartCapital;
 
@@ -3673,8 +3650,8 @@
 
         // Разблокировать блок Б
         document.getElementById('rcCalcBBtn').disabled = false;
-        // Обновить счётчик сессии
-        updateSession();
+        // Подтянуть изменения из журнала (если есть) и пересчитать трейлинг-стоп-аут
+        _rcApplyJournalDeltas();
     }
 
     // ── Персистентность сессии (localStorage по сегодняшней дате) ──
@@ -3683,65 +3660,87 @@
     }
 
     function saveSessionState() {
-        const slots = [0, 1, 2].map(i => document.getElementById('rcSlot' + i).value);
         localStorage.setItem('rcSessionState', JSON.stringify({
             date: _rcToday(),
             capital: document.getElementById('rcCapital').value,
             sessionStartCapital: _rcSessionStartCapital,
+            peakCapital: _rcPeakCapital,
+            appliedJournalPnl: _rcAppliedJournalPnl,
             tradeRisk: _rcTradeRisk,
             sessLimit: _rcSessLimit,
-            slots,
         }));
     }
 
     function loadSessionState() {
         let state;
         try { state = JSON.parse(localStorage.getItem('rcSessionState')); } catch { state = null; }
-        if (state && state.date === _rcToday()) {
-            (state.slots || []).forEach((v, i) => {
-                const el = document.getElementById('rcSlot' + i);
-                if (el && v) el.value = v;
-            });
-            // Сессия за сегодня уже была открыта — переносим её якорь капитала,
-            // чтобы лимиты не пересчитались от текущего (возможно, уже другого) капитала.
-            if (state.sessionStartCapital) _rcSessionStartCapital = state.sessionStartCapital;
-        } else {
-            _rcSessionStartCapital = 0; // новый день — якорь сбрасывается сам
-        }
-        // Капитал переиспользуется изо дня в день — сбрасываются только слоты сессии.
         const capitalEl = document.getElementById('rcCapital');
+        if (state && state.date === _rcToday()) {
+            // Сессия за сегодня уже была открыта — восстанавливаем якорь, пик и текущий
+            // капитал (с учётом уже применённого P&L из журнала), а не пересчитываем заново.
+            if (state.sessionStartCapital) _rcSessionStartCapital = state.sessionStartCapital;
+            if (state.peakCapital) _rcPeakCapital = state.peakCapital;
+            if (state.appliedJournalPnl) _rcAppliedJournalPnl = state.appliedJournalPnl;
+            if (state.capital && !capitalEl.value) capitalEl.value = state.capital;
+        } else {
+            _rcSessionStartCapital = 0; // новый день — якорь, пик и снимок журнала сбрасываются
+            _rcPeakCapital = 0;
+            _rcAppliedJournalPnl = {};
+        }
+        // Капитал переиспользуется изо дня в день, если сессии на сегодня ещё не было.
         if (!capitalEl.value) {
             const persisted = localStorage.getItem('rcCapitalPersist');
             if (persisted) capitalEl.value = persisted;
         }
         if (capitalEl.value) {
-            calcLimits(); // пересчитает _rcTradeRisk/_rcSessLimit и вызовет updateSession()
+            calcLimits(); // пересчитает _rcTradeRisk/_rcSessLimit, подтянет журнал и трейлинг
         } else {
-            updateSession();
+            _rcRecomputeTrailing();
         }
     }
 
-    // Сумма убытков по сделкам, закрытым сегодня через "Открытые планы → Закрыть сделку"
-    // (эти сделки не проходят через ручные слоты rcSlot0/1/2, поэтому их нужно учитывать отдельно)
-    function _rcJournalLossToday() {
+    // {reviewId: resultUsd} по сделкам, закрытым сегодня через "Открытые планы → Закрыть сделку"
+    function _rcTodayReviewMap() {
         const today = _rcToday();
-        return (_journalCache || [])
-            .filter(t => t.type === 'review' && (t.resultUsd || 0) < 0 && t.ts && new Date(t.ts).toISOString().slice(0, 10) === today)
-            .reduce((sum, t) => sum + Math.abs(t.resultUsd), 0);
+        const map = {};
+        (_journalCache || []).forEach(t => {
+            if (t.type === 'review' && t.ts && new Date(t.ts).toISOString().slice(0, 10) === today) {
+                map[t.id] = t.resultUsd || 0;
+            }
+        });
+        return map;
     }
 
-    function _rcSessionSpent() {
-        let spent = _rcJournalLossToday();
-        for (let i = 0; i < 3; i++) {
-            spent += parseFloat(document.getElementById('rcSlot' + i).value) || 0;
+    // Сверяет текущее состояние журнала со снимком _rcAppliedJournalPnl и прибавляет
+    // к полю "Ваш капитал" только РАЗНИЦУ: новые закрытые сделки — целиком, изменённые
+    // (отредактированный пост-разбор) — на дельту, удалённые — вычитает обратно.
+    // Это не задваивает ручные правки капитала, которые пользователь мог внести сам.
+    function _rcApplyJournalDeltas() {
+        if (!_rcSessionStartCapital) return; // сессия ещё не открыта — нечего применять
+        const current = _rcTodayReviewMap();
+        let delta = 0;
+        for (const id in current) {
+            const prev = _rcAppliedJournalPnl[id];
+            delta += prev === undefined ? current[id] : (current[id] - prev);
         }
-        return spent;
+        for (const id in _rcAppliedJournalPnl) {
+            if (!(id in current)) delta -= _rcAppliedJournalPnl[id];
+        }
+        _rcAppliedJournalPnl = current;
+        if (delta !== 0) {
+            const capEl = document.getElementById('rcCapital');
+            const cur = parseFloat(capEl.value);
+            capEl.value = ((isNaN(cur) ? _rcSessionStartCapital : cur) + delta).toFixed(2);
+        }
+        _rcRecomputeTrailing();
     }
 
     function _rcSessionLocked() {
-        const budget = _rcSessLimit;
-        if (budget <= 0) return false;
-        return _rcSessionSpent() >= budget;
+        if (_rcSessLimit <= 0) return false;
+        const current = parseFloat(document.getElementById('rcCapital').value);
+        if (isNaN(current)) return false;
+        const peak = Math.max(_rcPeakCapital, current);
+        return (current - (peak - _rcSessLimit)) <= 0;
     }
 
     // ── БЛОК Б: рассчитать стоп ──────────────────────────────
@@ -3947,36 +3946,44 @@
             document.getElementById('rcConfirms').value = '';
             document.getElementById('rcInvalidates').value = '';
             await jRender();
+            _rcApplyJournalDeltas();
         } else {
             msgEl.textContent = 'Не удалось сохранить план, попробуйте ещё раз';
             msgEl.style.color = '#e05252';
         }
     }
 
-    // ── БЛОК В: счётчик сессии ────────────────────────────────
-    function updateSession() {
-        const budget = _rcSessLimit;
-        for (let i = 0; i < 3; i++) {
-            const v = parseFloat(document.getElementById('rcSlot' + i).value) || 0;
-            const stEl = document.getElementById('rcSlotSt' + i);
-            if (v <= 0) { stEl.textContent = ''; continue; }
-            const ok = v <= _rcTradeRisk;
-            stEl.textContent = ok ? '✓ ок' : '⚠ превышен';
-            stEl.className   = 'rc-slot-status ' + (ok ? 'ok' : 'over');
-        }
-        const spent   = _rcSessionSpent();
-        const remain  = budget - spent;
-        const remEl   = document.getElementById('rcRemain');
+    // ── БЛОК В: трейлинг стоп-аут сессии ───────────────────────
+    // Пересчитывает пиковый капитал, уровень стоп-аута (трейлится только вверх, вслед
+    // за пиком) и остаток бюджета на потери от ТЕКУЩЕГО значения поля "Ваш капитал".
+    function _rcRecomputeTrailing() {
+        const peakEl   = document.getElementById('rcPeakVal');
+        const curEl    = document.getElementById('rcCurrentVal');
+        const stopEl   = document.getElementById('rcStopOutVal');
+        const remEl    = document.getElementById('rcRemain');
         const lockBanner = document.getElementById('rcSessionLockBanner');
-        if (budget <= 0) {
-            remEl.textContent = '—'; remEl.className = 'rc-remain-val ok';
+
+        if (!_rcSessionStartCapital || _rcSessLimit <= 0) {
+            peakEl.textContent = curEl.textContent = stopEl.textContent = remEl.textContent = '—';
+            remEl.className = 'rc-card-val';
             lockBanner.style.display = 'none';
             _rcSessionLockNotified = false;
-            saveSessionState();
             return;
         }
-        remEl.textContent = (remain >= 0 ? '$' : '−$') + Math.abs(remain).toFixed(2);
-        remEl.className   = 'rc-remain-val ' + (remain >= 0 ? 'ok' : 'over');
+
+        const current = parseFloat(document.getElementById('rcCapital').value);
+        if (!isNaN(current) && current > _rcPeakCapital) _rcPeakCapital = current;
+        if (_rcPeakCapital < _rcSessionStartCapital) _rcPeakCapital = _rcSessionStartCapital;
+
+        const stopOut = _rcPeakCapital - _rcSessLimit;
+        const remain  = (isNaN(current) ? _rcSessionStartCapital : current) - stopOut;
+
+        peakEl.textContent = '$' + _rcPeakCapital.toFixed(2);
+        curEl.textContent  = '$' + (isNaN(current) ? _rcSessionStartCapital : current).toFixed(2);
+        stopEl.textContent = '$' + stopOut.toFixed(2);
+        remEl.textContent  = (remain >= 0 ? '$' : '−$') + Math.abs(remain).toFixed(2);
+        remEl.className    = 'rc-card-val ' + (remain >= 0 ? 'ok' : 'over');
+
         const locked = remain <= 0;
         lockBanner.style.display = locked ? 'block' : 'none';
         if (locked && !_rcSessionLockNotified) {
@@ -4002,18 +4009,16 @@
     }
 
     function resetSession() {
-        for (let i = 0; i < 3; i++) {
-            document.getElementById('rcSlot' + i).value = '';
-            document.getElementById('rcSlotSt' + i).textContent = '';
-        }
-        // Сброс якоря капитала — следующий "Рассчитать лимиты" откроет новую сессию
-        // от текущего значения в поле "Капитал".
+        // Сброс якоря капитала, пика и снимка журнала — следующий "Рассчитать лимиты"
+        // откроет новую сессию от текущего значения в поле "Капитал".
         _rcSessionStartCapital = 0;
+        _rcPeakCapital = 0;
+        _rcAppliedJournalPnl = {};
         const capitalEl = document.getElementById('rcCapital');
         if (capitalEl.value) {
             calcLimits();
         } else {
-            updateSession();
+            _rcRecomputeTrailing();
         }
     }
 
@@ -4157,7 +4162,7 @@
             if (planId != null) await _authFetch(`${API_BASE}/user/journal/${planId}`, { method: 'DELETE' });
         }
         await jRender();
-        updateSession();
+        _rcApplyJournalDeltas();
     }
 
     function openPostReview(planId, existingReview = null) {
@@ -4241,7 +4246,7 @@
         if (r.ok) {
             closePostReview();
             await jRender();
-            updateSession();
+            _rcApplyJournalDeltas();
         } else {
             msgEl.textContent = 'Не удалось сохранить разбор, попробуйте ещё раз';
             msgEl.style.color = '#e05252';
