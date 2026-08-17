@@ -1149,24 +1149,34 @@
                 min-width: unset;
             }
 
-            /* Сайдбар → нижняя навигационная панель */
+            /* Сайдбар → нижняя навигационная панель, прокручиваемая свайпом (иконок больше, чем влезает в ширину) */
             .sidebar {
                 position: fixed;
                 bottom: 0; left: 0; right: 0;
                 height: 56px;
                 flex-direction: row;
-                justify-content: space-around;
+                justify-content: flex-start;
                 align-items: center;
                 padding: 0 4px;
                 border-right: none;
                 border-top: 1px solid var(--border-color);
                 z-index: 200;
                 gap: 0;
+                overflow-x: auto;
+                -webkit-overflow-scrolling: touch;
+                scrollbar-width: none;
             }
+            .sidebar::-webkit-scrollbar { display: none; }
             .sidebar-logo { display: none; }
-            .sidebar-icons { flex-direction: row; flex: unset; gap: 0; align-items: center; }
-            .sidebar-bottom { flex-direction: row; margin-top: 0; gap: 0; align-items: center; }
-            .sidebar-btn { width: 44px; height: 44px; }
+            .sidebar-icons { flex-direction: row; flex: unset; gap: 0; align-items: center; flex-shrink: 0; }
+            .sidebar-bottom { flex-direction: row; margin-top: 0; gap: 0; align-items: center; flex-shrink: 0; }
+            .sidebar-btn { width: 44px; height: 44px; flex-shrink: 0; }
+            .sidebar-avatar { flex-shrink: 0; }
+
+            /* Профиль-дропдаун: на десктопе позиционируется от вертикального сайдбара
+               (left:52px), на мобиле сайдбар — горизонтальный и прокручиваемый, поэтому
+               якорим независимо от прокрученной позиции аватара */
+            .profile-dropdown { position: fixed; left: auto; right: 8px; bottom: 64px; }
 
             /* Topbar */
             .topbar { grid-column: 1; grid-row: 1; padding: 0 8px; gap: 4px; }
@@ -1236,15 +1246,33 @@
                 box-shadow: -6px 0 10px var(--bg-secondary);
             }
 
-            /* Шапка графика — компактная */
-            .chart-header { padding: 4px 8px; flex-wrap: nowrap; gap: 6px; overflow: hidden; }
+            /* Шапка графика — компактная, две строки: символ/цена сверху, таймфреймы
+               и тип графика снизу на всю ширину со своим горизонтальным скроллом
+               (раньше был flex-wrap:nowrap+overflow:hidden — часть таймфреймов
+               обрезалась без возможности докрутить) */
+            .chart-header { padding: 4px 8px; flex-wrap: wrap; gap: 4px; }
             .chart-stats { display: none; }
             .symbol-name { font-size: 13px; }
             .symbol-price { font-size: 14px; }
             .symbol-change { font-size: 11px; padding: 1px 5px; }
-            .chart-controls { gap: 4px; }
+            .chart-controls {
+                margin-left: 0;
+                width: 100%;
+                gap: 4px;
+                overflow-x: auto;
+                -webkit-overflow-scrolling: touch;
+                scrollbar-width: none;
+            }
+            .chart-controls::-webkit-scrollbar { display: none; }
+            .chart-controls .timeframes,
+            .chart-controls .chart-type-toggle { flex-shrink: 0; }
             .chart-controls .timeframes button,
-            .chart-controls .chart-type-toggle button { padding: 3px 7px; font-size: 11px; }
+            .chart-controls .chart-type-toggle button { padding: 3px 7px; font-size: 11px; white-space: nowrap; flex-shrink: 0; }
+
+            /* Список наблюдения: убираем конфликтующий inline max-height
+               (calc(100vh - 340px) не соотносится с реальной высотой выезжающего
+               ящика на телефоне) — скролл всего ящика уже даёт .left-panel */
+            #pairsList { max-height: none; overflow-y: visible; }
         }
     </style>
 </head>
