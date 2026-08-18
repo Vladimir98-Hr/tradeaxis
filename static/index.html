@@ -1222,6 +1222,24 @@
             }
             .right-panel.mob-open { transform: translateX(0); }
 
+            /* Список наблюдения → отдельный выдвигаемый ящик справа (та же логика, что
+               и .left-panel/.right-panel). Раньше это была просто карточка ниже графика,
+               которую нельзя было докрутить — свайп над графиком перехватывался самим
+               графиком (панорамирование/зум), скролл к ней не доходил */
+            #watchlistCard {
+                position: fixed;
+                right: 0; top: 48px; bottom: 56px;
+                width: min(300px, 88vw);
+                z-index: 300;
+                transform: translateX(100%);
+                transition: transform 0.25s ease;
+                background: var(--bg-secondary);
+                border-left: 1px solid var(--border-color);
+                overflow-y: auto;
+                -webkit-overflow-scrolling: touch;
+            }
+            #watchlistCard.mob-open { transform: translateX(0); }
+
             /* Затемнение фона при открытом ящике */
             .mob-backdrop {
                 display: block;
@@ -1326,6 +1344,9 @@
             </button>
             <button class="sidebar-btn mob-only" title="Сканер" onclick="mobTogglePanel('right')">
                 <svg viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27A6.471 6.471 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg>
+            </button>
+            <button class="sidebar-btn mob-only" title="Список наблюдения" onclick="mobTogglePanel('watchlist')">
+                <svg viewBox="0 0 24 24"><path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"/></svg>
             </button>
         </div>
         <div class="sidebar-bottom" style="position:relative">
@@ -5588,18 +5609,20 @@
     // ============================================================
     // Мобильные выдвигаемые панели
     // ============================================================
-    function mobTogglePanel(side) {
-        const panel = document.querySelector(side === 'left' ? '.left-panel' : '.right-panel');
-        const other = document.querySelector(side === 'left' ? '.right-panel' : '.left-panel');
+    const _mobPanelSelectors = { left: '.left-panel', right: '.right-panel', watchlist: '#watchlistCard' };
+
+    function mobTogglePanel(which) {
+        const panel = document.querySelector(_mobPanelSelectors[which]);
         const backdrop = document.getElementById('mobBackdrop');
         const isOpen = panel.classList.toggle('mob-open');
-        other.classList.remove('mob-open');
+        Object.entries(_mobPanelSelectors).forEach(([k, sel]) => {
+            if (k !== which) document.querySelector(sel).classList.remove('mob-open');
+        });
         backdrop.classList.toggle('active', isOpen);
     }
 
     function mobCloseAll() {
-        document.querySelector('.left-panel').classList.remove('mob-open');
-        document.querySelector('.right-panel').classList.remove('mob-open');
+        Object.values(_mobPanelSelectors).forEach(sel => document.querySelector(sel).classList.remove('mob-open'));
         document.getElementById('mobBackdrop').classList.remove('active');
     }
 
