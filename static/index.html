@@ -1183,11 +1183,15 @@
             .topbar-title { font-size: 13px; margin-right: 4px; }
             .topbar-sep { display: none; }
 
-            /* Основная область — полная ширина */
+            /* Основная область — полная ширина. overflow-y:auto переопределяет десктопный
+               overflow:hidden — иначе карточка "Список наблюдения" под графиком физически
+               недоступна для скролла и торчит из-под нижней панели на пару пикселей */
             .center-panel {
                 grid-column: 1;
                 grid-row: 2;
                 padding-bottom: 56px;
+                overflow-y: auto;
+                -webkit-overflow-scrolling: touch;
             }
 
             /* Левая панель → выдвигаемый ящик слева */
@@ -1238,12 +1242,15 @@
             .topbar-right .topbar-sep,
             .topbar-right > button:not(.mob-keep) { font-size: 11px; padding: 4px 8px; }
 
-            /* Мультиграфик — крестик всегда виден */
-            .mc-topbar { position: relative; padding: 6px 48px 6px 10px; overflow-x: auto; }
+            /* Мультиграфик — прокручиваемая полоса; крестик как sticky-элемент в конце ряда,
+               а не absolute поверх контента — раньше он "плавал" над кнопкой "Рисование"
+               при прокрутке, потому что не занимал в потоке своё место */
+            .mc-topbar { padding: 6px 10px; overflow-x: auto; -webkit-overflow-scrolling: touch; scrollbar-width: none; }
+            .mc-topbar::-webkit-scrollbar { display: none; }
+            .mc-title, .mc-tf-btns, .mc-tf-btn, .mc-draw-btn, .mc-draw-toolbar { flex-shrink: 0; }
             .mc-close-btn {
-                position: absolute; right: 6px; top: 50%; transform: translateY(-50%);
-                background: var(--bg-secondary); z-index: 1;
-                box-shadow: -6px 0 10px var(--bg-secondary);
+                position: sticky; right: 0; flex-shrink: 0;
+                background: var(--bg-secondary);
             }
 
             /* Шапка графика — компактная, две строки: символ/цена сверху, таймфреймы
@@ -2883,6 +2890,43 @@
         if (document.getElementById('volScanList')) fetchVolScan();
         if (document.getElementById('spreadScanList')) fetchSpreadScan();
     });
+
+    // Свайп вниз — обновление страницы (на мобиле). Раскладка держится на внутренних
+    // overflow-контейнерах, а не на скролле document, поэтому нативный "потяни вниз —
+    // обновить" браузера не срабатывает — реализуем сами. Срабатывает, только если
+    // ближайший прокручиваемый предок точки касания уже находится в самом верху —
+    // иначе мешало бы обычной прокрутке списков вниз.
+    (function initPullToRefresh() {
+        const THRESHOLD = 70;
+        let startY = null, tracking = false, scrollEl = null;
+
+        function findScrollAncestor(el) {
+            while (el && el !== document.body) {
+                const style = getComputedStyle(el);
+                if (/(auto|scroll)/.test(style.overflowY) && el.scrollHeight > el.clientHeight + 1) return el;
+                el = el.parentElement;
+            }
+            return document.scrollingElement || document.documentElement;
+        }
+
+        document.addEventListener('touchstart', (e) => {
+            if (e.touches.length !== 1) { tracking = false; return; }
+            scrollEl = findScrollAncestor(e.target);
+            if (scrollEl.scrollTop > 0) { tracking = false; return; }
+            startY = e.touches[0].clientY;
+            tracking = true;
+        }, { passive: true });
+
+        document.addEventListener('touchmove', (e) => {
+            if (!tracking || startY == null) return;
+            if (e.touches[0].clientY - startY > THRESHOLD) {
+                tracking = false;
+                location.reload();
+            }
+        }, { passive: true });
+
+        document.addEventListener('touchend', () => { tracking = false; startY = null; }, { passive: true });
+    })();
 
     // Поиск пар
     document.getElementById('pairsSearch').addEventListener('input', (e) => {
