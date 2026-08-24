@@ -5565,11 +5565,14 @@
             if (items && items.length > 0) {
                 const byMarket = {};
                 items.forEach(it => {
+                    const sym = it.symbol;
+                    const base = sym.endsWith('USDT') ? sym.slice(0, -4) : sym;
+                    const name = sym.endsWith('USDT') ? base + '/USDT' : sym;
                     if (!byMarket[it.market]) byMarket[it.market] = [];
-                    byMarket[it.market].push(it.symbol);
+                    byMarket[it.market].push({ symbol: sym, name, base });
                 });
-                Object.entries(byMarket).forEach(([market, syms]) => {
-                    localStorage.setItem('watchlist_' + market, JSON.stringify(syms));
+                Object.entries(byMarket).forEach(([market, list]) => {
+                    localStorage.setItem('watchlist_' + market, JSON.stringify(list));
                 });
                 if (typeof wlRender === 'function') wlRender();
             }
