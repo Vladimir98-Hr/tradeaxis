@@ -4512,8 +4512,12 @@
     }
 
     // ---- Watchlist (список наблюдения) ----
+    // localStorage — локальный кэш для мгновенного отображения. Источник истины — сервер,
+    // и каждое добавление/удаление шлёт туда только СВОЮ пару (POST/DELETE), а не весь
+    // список сразу — полная перезапись с одного устройства стирала пары, добавленные
+    // с других устройств, о которых это устройство ещё не знает.
     function wlLoad() { return JSON.parse(localStorage.getItem('watchlist_' + currentMarket) || '[]'); }
-    function wlSave(list) { localStorage.setItem('watchlist_' + currentMarket, JSON.stringify(list)); pushWatchlistToServer(); }
+    function wlSaveLocal(list) { localStorage.setItem('watchlist_' + currentMarket, JSON.stringify(list)); }
 
     function wlAdd(raw) {
         if (!raw) return;
@@ -4524,16 +4528,23 @@
         const list = wlLoad();
         if (list.find(x => x.symbol === sym)) { document.getElementById('wlInput').value = ''; return; }
         list.push({ symbol: sym, name, base });
-        wlSave(list);
+        wlSaveLocal(list);
         document.getElementById('wlInput').value = '';
         wlRender();
+        if (authToken) {
+            _authFetch('/user/watchlist/item', { method: 'POST', body: { symbol: sym, market: currentMarket } }).catch(() => {});
+        }
     }
 
     function wlAddCurrent() { wlAdd(currentSymbol); }
 
     function wlRemove(symbol) {
-        wlSave(wlLoad().filter(x => x.symbol !== symbol));
+        wlSaveLocal(wlLoad().filter(x => x.symbol !== symbol));
         wlRender();
+        if (authToken) {
+            const qs = `symbol=${encodeURIComponent(symbol)}&market=${encodeURIComponent(currentMarket)}`;
+            _authFetch(`/user/watchlist/item?${qs}`, { method: 'DELETE' }).catch(() => {});
+        }
     }
 
     function wlRender() {
@@ -5538,19 +5549,6 @@
                 });
                 if (typeof wlRender === 'function') wlRender();
             }
-        } catch {}
-    }
-
-    async function pushWatchlistToServer() {
-        if (!authToken) return;
-        try {
-            const markets = ['crypto', 'moex'];
-            const items = [];
-            markets.forEach(market => {
-                const list = JSON.parse(localStorage.getItem('watchlist_' + market) || '[]');
-                list.forEach((sym, pos) => items.push({ symbol: sym, market, position: pos }));
-            });
-            await _authFetch('/user/watchlist', { method: 'PUT', body: { items } });
         } catch {}
     }
 

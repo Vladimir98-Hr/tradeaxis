@@ -9,7 +9,7 @@ import uuid
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, delete
+from sqlalchemy import select, delete, func
 from typing import List, Optional
 
 from database import User, UserSettings, WatchlistItem, TradeJournal, get_db
@@ -112,7 +112,13 @@ async def save_watchlist(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """Полностью перезаписывает вотчлист пользователя."""
+    """Полностью перезаписывает вотчлист пользователя.
+
+    Не используется обычным потоком добавления/удаления одной пары (см.
+    /watchlist/item) — полная перезапись с одного устройства стирала бы
+    пары, добавленные с других устройств, которые это устройство ещё не
+    успело подтянуть.
+    """
     # Удаляем старые записи
     await db.execute(delete(WatchlistItem).where(WatchlistItem.user_id == current_user.id))
 
@@ -125,6 +131,60 @@ async def save_watchlist(
             position=i,
         ))
 
+    await db.commit()
+    return {"ok": True}
+
+
+@router.post("/watchlist/item", status_code=201)
+async def add_watchlist_item(
+    body: WatchlistItemSchema,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Добавляет одну пару в вотчлист (без затрагивания остальных)."""
+    result = await db.execute(
+        select(WatchlistItem).where(
+            WatchlistItem.user_id == current_user.id,
+            WatchlistItem.symbol == body.symbol,
+            WatchlistItem.market == body.market,
+        )
+    )
+    if result.scalar_one_or_none():
+        return {"ok": True}
+
+    count_result = await db.execute(
+        select(func.count()).select_from(WatchlistItem).where(
+            WatchlistItem.user_id == current_user.id,
+            WatchlistItem.market == body.market,
+        )
+    )
+    position = count_result.scalar() or 0
+
+    db.add(WatchlistItem(
+        user_id=current_user.id,
+        symbol=body.symbol,
+        market=body.market,
+        position=position,
+    ))
+    await db.commit()
+    return {"ok": True}
+
+
+@router.delete("/watchlist/item")
+async def delete_watchlist_item(
+    symbol: str,
+    market: str = "crypto",
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Удаляет одну пару из вотчлиста (без затрагивания остальных)."""
+    await db.execute(
+        delete(WatchlistItem).where(
+            WatchlistItem.user_id == current_user.id,
+            WatchlistItem.symbol == symbol,
+            WatchlistItem.market == market,
+        )
+    )
     await db.commit()
     return {"ok": True}
 
