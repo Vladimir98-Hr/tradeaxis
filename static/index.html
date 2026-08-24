@@ -1549,7 +1549,10 @@
         <div class="card" id="watchlistCard" style="padding:0">
             <div class="div-scan-header" style="padding:10px 12px 8px">
                 <span>Список наблюдения</span>
-                <span id="watchlistCount" style="font-size:11px;color:var(--text-secondary)">0 пар</span>
+                <span style="display:flex;align-items:center;gap:8px">
+                    <span id="watchlistCount" style="font-size:11px;color:var(--text-secondary)">0 пар</span>
+                    <button class="div-scan-btn" onclick="wlPushAsMaster()" title="Сделать список с этого устройства основным на всех устройствах" style="padding:2px 8px;font-size:11px">⇪ Сделать основным</button>
+                </span>
             </div>
             <div style="display:flex;gap:6px;padding:0 10px 8px">
                 <input id="wlInput" class="rc-input" type="text" placeholder="Символ (напр. BTCUSDT)" style="flex:1;height:30px;font-size:12px" onkeydown="if(event.key==='Enter')wlAdd(this.value)">
@@ -4544,6 +4547,27 @@
         if (authToken) {
             const qs = `symbol=${encodeURIComponent(symbol)}&market=${encodeURIComponent(currentMarket)}`;
             _authFetch(`/user/watchlist/item?${qs}`, { method: 'DELETE' }).catch(() => {});
+        }
+    }
+
+    // Разовая ручная операция: если списки на разных устройствах разъехались (например,
+    // ещё до фикса инкрементальной синхронизации), отправляет ВЕСЬ локальный список
+    // с этого устройства на сервер, полностью заменяя то, что там сохранено — на других
+    // устройствах это подтянется при следующем заходе/обновлении страницы.
+    async function wlPushAsMaster() {
+        if (!authToken) { alert('Войдите в аккаунт, чтобы синхронизировать список наблюдения'); return; }
+        if (!confirm('Список наблюдения с этого устройства станет общим на всех устройствах — списки на других устройствах будут заменены этим при следующем входе. Продолжить?')) return;
+        try {
+            const markets = ['crypto', 'moex'];
+            const items = [];
+            markets.forEach(market => {
+                const list = JSON.parse(localStorage.getItem('watchlist_' + market) || '[]');
+                list.forEach((p, pos) => items.push({ symbol: p.symbol, market, position: pos }));
+            });
+            const r = await _authFetch('/user/watchlist', { method: 'PUT', body: { items } });
+            alert(r.ok ? 'Готово — этот список теперь основной на сервере.' : 'Не удалось синхронизировать, попробуйте ещё раз.');
+        } catch {
+            alert('Не удалось синхронизировать, попробуйте ещё раз.');
         }
     }
 
