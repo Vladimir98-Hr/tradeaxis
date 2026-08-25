@@ -27,16 +27,29 @@ def smma(data: np.ndarray, period: int) -> np.ndarray:
     return result
 
 
+def shift_forward(data: np.ndarray, offset: int) -> np.ndarray:
+    """
+    Сдвигает значения вперёд на offset баров (как параметр offset= в Pine Script):
+    значение, посчитанное на баре i, отображается на баре i+offset.
+    """
+    result = np.full(len(data), 0.0)
+    if offset < len(data):
+        result[offset:] = data[:len(data) - offset]
+    return result
+
+
 def calculate_alligator(df: pd.DataFrame) -> pd.DataFrame:
     """
-    Индикатор Alligator (Аллигатор Билла Вильямса).
-    Jaw (Челюсть) - SMMA(13), Teeth (Зубы) - SMMA(8), Lips (Губы) - SMMA(5).
+    Индикатор Alligator (Аллигатор Билла Вильямса), как в TradingView.
+    Jaw (Челюсть) - SMMA(13) со сдвигом вперёд на 8 баров,
+    Teeth (Зубы) - SMMA(8) со сдвигом вперёд на 5 баров,
+    Lips (Губы) - SMMA(5) со сдвигом вперёд на 3 бара.
     Все линии строятся по медианной цене (High + Low) / 2.
     """
     hl2 = (df['High'] + df['Low']) / 2
-    jaw = smma(hl2.values, 13)
-    teeth = smma(hl2.values, 8)
-    lips = smma(hl2.values, 5)
+    jaw = shift_forward(smma(hl2.values, 13), 8)
+    teeth = shift_forward(smma(hl2.values, 8), 5)
+    lips = shift_forward(smma(hl2.values, 5), 3)
 
     df_alligator = df[['timestamp', 'Close']].copy()
     df_alligator['Jaw'] = jaw
