@@ -16,6 +16,7 @@ from auth_routes import router as auth_router
 from user_routes import router as user_router
 from chat import router as chat_router
 from news_routes import router as news_router
+from finam_routes import router as finam_router
 from database import init_db
 
 # Создание приложения
@@ -38,6 +39,7 @@ app.include_router(ws_router)
 app.include_router(auth_router)
 app.include_router(user_router)
 app.include_router(news_router)
+app.include_router(finam_router)
 
 
 async def _warm_cache():

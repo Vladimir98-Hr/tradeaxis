@@ -1396,6 +1396,7 @@
         <div class="topbar-tabs" id="marketTabs">
             <button class="topbar-tab active" data-market="crypto">Крипто</button>
             <button class="topbar-tab" data-market="moex">MOEX</button>
+            <button class="topbar-tab" data-market="finam" id="finamTab" style="display:none" title="Finam Trade API — только для админа">Finam</button>
         </div>
         <div class="topbar-right">
             <button class="theme-toggle" id="themeToggle" title="Сменить тему">
@@ -1413,6 +1414,13 @@
             <button class="moex-cat active" data-cat="stocks">Акции</button>
             <button class="moex-cat" data-cat="futures">Фьюч</button>
             <button class="moex-cat" data-cat="commodities">Сырьё</button>
+        </div>
+
+        <!-- Finam: ручной ввод тикера в формате TICKER@MIC (например SBER@MISX) -->
+        <div class="card" id="finamSymbolCard" style="display:none;padding:10px 12px">
+            <input type="text" id="finamSymbolInput" placeholder="Тикер, напр. SBER@MISX" value="SBER@MISX"
+                   style="width:100%;box-sizing:border-box;padding:6px 8px;border-radius:6px;border:1px solid var(--border-color);background:var(--bg-secondary);color:var(--text-primary)">
+            <button class="div-scan-btn" style="margin-top:6px;width:100%" onclick="finamLoadSymbol()">Загрузить</button>
         </div>
 
         <!-- Список пар -->
@@ -2224,10 +2232,13 @@
     async function fetchAll() {
         try {
             const { chartLimit } = loadSettings();
+            const isFinam = currentMarket === 'finam';
             const url = currentMarket === 'moex'
                 ? `${API_BASE}/moex/chart-data?symbol=${currentSymbol}&timeframe=${currentTimeframe}&limit=${chartLimit}&market=${currentMoexCategory}`
+                : isFinam
+                ? `${API_BASE}/finam/chart-data?symbol=${encodeURIComponent(currentSymbol)}&timeframe=${currentTimeframe}&limit=${chartLimit}`
                 : `${API_BASE}/chart-data?symbol=${currentSymbol}&timeframe=${currentTimeframe}&limit=${chartLimit}`;
-            const res = await fetch(url);
+            const res = isFinam ? await _authFetch(url) : await fetch(url);
             const json = await res.json();
             if (!res.ok || !json.data) {
                 showError('mainChart', `${json.detail || 'Нет данных'}`);
@@ -2331,7 +2342,7 @@
             }
 
             // Обновить данные в header для MOEX (нет live ticker — берём из последней свечи)
-            if (currentMarket === 'moex' && lastCandle) {
+            if ((currentMarket === 'moex' || currentMarket === 'finam') && lastCandle) {
                 const lastRaw = json.data[json.data.length - 1];
                 const change = ((lastRaw.Close - lastRaw.Open) / lastRaw.Open * 100).toFixed(2);
                 const changeEl = document.getElementById('liveChange');
@@ -2574,23 +2585,28 @@
                 btn.textContent = tf === '10m' ? '10m' : '1W';
                 tfContainer.appendChild(btn);
             }
-            btn.style.display = market === 'moex' ? '' : 'none';
+            if (tf === '10m') btn.style.display = market === 'moex' ? '' : 'none';
+            else btn.style.display = (market === 'moex' || market === 'finam') ? '' : 'none';
         });
-        // Крипто-только таймфреймы
+        // Крипто и Finam: 5m/15m/4h доступны
         ['5m', '15m', '4h'].forEach(tf => {
             const btn = tfContainer.querySelector(`[data-tf="${tf}"]`);
-            if (btn) btn.style.display = market === 'crypto' ? '' : 'none';
+            if (btn) btn.style.display = (market === 'crypto' || market === 'finam') ? '' : 'none';
         });
-        // 1d: скрыть для фьючерсов и сырья (MOEX ISS forts не поддерживает дневные свечи)
+        // 1d: скрыть для фьючерсов и сырья MOEX (MOEX ISS forts не поддерживает дневные свечи)
         const d1btn = tfContainer.querySelector('[data-tf="1d"]');
         if (d1btn) {
-            d1btn.style.display = (market === 'crypto' || category === 'stocks') ? '' : 'none';
+            d1btn.style.display = (market === 'crypto' || market === 'finam' || category === 'stocks') ? '' : 'none';
         }
-        // 1m, 10m, 1h: скрыть для фьючерсов и сырья — API не поддерживает
+        // 1m, 10m, 1h: скрыть для фьючерсов и сырья MOEX — API не поддерживает
         ['1m', '10m', '1h'].forEach(tf => {
             const btn = tfContainer.querySelector(`[data-tf="${tf}"]`);
             if (btn) btn.style.display = (market === 'moex' && category !== 'stocks') ? 'none' : '';
         });
+        if (market === 'finam') {
+            const btn10m = tfContainer.querySelector('[data-tf="10m"]');
+            if (btn10m) btn10m.style.display = 'none';
+        }
         // Сбросить активный таймфрейм если он скрыт — дефолт 1w для фьючерсов/сырья, 1h для остальных
         const activeTf = tfContainer.querySelector('button.active');
         if (activeTf && activeTf.style.display === 'none') {
@@ -2607,7 +2623,19 @@
         document.querySelectorAll('#marketTabs .topbar-tab').forEach(b =>
             b.classList.toggle('active', b.dataset.market === market));
         const moexCats = document.getElementById('moexCategories');
-        if (market === 'moex') {
+        const finamCard = document.getElementById('finamSymbolCard');
+        finamCard.style.display = market === 'finam' ? 'block' : 'none';
+        if (market === 'finam') {
+            moexCats.style.display = 'none';
+            if (tickerInterval) clearInterval(tickerInterval);
+            if (visibleTickerInterval) clearInterval(visibleTickerInterval);
+            document.getElementById('wsStatus').textContent = 'Finam: исторические данные';
+            document.getElementById('wsStatus').className = '';
+            updateTimeframesForMarket('finam');
+            currentSymbol = document.getElementById('finamSymbolInput').value.trim() || 'SBER@MISX';
+            document.getElementById('chartSymbolName').textContent = currentSymbol;
+            fetchAll();
+        } else if (market === 'moex') {
             moexCats.style.display = 'flex';
             if (tickerInterval) clearInterval(tickerInterval);
             if (visibleTickerInterval) clearInterval(visibleTickerInterval);
@@ -2640,6 +2668,15 @@
             fetchSpreadScan();
             wlRender();
         }
+    }
+
+    /** Finam: загрузить свечи по тикеру, введённому вручную (TICKER@MIC) */
+    function finamLoadSymbol() {
+        const sym = document.getElementById('finamSymbolInput').value.trim().toUpperCase();
+        if (!sym) return;
+        currentSymbol = sym;
+        document.getElementById('chartSymbolName').textContent = sym;
+        fetchAll();
     }
 
     /** Выбор пары из списка */
@@ -5453,6 +5490,8 @@
         if (adminNav) adminNav.style.display = (currentUser && currentUser.is_admin) ? 'flex' : 'none';
         const riskBtn = document.getElementById('riskCalcBtn');
         if (riskBtn) riskBtn.style.display = currentUser ? '' : 'none';
+        const finamTab = document.getElementById('finamTab');
+        if (finamTab) finamTab.style.display = (currentUser && currentUser.is_admin) ? '' : 'none';
     }
 
     function openAuthModal(tab) {

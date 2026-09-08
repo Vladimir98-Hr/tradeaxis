@@ -76,6 +76,10 @@ MOEX_SYMBOLS = {
     "MOEX":  {"name": "MOEX / Московская биржа", "base": "MOEX"},
 }
 
+# Finam Trade API (только для админа) — secret-токен из личного кабинета Финама,
+# раздел «Токены». Пусто = раздел Finam в терминале недоступен.
+FINAM_SECRET_TOKEN = os.getenv("FINAM_SECRET_TOKEN", "")
+
 # Фьючерсы и сырьё MOEX — базовые тикеры.
 # Конкретный контракт (SiM6, BRM6...) определяется автоматически в moex.get_active_future_secid().
 MOEX_FUTURES = {
