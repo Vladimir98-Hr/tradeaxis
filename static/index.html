@@ -598,6 +598,8 @@
         .vol-timer { font-size: 11px; color: var(--text-secondary); font-weight: 400; }
         .vol-pos { color: var(--green); }
         .vol-neg { color: var(--red); }
+        .vol-neutral { color: #ff9800; }
+        .vol-info { color: #2196f3; }
         /* Журнал сделок */
         .journal-item { display:flex; justify-content:space-between; align-items:center; padding:5px 8px; border-radius:6px; font-size:12px; gap:8px; }
         .journal-item:hover { background:var(--hover-bg); }
@@ -3106,27 +3108,39 @@
             const _vs = loadSettings();
             const url = isMoex
                 ? `${API_BASE}/moex/scan/volatile?threshold=${_vs.volThresholdMoex}&top=20`
-                : `${API_BASE}/scan/volatile?threshold=${_vs.volThresholdCrypto}&top=20`;
+                : `${API_BASE}/scan/volatile?threshold=${_vs.volScoreThresholdCrypto}&top=20`;
             const res = await fetch(url);
             const json = await res.json();
             // Если за время запроса пользователь сменил рынок — игнорируем ответ
             if (myGen !== _volGen) return;
             if (!res.ok) throw new Error(json.detail || 'Ошибка');
-            const THRESHOLD = isMoex ? _vs.volThresholdMoex : _vs.volThresholdCrypto;
-            const filtered = (json.pairs ?? []).filter(p => Math.abs(p.change_30m ?? 0) >= THRESHOLD);
-            info.textContent = `Найдено: ${filtered.length} ${isMoex ? 'инструментов' : 'пар'}`;
-            list.innerHTML = filtered.length
-                ? filtered.map(p => {
-                    const chg = p.change_30m ?? 0;
-                    const sign = chg >= 0 ? '+' : '';
-                    const cls = chg >= 0 ? 'vol-pos' : 'vol-neg';
+            const pairs = json.pairs ?? [];
+            info.textContent = `Найдено: ${pairs.length} ${isMoex ? 'инструментов' : 'пар'}`;
+            const PHASE_CLASS = {
+                'UP-EXPANSION': 'vol-pos',
+                'DOWN-EXPANSION': 'vol-neg',
+                'POST-PUMP': 'vol-neutral',
+                'HIGH-VOL-RANGE': 'vol-info',
+            };
+            list.innerHTML = pairs.length
+                ? pairs.map(p => {
+                    if (isMoex) {
+                        const chg = p.change_30m ?? 0;
+                        const sign = chg >= 0 ? '+' : '';
+                        const cls = chg >= 0 ? 'vol-pos' : 'vol-neg';
+                        return `<div class="div-scan-item" onclick="selectPair({symbol:'${p.symbol}',name:'${p.name}',base:'${p.base}'})">
+                            <span class="div-scan-badge ${cls}">${sign}${chg}%</span>
+                            <span class="div-scan-name">${p.name}</span>
+                        </div>`;
+                    }
+                    const cls = PHASE_CLASS[p.phase] || 'vol-info';
                     return `<div class="div-scan-item" onclick="selectPair({symbol:'${p.symbol}',name:'${p.name}',base:'${p.base}'})">
-                        <span class="div-scan-badge ${cls}">${sign}${chg}%</span>
-                        <span class="div-scan-name">${p.name}</span>
+                        <span class="div-scan-badge ${cls}">${p.score}</span>
+                        <span class="div-scan-name">${p.name}<br><small style="opacity:.7">5m: ${p.return_5m > 0 ? '+' : ''}${p.return_5m}% · RVOL ${p.rvol_1m}x</small></span>
                     </div>`;
                 }).join('')
                 : '<div class="div-scan-empty">Нет пар выше порога</div>';
-            volNextRefresh = Date.now() + 5 * 60 * 1000;
+            volNextRefresh = Date.now() + (isMoex ? 5 * 60 * 1000 : 60 * 1000);
         } catch(e) {
             if (myGen !== _volGen) return;
             list.innerHTML = `<div class="div-scan-empty" style="color:var(--red)">${e.message}</div>`;
@@ -4631,7 +4645,7 @@
         showAlligator: true, jawColor: '#2962ff', teethColor: '#ef5350', lipsColor: '#26a69a',
         showBB: true, bbColor: '#2196f3',
         showAO: true, aoUp: '#26a69a', aoDown: '#ef5350',
-        volThresholdCrypto: 2, volThresholdMoex: 3,
+        volScoreThresholdCrypto: 60, volThresholdMoex: 3,
         volAutoRefresh: true,
         // Новые ключи
         showGrid: true, logScale: false, autoScale: true,
@@ -4664,7 +4678,7 @@
             showAO:               document.getElementById('s_showAO').checked,
             aoUp:                 document.getElementById('s_aoUp').value,
             aoDown:               document.getElementById('s_aoDown').value,
-            volThresholdCrypto:   parseFloat(document.getElementById('s_volCrypto').value),
+            volScoreThresholdCrypto: parseFloat(document.getElementById('s_volCrypto').value),
             volThresholdMoex:     parseFloat(document.getElementById('s_volMoex').value),
             volAutoRefresh:       document.getElementById('s_volAutoRefresh').checked,
             showGrid:             document.getElementById('s_showGrid').checked,
@@ -4734,7 +4748,7 @@
         document.getElementById('s_showAO').checked          = s.showAO;
         document.getElementById('s_aoUp').value              = s.aoUp;
         document.getElementById('s_aoDown').value            = s.aoDown;
-        document.getElementById('s_volCrypto').value         = s.volThresholdCrypto;
+        document.getElementById('s_volCrypto').value         = s.volScoreThresholdCrypto;
         document.getElementById('s_volMoex').value           = s.volThresholdMoex;
         document.getElementById('s_volAutoRefresh').checked  = s.volAutoRefresh;
         document.getElementById('s_divTimeframe').value      = s.divScanTimeframe || '1d';
@@ -4839,7 +4853,7 @@
     const SECTION_KEYS = {
         chart:      ['candleUp','candleDown','chartLimit','showGrid','logScale','autoScale'],
         ui:         [],
-        scanner:    ['volThresholdCrypto','volThresholdMoex','volAutoRefresh','divScanTimeframe'],
+        scanner:    ['volScoreThresholdCrypto','volThresholdMoex','volAutoRefresh','divScanTimeframe'],
         indicators: ['showAlligator','jawColor','teethColor','lipsColor','showBB','bbColor','showAO','aoUp','aoDown'],
         behavior:   ['rememberLastMarket','rememberLastTimeframe','rememberFxIndicators','confirmClearAll'],
     };
@@ -6101,9 +6115,9 @@
                         <div class="sv2-section-desc">Параметры сканера волатильности и дивергенций</div>
                         <div class="sv2-group">
                             <div class="sv2-group-title">Сканер волатильности</div>
-                            <div class="sv2-row" data-search="порог волатильность крипто процент">
-                                <div class="sv2-label">Порог крипто (%)</div>
-                                <input type="number" class="sv2-num" id="s_volCrypto" value="2" min="0.1" max="50" step="0.5">
+                            <div class="sv2-row" data-search="порог волатильность крипто score импульс">
+                                <div class="sv2-label">Порог крипто (score начала импульса)</div>
+                                <input type="number" class="sv2-num" id="s_volCrypto" value="60" min="0" max="100" step="5">
                             </div>
                             <div class="sv2-row" data-search="порог волатильность moex биржа">
                                 <div class="sv2-label">Порог MOEX (%)</div>

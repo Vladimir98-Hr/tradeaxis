@@ -319,22 +319,40 @@ async def get_divergences(symbol: str = "BTCUSDT", timeframe: str = "1h", limit:
         raise HTTPException(status_code=500, detail=f"Divergences: {str(e)}")
 
 
+def _median(values):
+    s = sorted(values)
+    n = len(s)
+    if n == 0:
+        return 0.0
+    mid = n // 2
+    return s[mid] if n % 2 else (s[mid - 1] + s[mid]) / 2
+
+
+def _true_range(high, low, prev_close):
+    return max(high - low, abs(high - prev_close), abs(low - prev_close))
+
+
 @router.get("/scan/volatile")
-async def scan_volatile(threshold: float = 1.5, top: int = 20):
-    """Пары с высокой волатильностью за последние 30 минут (5m свечи, топ-50 по объёму)."""
-    key = get_cache_key("", "5m", top, f"volatile30v3_{threshold}")
+async def scan_volatile(threshold: float = 60.0, top: int = 20):
+    """
+    Сканер начала импульса (не «уже выросло», а «только начинает резко двигаться»):
+    ускорение цены (return 1m/5m/15m) + аномальный относительный объём (RVOL) +
+    расширение диапазона (True Range к медиане) + пробой локального 30-минутного
+    диапазона. threshold — минимальный score (0-100), не процент.
+    """
+    key = get_cache_key("", "1m", top, f"impulse_{threshold}")
     cached = await get_cached_data(key)
     if cached:
         return cached
 
-    # Шаг 1: все тикеры — один быстрый запрос → берём топ-50 по объёму
     try:
         all_tickers = await async_fetch_all_tickers()
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Tickers: {str(e)}")
 
-    sorted_tickers = sorted(all_tickers.values(), key=lambda t: t.get('volume24h', 0), reverse=True)
-    top_symbols = sorted_tickers[:50]
+    # Минимальная ликвидность (volume24h уже в млн USDT) + топ по объёму
+    liquid = [t for t in all_tickers.values() if t.get('volume24h', 0) >= 1.0]
+    top_symbols = sorted(liquid, key=lambda t: t.get('volume24h', 0), reverse=True)[:60]
 
     sem = asyncio.Semaphore(6)
 
@@ -343,25 +361,100 @@ async def scan_volatile(threshold: float = 1.5, top: int = 20):
             try:
                 sym = t_info['symbol']
                 base = sym.replace('USDT', '')
-                df = await async_fetch_ohlcv_df(sym, '5m', 14)
-                if len(df) < 8:
+                df = await async_fetch_ohlcv_df(sym, '1m', 90)
+                if len(df) < 65:
                     return None
+
                 closes = df['Close'].values
-                # % изменение за ~30 минут (6 баров × 5m)
-                change_30m = (closes[-1] - closes[-7]) / closes[-7] * 100
-                # Осцилляция: среднее абсолютное отклонение бар-к-бару
-                bar_changes = [(closes[i] - closes[i-1]) / closes[i-1] * 100
-                               for i in range(1, len(closes))]
-                oscillation = sum(abs(c) for c in bar_changes) / len(bar_changes)
-                score = abs(change_30m) + oscillation * 3
-                if abs(change_30m) < threshold:
+                highs = df['High'].values
+                lows = df['Low'].values
+                volumes = df['Volume'].values
+                n = len(closes)
+
+                def ret(k):
+                    prev = closes[n - 1 - k]
+                    return (closes[-1] - prev) / prev * 100 if prev else 0.0
+
+                return_1m = ret(1)
+                return_5m = ret(5)
+                return_15m = ret(15)
+
+                # RVOL: текущий объём к медиане предыдущих 60 баров
+                prev_volumes = volumes[-61:-1]
+                median_vol = _median(prev_volumes)
+                rvol_1m = (volumes[-1] / median_vol) if median_vol > 0 else 0.0
+
+                # Range expansion: True Range текущего бара к медиане TR предыдущих 60
+                trs = [
+                    _true_range(highs[i], lows[i], closes[i - 1])
+                    for i in range(n - 60, n)
+                ]
+                current_tr = trs[-1]
+                median_tr = _median(trs[:-1])
+                range_expansion = (current_tr / median_tr) if median_tr > 0 else 0.0
+
+                # z-score модуля 5-минутной доходности за последние ~60 баров
+                five_min_rets = [
+                    abs((closes[i] - closes[i - 5]) / closes[i - 5] * 100)
+                    for i in range(n - 60, n) if closes[i - 5]
+                ]
+                mean_5m = sum(five_min_rets) / len(five_min_rets) if five_min_rets else 0.0
+                var_5m = sum((x - mean_5m) ** 2 for x in five_min_rets) / len(five_min_rets) if five_min_rets else 0.0
+                std_5m = var_5m ** 0.5
+                z_abs_5m = ((abs(return_5m) - mean_5m) / std_5m) if std_5m > 0 else 0.0
+
+                # Пробой локального диапазона (последние 30 баров, без текущего)
+                window_high = max(highs[-31:-1])
+                window_low = min(lows[-31:-1])
+                if closes[-1] > window_high:
+                    breakout = "up"
+                elif closes[-1] < window_low:
+                    breakout = "down"
+                else:
+                    breakout = "none"
+
+                # Перегрев: движение за 15м намного больше типичного размаха
+                overheat = mean_5m > 0 and abs(return_15m) > mean_5m * 6
+
+                def clamp01(x):
+                    return max(0.0, min(1.0, x))
+
+                s_price = clamp01(max(abs(return_1m) / 2, abs(return_5m) / 5, abs(return_15m) / 8))
+                s_z = clamp01(z_abs_5m / 4)
+                s_rvol = clamp01(rvol_1m / 5)
+                s_range = clamp01(range_expansion / 3)
+                s_breakout = 1.0 if breakout != "none" else 0.0
+                s_liquidity = clamp01(t_info.get('volume24h', 0) / 20)
+
+                score = (
+                    25 * s_price + 20 * s_z + 20 * s_rvol +
+                    15 * s_range + 10 * s_breakout + 10 * s_liquidity
+                )
+
+                if overheat:
+                    phase = "POST-PUMP"
+                elif breakout == "up" and return_5m > 0:
+                    phase = "UP-EXPANSION"
+                elif breakout == "down" and return_5m < 0:
+                    phase = "DOWN-EXPANSION"
+                else:
+                    phase = "HIGH-VOL-RANGE"
+
+                if score < threshold:
                     return None
+
                 return {
                     "symbol": sym, "name": f"{base}/USDT", "base": base,
                     "price": float(closes[-1]),
-                    "change_30m": round(change_30m, 2),
-                    "oscillation": round(oscillation, 3),
-                    "score": round(score, 2),
+                    "return_1m": round(return_1m, 2),
+                    "return_5m": round(return_5m, 2),
+                    "return_15m": round(return_15m, 2),
+                    "rvol_1m": round(rvol_1m, 2),
+                    "range_expansion": round(range_expansion, 2),
+                    "z_abs_5m": round(z_abs_5m, 2),
+                    "breakout": breakout,
+                    "score": round(score, 1),
+                    "phase": phase,
                 }
             except Exception:
                 return None
@@ -370,7 +463,7 @@ async def scan_volatile(threshold: float = 1.5, top: int = 20):
     pairs = [r for r in results if r]
     pairs.sort(key=lambda x: x['score'], reverse=True)
     response = {"threshold": threshold, "count": len(pairs[:top]), "pairs": pairs[:top]}
-    await set_cached_data(key, response, ttl=600)
+    await set_cached_data(key, response, ttl=45)
     return response
 
 
