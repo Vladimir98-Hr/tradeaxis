@@ -600,6 +600,12 @@
         .vol-neg { color: var(--red); }
         .vol-neutral { color: #ff9800; }
         .vol-info { color: #2196f3; }
+        @keyframes volFlash {
+            0%   { background: rgba(41,182,246,.35); }
+            100% { background: transparent; }
+        }
+        .vol-flash { animation: volFlash 2.5s ease-out; }
+        .vol-log-time { opacity:.55; font-size:10px; margin-left:6px; }
         /* Журнал сделок */
         .journal-item { display:flex; justify-content:space-between; align-items:center; padding:5px 8px; border-radius:6px; font-size:12px; gap:8px; }
         .journal-item:hover { background:var(--hover-bg); }
@@ -1594,7 +1600,10 @@
         <div class="card div-scan-card">
             <div class="div-scan-header">
                 <span id="volScanTitle">Сканер волатильности</span>
-                <span class="vol-timer" id="volScanTimer"></span>
+                <span style="display:flex;align-items:center;gap:6px">
+                    <button class="div-scan-btn" id="volLogClearBtn" onclick="volLogClear()" title="Очистить журнал сигналов" style="padding:2px 8px;font-size:11px">🗑</button>
+                    <span class="vol-timer" id="volScanTimer"></span>
+                </span>
             </div>
             <div class="div-scan-info" id="volScanInfo"></div>
             <div class="div-scan-list" id="volScanList">
@@ -3098,12 +3107,67 @@
     let spreadNextRefresh = 0;
     let _spreadGen = 0;
 
+    // Журнал сигналов крипто-сканера: копится, не стирается при каждом обновлении
+    // (раньше список полностью заменялся раз в минуту, и пары не успевали просмотреть).
+    let volSignalLog = [];
+    let _volPrevSymbols = new Set();
+    const VOL_LOG_MAX = 150;
+    const VOL_LOG_KEY = 'volSignalLog_v1';
+
+    function _volLoadLog() {
+        try { volSignalLog = JSON.parse(localStorage.getItem(VOL_LOG_KEY) || '[]'); } catch { volSignalLog = []; }
+    }
+    function _volSaveLog() {
+        try { localStorage.setItem(VOL_LOG_KEY, JSON.stringify(volSignalLog.slice(0, VOL_LOG_MAX))); } catch {}
+    }
+    function volLogClear() {
+        volSignalLog = [];
+        _volPrevSymbols = new Set();
+        _volSaveLog();
+        if (currentMarket !== 'moex') _volRenderLog(new Set());
+    }
+    function _volBeep() {
+        try {
+            const ctx = new (window.AudioContext || window.webkitAudioContext)();
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            osc.connect(gain); gain.connect(ctx.destination);
+            osc.frequency.value = 880;
+            gain.gain.setValueAtTime(0.15, ctx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.35);
+            osc.start(); osc.stop(ctx.currentTime + 0.35);
+        } catch {}
+    }
+    const VOL_PHASE_CLASS = {
+        'UP-EXPANSION': 'vol-pos',
+        'DOWN-EXPANSION': 'vol-neg',
+        'POST-PUMP': 'vol-neutral',
+        'HIGH-VOL-RANGE': 'vol-info',
+    };
+    function _volRenderLog(freshSymbols) {
+        const list = document.getElementById('volScanList');
+        const info = document.getElementById('volScanInfo');
+        info.textContent = volSignalLog.length ? `Журнал: ${volSignalLog.length} сигналов` : '';
+        list.innerHTML = volSignalLog.length
+            ? volSignalLog.map(p => {
+                const cls = VOL_PHASE_CLASS[p.phase] || 'vol-info';
+                const flash = freshSymbols.has(p.symbol) ? ' vol-flash' : '';
+                const t = new Date(p.time).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
+                return `<div class="div-scan-item${flash}" onclick="selectPair({symbol:'${p.symbol}',name:'${p.name}',base:'${p.base}'})">
+                    <span class="div-scan-badge ${cls}">${p.score}</span>
+                    <span class="div-scan-name">${p.name}<span class="vol-log-time">${t}</span><br><small style="opacity:.7">5m: ${p.return_5m > 0 ? '+' : ''}${p.return_5m}% · RVOL ${p.rvol_1m}x</small></span>
+                </div>`;
+            }).join('')
+            : '<div class="div-scan-empty">Пока нет сигналов выше порога</div>';
+    }
+
     async function fetchVolScan() {
         const myGen = ++_volGen;
         const list = document.getElementById('volScanList');
         const info = document.getElementById('volScanInfo');
-        list.innerHTML = '<div class="div-scan-empty">Сканирование...</div>';
         const isMoex = currentMarket === 'moex';
+        if (isMoex) list.innerHTML = '<div class="div-scan-empty">Сканирование...</div>';
+        else if (!volSignalLog.length && !_volPrevSymbols.size) list.innerHTML = '<div class="div-scan-empty">Сканирование...</div>';
         try {
             const _vs = loadSettings();
             const url = isMoex
@@ -3115,16 +3179,11 @@
             if (myGen !== _volGen) return;
             if (!res.ok) throw new Error(json.detail || 'Ошибка');
             const pairs = json.pairs ?? [];
-            info.textContent = `Найдено: ${pairs.length} ${isMoex ? 'инструментов' : 'пар'}`;
-            const PHASE_CLASS = {
-                'UP-EXPANSION': 'vol-pos',
-                'DOWN-EXPANSION': 'vol-neg',
-                'POST-PUMP': 'vol-neutral',
-                'HIGH-VOL-RANGE': 'vol-info',
-            };
-            list.innerHTML = pairs.length
-                ? pairs.map(p => {
-                    if (isMoex) {
+
+            if (isMoex) {
+                info.textContent = `Найдено: ${pairs.length} инструментов`;
+                list.innerHTML = pairs.length
+                    ? pairs.map(p => {
                         const chg = p.change_30m ?? 0;
                         const sign = chg >= 0 ? '+' : '';
                         const cls = chg >= 0 ? 'vol-pos' : 'vol-neg';
@@ -3132,18 +3191,27 @@
                             <span class="div-scan-badge ${cls}">${sign}${chg}%</span>
                             <span class="div-scan-name">${p.name}</span>
                         </div>`;
-                    }
-                    const cls = PHASE_CLASS[p.phase] || 'vol-info';
-                    return `<div class="div-scan-item" onclick="selectPair({symbol:'${p.symbol}',name:'${p.name}',base:'${p.base}'})">
-                        <span class="div-scan-badge ${cls}">${p.score}</span>
-                        <span class="div-scan-name">${p.name}<br><small style="opacity:.7">5m: ${p.return_5m > 0 ? '+' : ''}${p.return_5m}% · RVOL ${p.rvol_1m}x</small></span>
-                    </div>`;
-                }).join('')
-                : '<div class="div-scan-empty">Нет пар выше порога</div>';
+                    }).join('')
+                    : '<div class="div-scan-empty">Нет пар выше порога</div>';
+            } else {
+                const currentSymbols = new Set(pairs.map(p => p.symbol));
+                const freshSymbols = new Set([...currentSymbols].filter(s => !_volPrevSymbols.has(s)));
+                const now = Date.now();
+                pairs.filter(p => freshSymbols.has(p.symbol)).forEach(p => {
+                    volSignalLog.unshift({ ...p, time: now });
+                });
+                if (volSignalLog.length > VOL_LOG_MAX) volSignalLog.length = VOL_LOG_MAX;
+                _volPrevSymbols = currentSymbols;
+                _volSaveLog();
+                _volRenderLog(freshSymbols);
+                if (freshSymbols.size > 0) _volBeep();
+            }
             volNextRefresh = Date.now() + (isMoex ? 5 * 60 * 1000 : 60 * 1000);
         } catch(e) {
             if (myGen !== _volGen) return;
-            list.innerHTML = `<div class="div-scan-empty" style="color:var(--red)">${e.message}</div>`;
+            if (isMoex) {
+                list.innerHTML = `<div class="div-scan-empty" style="color:var(--red)">${e.message}</div>`;
+            }
             // Не оставляем сканер зависшим на ошибке (например, после сна компьютера) —
             // сами повторим попытку через 15 сек, без перезагрузки страницы.
             volNextRefresh = Date.now() + 15 * 1000;
@@ -3682,6 +3750,7 @@
             await fetchSymbolsList();
             fetchAll();
             startTicker();
+            _volLoadLog();
             setTimeout(fetchVolScan, 5000);
             setInterval(tickVolTimer, 1000);
             setTimeout(fetchSpreadScan, 6000);
