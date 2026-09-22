@@ -80,6 +80,8 @@ async def startup():
     os.makedirs("uploads/news", exist_ok=True)
     await init_db()
     asyncio.create_task(_warm_cache())
+    from finam import run_finam_catalog_refresher
+    asyncio.create_task(run_finam_catalog_refresher())
 
 # Создаём папку uploads заранее (StaticFiles требует существующую директорию)
 import os as _os

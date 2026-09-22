@@ -1404,7 +1404,7 @@
         <div class="topbar-tabs" id="marketTabs">
             <button class="topbar-tab active" data-market="crypto">Крипто</button>
             <button class="topbar-tab" data-market="moex">MOEX</button>
-            <button class="topbar-tab" data-market="finam" id="finamTab" style="display:none" title="Finam Trade API — только для админа">Finam</button>
+            <button class="topbar-tab" data-market="finam" id="finamTab" style="display:none" title="Finam Trade API — данные Мосбиржи">Finam</button>
         </div>
         <div class="topbar-right">
             <button class="theme-toggle" id="themeToggle" title="Сменить тему">
@@ -1424,11 +1424,22 @@
             <button class="moex-cat" data-cat="commodities">Сырьё</button>
         </div>
 
-        <!-- Finam: ручной ввод тикера в формате TICKER@MIC (например SBER@MISX) -->
-        <div class="card" id="finamSymbolCard" style="display:none;padding:10px 12px">
-            <input type="text" id="finamSymbolInput" placeholder="Тикер, напр. SBER@MISX" value="SBER@MISX"
-                   style="width:100%;box-sizing:border-box;padding:6px 8px;border-radius:6px;border:1px solid var(--border-color);background:var(--bg-secondary);color:var(--text-primary)">
-            <button class="div-scan-btn" style="margin-top:6px;width:100%" onclick="finamLoadSymbol()">Загрузить</button>
+        <!-- Категории Finam (акции/фьючерсы/валюты/сырьё через Finam Trade API) -->
+        <div class="moex-categories" id="finamCategories" style="display:none">
+            <button class="moex-cat active" data-cat="stocks">Акции</button>
+            <button class="moex-cat" data-cat="futures">Фьюч</button>
+            <button class="moex-cat" data-cat="currencies">Валюты</button>
+            <button class="moex-cat" data-cat="commodities">Сырьё</button>
+        </div>
+
+        <!-- Finam: свёрнутый по умолчанию fallback — ручной ввод тикера TICKER@MIC -->
+        <div class="card" id="finamSymbolCard" style="display:none;padding:8px 12px">
+            <div id="finamManualToggle" style="cursor:pointer;font-size:12px;color:var(--text-secondary)" onclick="document.getElementById('finamManualBody').style.display = document.getElementById('finamManualBody').style.display === 'none' ? 'block' : 'none'">Ввести тикер вручную ▾</div>
+            <div id="finamManualBody" style="display:none;margin-top:6px">
+                <input type="text" id="finamSymbolInput" placeholder="Тикер, напр. SBER@MISX" value="SBER@MISX"
+                       style="width:100%;box-sizing:border-box;padding:6px 8px;border-radius:6px;border:1px solid var(--border-color);background:var(--bg-secondary);color:var(--text-primary)">
+                <button class="div-scan-btn" style="margin-top:6px;width:100%" onclick="finamLoadSymbol()">Загрузить</button>
+            </div>
         </div>
 
         <!-- Список пар -->
@@ -1967,6 +1978,7 @@
     let currentTimeframe = '1h';
     let currentMarket = 'crypto';        // 'crypto' | 'moex'
     let currentMoexCategory = 'stocks';  // 'stocks' | 'futures' | 'commodities'
+    let currentFinamCategory = 'stocks';  // 'stocks' | 'futures' | 'currencies' | 'commodities'
 
     // Ссылки на графики и серии
     let mainChart, candleSeries, jawSeries, teethSeries, lipsSeries;
@@ -2584,6 +2596,38 @@
         }
     }
 
+    /** Загружает список инструментов Finam по категории (акции/фьючерсы/валюты/сырьё) */
+    async function fetchFinamSymbols(category) {
+        const container = document.getElementById('pairsList');
+        container.innerHTML = '<div style="padding:16px;text-align:center;color:var(--text-secondary);font-size:13px">Загрузка...</div>';
+        try {
+            const res = await _authFetch(`${API_BASE}/finam/symbols?category=${category}`);
+            const json = await res.json();
+            container.innerHTML = '';
+            (json.symbols || []).forEach(sym => {
+                const color = symbolColor(sym.base);
+                const div = document.createElement('div');
+                div.className = `pair-item${sym.symbol === currentSymbol ? ' active' : ''}`;
+                div.dataset.symbol = sym.symbol;
+                div.innerHTML = `
+                    <div class="pair-icon" style="background:${color}20;color:${color}">${sym.base[0]}</div>
+                    <div class="pair-info">
+                        <div class="pair-name">${sym.name}</div>
+                        <div class="pair-name-sub">${sym.base}</div>
+                    </div>
+                    <div class="pair-values">
+                        <div class="pair-price" data-price="${sym.symbol}">--</div>
+                        <div class="pair-change" data-change="${sym.symbol}">--</div>
+                    </div>`;
+                div.addEventListener('click', () => selectPair(sym));
+                container.appendChild(div);
+            });
+            if (json.symbols && json.symbols.length > 0) selectPair(json.symbols[0]);
+        } catch(e) {
+            container.innerHTML = '<div style="padding:16px;text-align:center;color:var(--text-secondary)">Ошибка загрузки</div>';
+        }
+    }
+
     /** Показывает/скрывает кнопки таймфреймов для выбранного рынка и категории */
     function updateTimeframesForMarket(market, category = 'stocks') {
         const tfContainer = document.getElementById('timeframes');
@@ -2634,18 +2678,27 @@
         document.querySelectorAll('#marketTabs .topbar-tab').forEach(b =>
             b.classList.toggle('active', b.dataset.market === market));
         const moexCats = document.getElementById('moexCategories');
+        const finamCats = document.getElementById('finamCategories');
         const finamCard = document.getElementById('finamSymbolCard');
         finamCard.style.display = market === 'finam' ? 'block' : 'none';
+        finamCats.style.display = market === 'finam' ? 'flex' : 'none';
         if (market === 'finam') {
             moexCats.style.display = 'none';
             if (tickerInterval) clearInterval(tickerInterval);
             if (visibleTickerInterval) clearInterval(visibleTickerInterval);
             document.getElementById('wsStatus').textContent = 'Finam: исторические данные';
             document.getElementById('wsStatus').className = '';
+            document.getElementById('divScanTitle').textContent = 'Дивергенции 1D · Finam';
+            document.getElementById('divScanList').innerHTML = '<div class="div-scan-empty">Нажмите «Сканировать»</div>';
+            document.getElementById('divScanInfo').textContent = '';
+            document.getElementById('volScanList').innerHTML = '<div class="div-scan-empty">Сканирование...</div>';
+            volNextRefresh = 0;
             updateTimeframesForMarket('finam');
-            currentSymbol = document.getElementById('finamSymbolInput').value.trim() || 'SBER@MISX';
-            document.getElementById('chartSymbolName').textContent = currentSymbol;
-            fetchAll();
+            fetchFinamSymbols(currentFinamCategory);
+            fetchVolScan();
+            spreadNextRefresh = 0;
+            fetchSpreadScan();
+            wlRender();
         } else if (market === 'moex') {
             moexCats.style.display = 'flex';
             if (tickerInterval) clearInterval(tickerInterval);
@@ -3088,11 +3141,21 @@
     document.getElementById('moexCategories').addEventListener('click', (e) => {
         const btn = e.target.closest('[data-cat]');
         if (!btn) return;
-        document.querySelectorAll('.moex-cat').forEach(b => b.classList.remove('active'));
+        document.querySelectorAll('#moexCategories .moex-cat').forEach(b => b.classList.remove('active'));
         btn.classList.add('active');
         currentMoexCategory = btn.dataset.cat;
         updateTimeframesForMarket('moex', currentMoexCategory);
         fetchMoexSymbols(currentMoexCategory);
+    });
+
+    // Категории Finam (Акции / Фьюч / Валюты / Сырьё)
+    document.getElementById('finamCategories').addEventListener('click', (e) => {
+        const btn = e.target.closest('[data-cat]');
+        if (!btn) return;
+        document.querySelectorAll('#finamCategories .moex-cat').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        currentFinamCategory = btn.dataset.cat;
+        fetchFinamSymbols(currentFinamCategory);
     });
 
 
@@ -3166,21 +3229,25 @@
         const list = document.getElementById('volScanList');
         const info = document.getElementById('volScanInfo');
         const isMoex = currentMarket === 'moex';
-        if (isMoex) list.innerHTML = '<div class="div-scan-empty">Сканирование...</div>';
+        const isFinam = currentMarket === 'finam';
+        const isMoexLike = isMoex || isFinam;
+        if (isMoexLike) list.innerHTML = '<div class="div-scan-empty">Сканирование...</div>';
         else if (!volSignalLog.length && !_volPrevSymbols.size) list.innerHTML = '<div class="div-scan-empty">Сканирование...</div>';
         try {
             const _vs = loadSettings();
             const url = isMoex
                 ? `${API_BASE}/moex/scan/volatile?threshold=${_vs.volThresholdMoex}&top=20`
+                : isFinam
+                ? `${API_BASE}/finam/scan/volatile?threshold=1.0&top=20`
                 : `${API_BASE}/scan/volatile?threshold=${_vs.volScoreThresholdCrypto}&top=20`;
-            const res = await fetch(url);
+            const res = isFinam ? await _authFetch(url) : await fetch(url);
             const json = await res.json();
             // Если за время запроса пользователь сменил рынок — игнорируем ответ
             if (myGen !== _volGen) return;
             if (!res.ok) throw new Error(json.detail || 'Ошибка');
             const pairs = json.pairs ?? [];
 
-            if (isMoex) {
+            if (isMoexLike) {
                 info.textContent = `Найдено: ${pairs.length} инструментов`;
                 list.innerHTML = pairs.length
                     ? pairs.map(p => {
@@ -3206,10 +3273,10 @@
                 _volRenderLog(freshSymbols);
                 if (freshSymbols.size > 0) _volBeep();
             }
-            volNextRefresh = Date.now() + (isMoex ? 5 * 60 * 1000 : 60 * 1000);
+            volNextRefresh = Date.now() + (isMoexLike ? 5 * 60 * 1000 : 60 * 1000);
         } catch(e) {
             if (myGen !== _volGen) return;
-            if (isMoex) {
+            if (isMoexLike) {
                 list.innerHTML = `<div class="div-scan-empty" style="color:var(--red)">${e.message}</div>`;
             }
             // Не оставляем сканер зависшим на ошибке (например, после сна компьютера) —
@@ -3237,16 +3304,19 @@
         const info = document.getElementById('spreadScanInfo');
         list.innerHTML = '<div class="div-scan-empty">Сканирование...</div>';
         const isMoex = currentMarket === 'moex';
+        const isFinam = currentMarket === 'finam';
         try {
             const url = isMoex
                 ? `${API_BASE}/moex/scan/spread?threshold=3.0&top=20`
+                : isFinam
+                ? `${API_BASE}/finam/scan/spread?threshold=1.0&top=20`
                 : `${API_BASE}/scan/spread?threshold=1.0&top=20`;
-            const res = await fetch(url);
+            const res = isFinam ? await _authFetch(url) : await fetch(url);
             const json = await res.json();
             if (myGen !== _spreadGen) return;
             if (!res.ok) throw new Error(json.detail || 'Ошибка');
             const pairs = json.pairs ?? [];
-            info.textContent = `Найдено: ${pairs.length} ${isMoex ? 'инструментов' : 'пар'}`;
+            info.textContent = `Найдено: ${pairs.length} ${(isMoex || isFinam) ? 'инструментов' : 'пар'}`;
             list.innerHTML = pairs.length
                 ? pairs.map(p => `<div class="div-scan-item" onclick="selectPair({symbol:'${p.symbol}',name:'${p.name}',base:'${p.base}'})">
                     <span class="div-scan-badge vol-pos">${p.spread}%</span>
@@ -3283,16 +3353,19 @@
         btn.disabled = true;
         btn.textContent = '...';
         const isMoex = currentMarket === 'moex';
-        list.innerHTML = `<div class="div-scan-empty">Сканирование${isMoex ? ' MOEX...' : ' всех пар...<br>Может занять 20–40 сек'}</div>`;
+        const isFinam = currentMarket === 'finam';
+        list.innerHTML = `<div class="div-scan-empty">Сканирование${(isMoex || isFinam) ? (isFinam ? ' Finam...' : ' MOEX...') : ' всех пар...<br>Может занять 20–40 сек'}</div>`;
         info.textContent = '';
         try {
             const divTf = loadSettings().divScanTimeframe || '1d';
             const divTfLabel = divTf === '1d' ? '1D' : divTf === '4h' ? '4H' : divTf === '1h' ? '1H' : divTf.toUpperCase();
-            document.getElementById('divScanTitle').textContent = `Дивергенции ${divTfLabel} · ${isMoex ? 'MOEX' : 'Крипто'}`;
+            document.getElementById('divScanTitle').textContent = `Дивергенции ${divTfLabel} · ${isFinam ? 'Finam' : isMoex ? 'MOEX' : 'Крипто'}`;
             const url = isMoex
                 ? `${API_BASE}/moex/scan/divergences?timeframe=${divTf}`
+                : isFinam
+                ? `${API_BASE}/finam/scan/divergences?timeframe=${divTf}`
                 : `${API_BASE}/scan/divergences?timeframe=${divTf}&limit=50`;
-            const res = await fetch(url);
+            const res = isFinam ? await _authFetch(url) : await fetch(url);
             const json = await res.json();
             if (!res.ok) throw new Error(json.detail || 'Ошибка');
             info.textContent = `Найдено: ${json.count} из ${json.scanned}`;
@@ -3300,7 +3373,9 @@
                 list.innerHTML = '<div class="div-scan-empty">Дивергенций не найдено</div>';
             } else {
                 list.innerHTML = json.divergences.map(d => {
-                    const onclick = isMoex
+                    const onclick = isFinam
+                        ? `currentFinamCategory='${d.cat}'; selectPair({symbol:'${d.symbol}',name:'${d.name}'})`
+                        : isMoex
                         ? `currentMoexCategory='${d.cat}'; selectPair({symbol:'${d.symbol}',name:'${d.name}'})`
                         : `selectPair({symbol:'${d.symbol}',name:'${d.name}',base:'${d.base}'})`;
                     return `<div class="div-scan-item ${d.type}" onclick="${onclick}">
@@ -5574,7 +5649,7 @@
         const riskBtn = document.getElementById('riskCalcBtn');
         if (riskBtn) riskBtn.style.display = currentUser ? '' : 'none';
         const finamTab = document.getElementById('finamTab');
-        if (finamTab) finamTab.style.display = (currentUser && currentUser.is_admin) ? '' : 'none';
+        if (finamTab) finamTab.style.display = currentUser ? '' : 'none';
     }
 
     function openAuthModal(tab) {

@@ -1,9 +1,11 @@
 """
-Модуль для получения данных через Finam Trade API (только для админа).
+Модуль для получения данных через Finam Trade API.
 Требует secret-токен из личного кабинета Финама (FINAM_SECRET_TOKEN в .env).
 Документация: https://api.finam.ru/docs/rest/
 """
 
+import asyncio
+import re
 import httpx
 import pandas as pd
 from datetime import datetime, timedelta, timezone
@@ -151,21 +153,79 @@ async def fetch_ohlcv_finam(symbol: str, timeframe: str = '1d', limit: int = 100
     return result.tail(limit).reset_index(drop=True)
 
 
+# Биржевые коды (mic), интересные для раздела Finam:
+# MISX/RTSX — Мосбиржа (акции, валюты, рублёвые фьючерсы),
+# остальные — мировые товарные/индексные биржи (CME, NYMEX, COMEX, ICE, CBOT, LME),
+# на которых Finam также даёт торговать (нефть, металлы, зерно, индексы и т.д.)
+_RELEVANT_MICS = {"MISX", "RTSX", "XLME", "XNYM", "XCEC", "IFEU", "IFUS", "XCBT", "XCBF", "XCME"}
+
+# Тикер конкретного экспирирующегося контракта (например SiU6, NGV26) оканчивается
+# на код месяца + год — такие тикеры не нужны в списке инструментов, нужен только
+# непрерывный тикер без даты (например GAZPF, CL, GC).
+_DATED_FUTURE_RE = re.compile(r"[FGHJKMNQUVXZ]\d{1,2}$")
+
+
+def _is_continuous_ticker(ticker: str) -> bool:
+    return not _DATED_FUTURE_RE.search(ticker or "")
+
+
+async def _refresh_finam_assets_cache() -> None:
+    """
+    Полный обход каталога Finam (/v1/assets/all, постранично) в фоне —
+    вызывается из background-задачи при старте приложения и раз в несколько часов,
+    НЕ из обработчика запроса (каталог Finam содержит 100k+ инструментов по всем
+    мировым биржам, полный обход занимает минуты). Пока кеш не прогрет, роуты
+    Finam отдают только надёжный curated-список из config.py.
+    """
+    assets = []
+    cursor = None
+    for _ in range(400):  # с запасом — полный обход каталога по всем страницам
+        params = {"only_active": "true"}
+        if cursor:
+            params["cursor"] = cursor
+        try:
+            data = await _finam_get("/v1/assets/all", params=params)
+        except HTTPException:
+            break
+        page = data.get("assets", [])
+        if not page:
+            break
+        for a in page:
+            if a.get("mic") not in _RELEVANT_MICS:
+                continue
+            if a.get("type") == "FUTURES" and not _is_continuous_ticker(a.get("ticker", "")):
+                continue
+            assets.append(a)
+        cursor = data.get("cursor") or data.get("next_cursor")
+        if not cursor:
+            break
+
+    if assets:
+        _assets_cache["data"] = assets
+        _assets_cache["expires_at"] = datetime.now(timezone.utc) + timedelta(hours=6)
+
+
+async def run_finam_catalog_refresher() -> None:
+    """Фоновый цикл: обновляет кеш каталога Finam при старте и затем каждые 6 часов."""
+    if not FINAM_SECRET_TOKEN:
+        return
+    while True:
+        try:
+            await _refresh_finam_assets_cache()
+        except Exception:
+            pass
+        await asyncio.sleep(6 * 3600)
+
+
 async def fetch_finam_assets() -> list:
     """
-    Возвращает список доступных инструментов Finam Trade API (тикер, биржа, название).
-    Кешируется в памяти на несколько часов.
+    Возвращает закешированный список инструментов Finam (акции/фьючерсы/сырьё/валюты),
+    собранный фоновой задачей run_finam_catalog_refresher(). Не делает сетевых
+    запросов сама — если фоновый обход ещё не завершился (первые минуты после
+    старта сервера), возвращает пустой список, и роуты используют только
+    curated-список из config.py.
     """
-    now = datetime.now(timezone.utc)
-    if _assets_cache["data"] is not None and _assets_cache["expires_at"] and now < _assets_cache["expires_at"]:
-        return _assets_cache["data"]
-
-    data = await _finam_get("/v1/assets")
-    assets = data.get("assets", [])
-
-    _assets_cache["data"] = assets
-    _assets_cache["expires_at"] = now + timedelta(hours=6)
-    return assets
+    return _assets_cache["data"] or []
 
 
 async def fetch_finam_quote(symbol: str) -> dict:
