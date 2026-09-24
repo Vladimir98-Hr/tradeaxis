@@ -57,25 +57,6 @@ RESET_TOKEN_EXPIRE_MINUTES = 60
 # База данных пользователей (SQLite)
 DATABASE_URL = os.getenv("DATABASE_URL", "sqlite+aiosqlite:///./users.db")
 
-# Акции MOEX (через MOEX ISS API, без токена, борд TQBR)
-MOEX_SYMBOLS = {
-    "SBER":  {"name": "SBER / Сбербанк",      "base": "SBER"},
-    "GAZP":  {"name": "GAZP / Газпром",        "base": "GAZP"},
-    "LKOH":  {"name": "LKOH / Лукойл",        "base": "LKOH"},
-    "YDEX":  {"name": "YDEX / Яндекс",        "base": "YDEX"},
-    "NVTK":  {"name": "NVTK / Новатэк",       "base": "NVTK"},
-    "ROSN":  {"name": "ROSN / Роснефть",      "base": "ROSN"},
-    "GMKN":  {"name": "GMKN / Норникель",     "base": "GMKN"},
-    "MTSS":  {"name": "MTSS / МТС",           "base": "MTSS"},
-    "SBERP": {"name": "SBERP / Сбербанк п",   "base": "SBERP"},
-    "VTBR":  {"name": "VTBR / ВТБ",           "base": "VTBR"},
-    "MGNT":  {"name": "MGNT / Магнит",        "base": "MGNT"},
-    "TATN":  {"name": "TATN / Татнефть",      "base": "TATN"},
-    "ALRS":  {"name": "ALRS / Алроса",        "base": "ALRS"},
-    "PLZL":  {"name": "PLZL / Полюс",         "base": "PLZL"},
-    "MOEX":  {"name": "MOEX / Московская биржа", "base": "MOEX"},
-}
-
 # Finam Trade API — secret-токен из личного кабинета Финама, раздел «Токены».
 # Пусто = раздел Finam в терминале недоступен. Доступен всем зарегистрированным пользователям.
 FINAM_SECRET_TOKEN = os.getenv("FINAM_SECRET_TOKEN", "")
@@ -160,19 +141,4 @@ FINAM_INSTRUMENTS = {
     "SB@IFUS":  {"name": "SB / Сахар", "cat": "commodities"},
     "CT@IFUS":  {"name": "CT / Хлопок", "cat": "commodities"},
     "OJ@IFUS":  {"name": "OJ / Апельсиновый сок", "cat": "commodities"},
-}
-
-# Фьючерсы и сырьё MOEX — базовые тикеры.
-# Конкретный контракт (SiM6, BRM6...) определяется автоматически в moex.get_active_future_secid().
-MOEX_FUTURES = {
-    # Фьючерсы (cat=futures)
-    "Si": {"name": "Si / USD-RUB",       "cat": "futures"},
-    "Ri": {"name": "Ri / Индекс РТС",    "cat": "futures"},
-    "MX": {"name": "MX / Индекс МосБ",   "cat": "futures"},
-    "Eu": {"name": "Eu / EUR-RUB",        "cat": "futures"},
-    # Сырьё (cat=commodities)
-    "BR": {"name": "BR / Нефть Brent",   "cat": "commodities"},
-    "GD": {"name": "GD / Золото",         "cat": "commodities"},
-    "SV": {"name": "SV / Серебро",        "cat": "commodities"},
-    "NG": {"name": "NG / Природный газ",  "cat": "commodities"},
 }

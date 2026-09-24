@@ -36,6 +36,18 @@ _INTERVAL_DELTA = {
     '1w': timedelta(weeks=1),
 }
 
+# Finam Trade API отклоняет запрос свечей 400 Bad Request, если диапазон
+# interval.start_time..interval.end_time превышает лимит, зависящий от таймфрейма
+# (подтверждено эмпирически: H1/H4 — около 31 дня, D — около 365 дней).
+# Ограничиваем диапазон снизу, чтобы не упереться в этот лимит при большом
+# chartLimit на фронтенде — вместо ошибки просто вернём меньше баров, чем limit.
+_MAX_RANGE_DAYS = {
+    '1m': 30, '5m': 30, '15m': 30,
+    '1h': 30, '4h': 30,
+    '1d': 360,
+    '1w': 1275,
+}
+
 # JWT кешируется в памяти — живёт 15 минут на стороне Finam, обновляем с запасом
 _jwt_cache: dict = {"token": None, "expires_at": None}
 
@@ -120,7 +132,9 @@ async def fetch_ohlcv_finam(symbol: str, timeframe: str = '1d', limit: int = 100
     delta = _INTERVAL_DELTA.get(timeframe, timedelta(days=1))
 
     end_time = datetime.now(timezone.utc)
-    start_time = end_time - delta * (limit + 5)
+    desired_start = end_time - delta * (limit + 5)
+    earliest_start = end_time - timedelta(days=_MAX_RANGE_DAYS.get(timeframe, 360))
+    start_time = max(desired_start, earliest_start)
 
     data = await _finam_get(
         f"/v1/instruments/{symbol}/bars",
@@ -199,6 +213,7 @@ async def _refresh_finam_assets_cache() -> None:
         cursor = data.get("cursor") or data.get("next_cursor")
         if not cursor:
             break
+        await asyncio.sleep(0.15)
 
     if assets:
         _assets_cache["data"] = assets

@@ -142,7 +142,7 @@ async def finam_scan_volatile(threshold: float = 1.0, top: int = 20, current_use
     if cached:
         return cached
 
-    sem = asyncio.Semaphore(6)
+    sem = asyncio.Semaphore(12)
 
     async def scan_one(inst):
         async with sem:
@@ -183,7 +183,7 @@ async def finam_scan_spread(threshold: float = 1.0, top: int = 20, current_user:
     if cached:
         return cached
 
-    sem = asyncio.Semaphore(6)
+    sem = asyncio.Semaphore(12)
 
     async def scan_one(inst):
         async with sem:
@@ -227,7 +227,7 @@ async def finam_scan_divergences(timeframe: str = "1d", limit: int = 50, current
         return cached
 
     instruments = _all_instruments()
-    sem = asyncio.Semaphore(6)
+    sem = asyncio.Semaphore(12)
 
     async def scan_one(inst):
         async with sem:
