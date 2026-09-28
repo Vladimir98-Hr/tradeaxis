@@ -82,6 +82,8 @@ async def startup():
     asyncio.create_task(_warm_cache())
     from finam import run_finam_catalog_refresher
     asyncio.create_task(run_finam_catalog_refresher())
+    from finam_routes import run_finam_chart_prewarmer
+    asyncio.create_task(run_finam_chart_prewarmer())
 
 # Создаём папку uploads заранее (StaticFiles требует существующую директорию)
 import os as _os

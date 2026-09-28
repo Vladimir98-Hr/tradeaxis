@@ -178,10 +178,11 @@ async def fetch_ohlcv_finam(symbol: str, timeframe: str = '1d', limit: int = 100
             window_end = window_start
 
         await get_jwt_token()  # прогреваем токен один раз до параллельных запросов
-        # Окон всегда немного (максимум ~11 для 10-летней дневной истории), поэтому
-        # шлём их все разом — сериализация через маленький semaphore только удлиняла
-        # хвост ожидания, если один из поздних запросов попадал в сетевую заминку.
-        sem = asyncio.Semaphore(len(windows) or 1)
+        # Полностью безлимитный параллелизм (по числу окон, до ~11) давал лишнюю
+        # нагрузку по памяти/сокетам на тесном VPS (1.8GB) — фиксированный потолок
+        # всё ещё покрывает большинство окон одним залпом, но не открывает больше
+        # 6 соединений разом.
+        sem = asyncio.Semaphore(6)
 
         async def _fetch_window(ws: datetime, we: datetime, client: httpx.AsyncClient):
             async with sem:
