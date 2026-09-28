@@ -282,7 +282,8 @@ async def finam_scan_volatile(threshold: float = 60.0, top: int = 20, current_us
             except Exception:
                 return None
 
-    results = await asyncio.gather(*[scan_one(inst) for inst in _all_instruments()])
+    instruments = await _all_instruments()
+    results = await asyncio.gather(*[scan_one(inst) for inst in instruments])
     pairs = [r for r in results if r]
     pairs.sort(key=lambda x: x["score"], reverse=True)
     response = {"threshold": threshold, "count": len(pairs[:top]), "pairs": pairs[:top]}
@@ -324,7 +325,8 @@ async def finam_scan_spread(threshold: float = 1.0, top: int = 20, current_user:
             except Exception:
                 return None
 
-    results = await asyncio.gather(*[scan_one(inst) for inst in _all_instruments()])
+    instruments = await _all_instruments()
+    results = await asyncio.gather(*[scan_one(inst) for inst in instruments])
     pairs = [r for r in results if r]
     pairs.sort(key=lambda x: x["spread"], reverse=True)
     response = {"threshold": threshold, "count": len(pairs[:top]), "pairs": pairs[:top]}
@@ -341,7 +343,7 @@ async def finam_scan_divergences(timeframe: str = "1d", limit: int = 50, current
     if cached:
         return cached
 
-    instruments = _all_instruments()
+    instruments = await _all_instruments()
     sem = asyncio.Semaphore(12)
 
     async def scan_one(inst):
