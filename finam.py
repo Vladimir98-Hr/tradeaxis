@@ -48,6 +48,15 @@ _MAX_RANGE_DAYS = {
     '1w': 1275,
 }
 
+# Для дневного/недельного графика тянем глубокую историю постранично (несколько
+# запросов подряд, окно за окном назад по времени), т.к. за один запрос Finam
+# отдаёт максимум ~_MAX_RANGE_DAYS. Внутридневные таймфреймы такой глубины не
+# требуют — там пагинация не включается.
+_HISTORY_YEARS = {
+    '1d': 10,
+    '1w': 10,
+}
+
 # JWT кешируется в памяти — живёт 15 минут на стороне Finam, обновляем с запасом
 _jwt_cache: dict = {"token": None, "expires_at": None}
 
@@ -101,17 +110,37 @@ async def get_jwt_token() -> str:
     return token
 
 
-async def _finam_get(path: str, params: dict | None = None) -> dict:
+async def _finam_get(
+    path: str,
+    params: dict | None = None,
+    retries: int = 0,
+    client: httpx.AsyncClient | None = None,
+) -> dict:
+    """
+    client — переиспользуемое HTTP-соединение для серии запросов подряд
+    (пагинация), чтобы не тратить время на TLS-хендшейк на каждый вызов.
+    Без него открывается разовое соединение, как раньше.
+    """
     token = await get_jwt_token()
-    async with httpx.AsyncClient(timeout=15) as client:
-        try:
-            resp = await client.get(
-                f"{FINAM_BASE_URL}{path}",
-                params=params or {},
-                headers={"Authorization": token},
-            )
-        except httpx.HTTPError as e:
-            raise HTTPException(status_code=502, detail=f"Finam Trade API недоступен: {e}")
+
+    async def _request(c: httpx.AsyncClient):
+        for attempt in range(retries + 1):
+            try:
+                return await c.get(
+                    f"{FINAM_BASE_URL}{path}",
+                    params=params or {},
+                    headers={"Authorization": token},
+                )
+            except httpx.HTTPError as e:
+                if attempt >= retries:
+                    raise HTTPException(status_code=502, detail=f"Finam Trade API недоступен: {e}")
+                await asyncio.sleep(0.5)
+
+    if client is not None:
+        resp = await _request(client)
+    else:
+        async with httpx.AsyncClient(timeout=20) as c:
+            resp = await _request(c)
 
     if resp.status_code in (401, 403):
         # Токен мог протухнуть раньше срока — сбрасываем кеш на следующий запрос
@@ -130,22 +159,72 @@ async def fetch_ohlcv_finam(symbol: str, timeframe: str = '1d', limit: int = 100
     """
     tf = FINAM_TIMEFRAMES.get(timeframe, 'TIME_FRAME_D')
     delta = _INTERVAL_DELTA.get(timeframe, timedelta(days=1))
-
+    max_range_days = _MAX_RANGE_DAYS.get(timeframe, 360)
     end_time = datetime.now(timezone.utc)
-    desired_start = end_time - delta * (limit + 5)
-    earliest_start = end_time - timedelta(days=_MAX_RANGE_DAYS.get(timeframe, 360))
-    start_time = max(desired_start, earliest_start)
+    history_years = _HISTORY_YEARS.get(timeframe)
 
-    data = await _finam_get(
-        f"/v1/instruments/{symbol}/bars",
-        params={
-            "timeframe": tf,
-            "interval.start_time": start_time.strftime('%Y-%m-%dT%H:%M:%SZ'),
-            "interval.end_time": end_time.strftime('%Y-%m-%dT%H:%M:%SZ'),
-        },
-    )
+    if history_years:
+        # Глубокая история: разбиваем весь диапазон на окна по max_range_days
+        # (лимит Finam на один запрос) и тянем их параллельно — иначе история
+        # в 10 лет собирается пачкой последовательных запросов и грузится
+        # заметно дольше, чем нужно для интерактивного открытия графика.
+        earliest_allowed = end_time - timedelta(days=history_years * 365)
+        windows = []
+        window_end = end_time
+        while window_end > earliest_allowed:
+            window_start = max(window_end - timedelta(days=max_range_days), earliest_allowed)
+            windows.append((window_start, window_end))
+            window_end = window_start
 
-    bars = data.get("bars", [])
+        await get_jwt_token()  # прогреваем токен один раз до параллельных запросов
+        sem = asyncio.Semaphore(4)
+
+        async def _fetch_window(ws: datetime, we: datetime, client: httpx.AsyncClient):
+            async with sem:
+                data = await _finam_get(
+                    f"/v1/instruments/{symbol}/bars",
+                    params={
+                        "timeframe": tf,
+                        "interval.start_time": ws.strftime('%Y-%m-%dT%H:%M:%SZ'),
+                        "interval.end_time": we.strftime('%Y-%m-%dT%H:%M:%SZ'),
+                    },
+                    retries=1,
+                    client=client,
+                )
+                return data.get("bars", [])
+
+        async with httpx.AsyncClient(timeout=20) as shared_client:
+            pages = await asyncio.gather(*[_fetch_window(ws, we, shared_client) for ws, we in windows])
+
+        bars = []
+        for page in reversed(pages):  # windows идут от новых к старым — собираем в хронологическом порядке
+            bars.extend(page)
+
+        # Дедуп на случай, если соседние окна вернули одну и ту же граничную свечу
+        seen = set()
+        deduped = []
+        for b in bars:
+            ts = b.get("timestamp")
+            if ts in seen:
+                continue
+            seen.add(ts)
+            deduped.append(b)
+        bars = deduped
+    else:
+        desired_start = end_time - delta * (limit + 5)
+        earliest_start = end_time - timedelta(days=max_range_days)
+        start_time = max(desired_start, earliest_start)
+
+        data = await _finam_get(
+            f"/v1/instruments/{symbol}/bars",
+            params={
+                "timeframe": tf,
+                "interval.start_time": start_time.strftime('%Y-%m-%dT%H:%M:%SZ'),
+                "interval.end_time": end_time.strftime('%Y-%m-%dT%H:%M:%SZ'),
+            },
+        )
+        bars = data.get("bars", [])
+
     if not bars:
         raise ValueError(f"Finam Trade API: нет данных для {symbol} ({timeframe})")
 
@@ -164,6 +243,10 @@ async def fetch_ohlcv_finam(symbol: str, timeframe: str = '1d', limit: int = 100
         'Volume': [_num(b.get('volume', 0)) for b in bars],
     })
 
+    # Для глубокой истории (1d/1w) отдаём всё, что накопили постранично —
+    # limit там относится только к «баров за один запрос» на других ТФ.
+    if history_years:
+        return result.reset_index(drop=True)
     return result.tail(limit).reset_index(drop=True)
 
 

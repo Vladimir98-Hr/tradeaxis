@@ -113,7 +113,11 @@ async def get_finam_chart_data(
             "bwmfi": bwmfi, "fractal_highs": fractal_highs, "fractal_lows": fractal_lows,
             "bearish": bearish, "bullish": bullish, "bollinger": bollinger,
         }
-        await set_cached_data(key, response, ttl=300)
+        # Глубокая история (1d/1w) собирается несколькими параллельными запросами
+        # к Finam и почти не меняется в течение дня — держим в кеше дольше,
+        # чтобы повторные открытия графика были мгновенными.
+        chart_ttl = 3600 * 3 if timeframe in ('1d', '1w') else 300
+        await set_cached_data(key, response, ttl=chart_ttl)
         return response
     except HTTPException:
         raise
