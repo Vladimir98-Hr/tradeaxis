@@ -48,13 +48,14 @@ _MAX_RANGE_DAYS = {
     '1w': 1275,
 }
 
-# Для дневного/недельного графика тянем глубокую историю постранично (несколько
-# запросов подряд, окно за окном назад по времени), т.к. за один запрос Finam
-# отдаёт максимум ~_MAX_RANGE_DAYS. Внутридневные таймфреймы такой глубины не
-# требуют — там пагинация не включается.
-_HISTORY_YEARS = {
-    '1d': 10,
-    '1w': 10,
+# Целевая глубина истории (в днях) для каждого таймфрейма — тянем её постранично
+# окнами по _MAX_RANGE_DAYS (несколько запросов параллельно), т.к. за один запрос
+# Finam отдаёт максимум ~_MAX_RANGE_DAYS. 1m сюда не входит — для тиковых минутных
+# свечей глубокая история не нужна, там действует обычная логика по limit.
+_HISTORY_DAYS = {
+    '5m': 30, '15m': 30,     # ~1 месяц
+    '1h': 150, '4h': 150,    # ~5 месяцев
+    '1d': 3650, '1w': 3650,  # ~10 лет
 }
 
 # JWT кешируется в памяти — живёт 15 минут на стороне Finam, обновляем с запасом
@@ -161,14 +162,14 @@ async def fetch_ohlcv_finam(symbol: str, timeframe: str = '1d', limit: int = 100
     delta = _INTERVAL_DELTA.get(timeframe, timedelta(days=1))
     max_range_days = _MAX_RANGE_DAYS.get(timeframe, 360)
     end_time = datetime.now(timezone.utc)
-    history_years = _HISTORY_YEARS.get(timeframe)
+    history_days = _HISTORY_DAYS.get(timeframe)
 
-    if history_years:
+    if history_days:
         # Глубокая история: разбиваем весь диапазон на окна по max_range_days
-        # (лимит Finam на один запрос) и тянем их параллельно — иначе история
-        # в 10 лет собирается пачкой последовательных запросов и грузится
+        # (лимит Finam на один запрос) и тянем их параллельно — иначе глубокая
+        # история собирается пачкой последовательных запросов и грузится
         # заметно дольше, чем нужно для интерактивного открытия графика.
-        earliest_allowed = end_time - timedelta(days=history_years * 365)
+        earliest_allowed = end_time - timedelta(days=history_days)
         windows = []
         window_end = end_time
         while window_end > earliest_allowed:
@@ -177,7 +178,10 @@ async def fetch_ohlcv_finam(symbol: str, timeframe: str = '1d', limit: int = 100
             window_end = window_start
 
         await get_jwt_token()  # прогреваем токен один раз до параллельных запросов
-        sem = asyncio.Semaphore(4)
+        # Окон всегда немного (максимум ~11 для 10-летней дневной истории), поэтому
+        # шлём их все разом — сериализация через маленький semaphore только удлиняла
+        # хвост ожидания, если один из поздних запросов попадал в сетевую заминку.
+        sem = asyncio.Semaphore(len(windows) or 1)
 
         async def _fetch_window(ws: datetime, we: datetime, client: httpx.AsyncClient):
             async with sem:
@@ -243,9 +247,9 @@ async def fetch_ohlcv_finam(symbol: str, timeframe: str = '1d', limit: int = 100
         'Volume': [_num(b.get('volume', 0)) for b in bars],
     })
 
-    # Для глубокой истории (1d/1w) отдаём всё, что накопили постранично —
-    # limit там относится только к «баров за один запрос» на других ТФ.
-    if history_years:
+    # Для таймфреймов с глубокой историей отдаём всё, что накопили постранично —
+    # limit там относится только к «баров за один запрос» на 1m (без пагинации).
+    if history_days:
         return result.reset_index(drop=True)
     return result.tail(limit).reset_index(drop=True)
 
