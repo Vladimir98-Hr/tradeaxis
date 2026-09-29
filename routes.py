@@ -448,7 +448,10 @@ async def get_chart_data(symbol: str = "BTCUSDT", timeframe: str = "1h", limit: 
             "bullish": bullish,
             "bollinger": bollinger,
         }
-        await set_cached_data(key, response)
+        # Короткий TTL: эндпоинт опрашивается часто для живого обновления графика
+        # (refreshLiveTail на фронте), пятиминутный дефолтный кеш держал данные
+        # замороженными по несколько минут — новая свеча физически не могла появиться.
+        await set_cached_data(key, response, ttl=5)
         return response
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Chart data: {str(e)}")
