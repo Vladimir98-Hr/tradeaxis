@@ -746,6 +746,59 @@
             transition: all .15s;
         }
         .rc-radio-btn.active { border-color: var(--accent-color); color: var(--accent-color); background: rgba(41,98,255,.1); }
+        /* Иконка-подсказка (?) рядом с полями калькулятора риска */
+        .rc-help {
+            position: relative;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 14px;
+            height: 14px;
+            border-radius: 50%;
+            background: var(--border-color);
+            color: var(--text-secondary);
+            font-size: 10px;
+            font-style: normal;
+            font-weight: 700;
+            line-height: 1;
+            cursor: pointer;
+            margin-left: 5px;
+            vertical-align: middle;
+            flex-shrink: 0;
+        }
+        .rc-help:hover, .rc-help.open { background: var(--accent-color); color: #fff; }
+        .rc-help-pop {
+            display: none;
+            position: absolute;
+            bottom: calc(100% + 8px);
+            left: 50%;
+            transform: translateX(-50%);
+            width: 240px;
+            max-width: 60vw;
+            background: #1b2230;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 9px 11px;
+            font-size: 11px;
+            line-height: 1.5;
+            color: var(--text-primary);
+            text-transform: none;
+            letter-spacing: normal;
+            font-weight: 400;
+            white-space: normal;
+            box-shadow: 0 4px 16px rgba(0,0,0,.35);
+            z-index: 50;
+        }
+        .rc-help-pop::after {
+            content: '';
+            position: absolute;
+            top: 100%;
+            left: 50%;
+            transform: translateX(-50%);
+            border: 5px solid transparent;
+            border-top-color: #1b2230;
+        }
+        .rc-help:hover .rc-help-pop, .rc-help.open .rc-help-pop { display: block; }
         .rc-calc-btn {
             width: 100%;
             padding: 10px;
@@ -1667,11 +1720,15 @@
                     </div>
                 </div>
                 <div>
-                    <div class="rc-label">Ваш капитал ($)</div>
+                    <div class="rc-label">Ваш капитал ($)
+                        <span class="rc-help">?<span class="rc-help-pop">Сумма денег на вашем торговом счёте прямо сейчас. От неё считается % риска на одну сделку и на всю сессию — чем больше капитал, тем больше в долларах можно рисковать при том же проценте. Поле обновляется автоматически, когда вы закрываете сделку через журнал («Открытые планы → Закрыть сделку»); если сделка была вне журнала — впишите актуальную сумму вручную.</span></span>
+                    </div>
                     <input class="rc-input" id="rcCapital" type="number" min="0" placeholder="10 000" onchange="if (_rcSessionStartCapital) _rcRecomputeTrailing()">
                 </div>
                 <div>
-                    <div class="rc-label">Стиль торговли</div>
+                    <div class="rc-label">Стиль торговли
+                        <span class="rc-help">?<span class="rc-help-pop">Насколько сильно вы готовы рисковать. «Консерв. ×0.5» — риск на сделку уменьшается вдвое от базового (для начинающих, просадки или сомнений). «Сбаланс. ×1» — стандартный риск, разумный вариант по умолчанию. «Агрессивный ×2» — риск удваивается: для опытных, кто осознанно готов на бОльшие просадки ради бОльшей потенциальной прибыли. Множитель напрямую умножает итоговый % риска на сделку.</span></span>
+                    </div>
                     <div class="rc-radio-group" id="rcStyleGroup">
                         <button class="rc-radio-btn" data-val="0.5" onclick="setRcStyle(this)">Консерв. ×0.5</button>
                         <button class="rc-radio-btn active" data-val="1" onclick="setRcStyle(this)">Сбаланс. ×1</button>
@@ -1679,7 +1736,9 @@
                     </div>
                 </div>
                 <div>
-                    <div class="rc-label">Горизонт сделки</div>
+                    <div class="rc-label">Горизонт сделки
+                        <span class="rc-help">?<span class="rc-help-pop">Как долго вы планируете держать позицию. «Внутри дня» — сделка закрывается в течение дня, минимально допустимое соотношение прибыль/риск 1.5:1. «Среднесрочная» — от нескольких дней до недель, минимум 2:1. «Долгосрочная» — недели-месяцы, минимум 3:1. Чем дольше держите позицию, тем шире должна быть потенциальная прибыль относительно риска, чтобы оправдать время и колебания цены.</span></span>
+                    </div>
                     <div class="rc-radio-group" id="rcCatGroup">
                         <button class="rc-radio-btn active" data-val="1" data-minrr="1.5" onclick="setRcCat(this)">Внутри дня</button>
                         <button class="rc-radio-btn" data-val="1.5" data-minrr="2" onclick="setRcCat(this)">Среднесрочная</button>
@@ -1693,12 +1752,16 @@
                 <div id="rcResA" style="display:none">
                     <div class="rc-cards">
                         <div class="rc-card highlight">
-                            <div class="rc-card-label">Риск / 1 сделка</div>
+                            <div class="rc-card-label">Риск / 1 сделка
+                                <span class="rc-help">?<span class="rc-help-pop">Максимальная сумма, которую можно потерять на одной сделке, если сработает стоп-лосс. Рассчитана из капитала, стиля торговли и горизонта сделки.</span></span>
+                            </div>
                             <div class="rc-card-val" id="rcA_tradeUsd">—</div>
                             <div class="rc-card-sub" id="rcA_tradePct">—</div>
                         </div>
                         <div class="rc-card danger">
-                            <div class="rc-card-label">Лимит сессии (3 сд.)</div>
+                            <div class="rc-card-label">Лимит сессии (3 сд.)
+                                <span class="rc-help">?<span class="rc-help-pop">Максимальная суммарная потеря за сегодня — примерно как если бы подряд закрылись 3 убыточные сделки. Как только текущий капитал падает до этого уровня, новые сделки блокируются до сброса сессии или следующего дня (см. блок В ниже).</span></span>
+                            </div>
                             <div class="rc-card-val" id="rcA_sessUsd">—</div>
                             <div class="rc-card-sub" id="rcA_sessPct">—</div>
                         </div>
@@ -1717,14 +1780,18 @@
                     </div>
                 </div>
                 <div>
-                    <div class="rc-label">Кредитное плечо: <span id="rcLevVal" style="color:var(--text-primary);font-weight:600">1×</span></div>
+                    <div class="rc-label">Кредитное плечо: <span id="rcLevVal" style="color:var(--text-primary);font-weight:600">1×</span>
+                        <span class="rc-help">?<span class="rc-help-pop">Плечо — это заём у биржи, который увеличивает размер вашей позиции сверх вложенной суммы. Плечо 1× — торговля только своими деньгами, без займа. Чем выше плечо, тем ближе цена ликвидации к цене входа: биржа принудительно закроет позицию раньше, если не хватит залога (маржи), даже если ваш стоп-лосс ещё не сработал. Более высокое плечо = более высокий риск потерять весь залог за меньшее движение цены.</span></span>
+                    </div>
                     <div style="display:flex;align-items:center;gap:10px">
                         <input type="range" id="rcLevSlider" min="1" max="100" step="1" value="1" style="flex:1" oninput="setRcLeverage(this.value)">
                         <input type="number" id="rcLevInput" min="1" max="100" step="1" value="1" class="rc-input" style="width:64px" oninput="setRcLeverage(this.value)">
                     </div>
                 </div>
                 <div>
-                    <div class="rc-label">Направление</div>
+                    <div class="rc-label">Направление
+                        <span class="rc-help">?<span class="rc-help-pop">ЛОНГ — ставка на рост цены (покупаете сейчас, чтобы продать дороже). ШОРТ — ставка на падение цены (продаёте сейчас, чтобы выкупить дешевле).</span></span>
+                    </div>
                     <div class="rc-dir-group">
                         <button class="rc-dir-btn long active" id="rcDirLong" onclick="setRcDir('long')">ЛОНГ ▲</button>
                         <button class="rc-dir-btn short" id="rcDirShort" onclick="setRcDir('short')">ШОРТ ▼</button>
@@ -1732,16 +1799,22 @@
                 </div>
                 <div class="rc-2col">
                     <div>
-                        <div class="rc-label">Цена входа</div>
+                        <div class="rc-label">Цена входа
+                            <span class="rc-help">?<span class="rc-help-pop">Цена, по которой вы планируете открыть позицию (купить в лонге или продать в шорте).</span></span>
+                        </div>
                         <input class="rc-input" id="rcEntry" type="number" min="0" placeholder="100">
                     </div>
                     <div>
-                        <div class="rc-label" id="rcPosLabel">Объём позиции ($)</div>
+                        <div class="rc-label" id="rcPosLabel">Объём позиции ($)
+                            <span class="rc-help">?<span class="rc-help-pop">При плече 1× — это полная сумма, на которую вы открываете позицию. При плече больше 1× это поле превращается в «Маржу / залог» — сумму, которую вы реально вносите своими деньгами; фактический размер позиции биржа увеличивает сама: маржа × плечо. Например, маржа $100 при плече 5× даёт позицию на $500.</span></span>
+                        </div>
                         <input class="rc-input" id="rcPosUsd" type="number" min="0" placeholder="500">
                     </div>
                 </div>
                 <div>
-                    <div class="rc-label">R:R (тейк / стоп)</div>
+                    <div class="rc-label">R:R (тейк / стоп)
+                        <span class="rc-help">?<span class="rc-help-pop">Risk:Reward — во сколько раз потенциальная прибыль больше суммы риска на сделку. Например, R:R = 2:1 значит, что при срабатывании тейк-профита вы заработаете вдвое больше, чем потеряли бы на стопе. Минимальное значение зависит от выбранного в блоке А горизонта сделки — чем длиннее горизонт, тем выше должен быть R:R.</span></span>
+                    </div>
                     <input class="rc-input" id="rcRRInput" type="number" min="0.1" step="0.1" placeholder="2.0" value="1.5" oninput="document.getElementById('rcResB').style.display='none'">
                     <div class="rc-section-sub" id="rcRRHint" style="margin-top:4px">Мин. R:R для «Внутри дня»: 1.5:1</div>
                 </div>
@@ -1752,24 +1825,32 @@
                 <div id="rcResB" style="display:none">
                     <div class="rc-stop-result">
                         <div>
-                            <div class="rc-card-label">Цена стоп-лосса</div>
+                            <div class="rc-card-label">Цена стоп-лосса
+                                <span class="rc-help">?<span class="rc-help-pop">Цена, при достижении которой позиция закрывается с убытком, равным вашему «Риску / 1 сделку» из блока А. Рассчитана автоматически из объёма позиции и допустимого риска.</span></span>
+                            </div>
                             <div class="rc-stop-price" id="rcB_stopPrice">—</div>
                             <div class="rc-card-sub" id="rcB_stopPct">—</div>
                         </div>
                         <div style="text-align:right">
-                            <div class="rc-card-label">Цена тейк-профита</div>
+                            <div class="rc-card-label">Цена тейк-профита
+                                <span class="rc-help">?<span class="rc-help-pop">Цена, при достижении которой позиция закрывается с прибылью — рассчитана по указанному R:R относительно расстояния до стопа.</span></span>
+                            </div>
                             <div style="font-size:18px;font-weight:700;color:#4caf82" id="rcB_tpPrice">—</div>
                             <div class="rc-card-sub" id="rcB_tpPct">—</div>
                         </div>
                     </div>
                     <div class="rc-stop-result" style="margin-top:6px">
                         <div>
-                            <div class="rc-card-label">Объём в монетах</div>
+                            <div class="rc-card-label">Объём в монетах
+                                <span class="rc-help">?<span class="rc-help-pop">Размер позиции, пересчитанный из долларов в количество монет актива по цене входа.</span></span>
+                            </div>
                             <div style="font-size:13px;font-weight:600" id="rcB_coins">—</div>
                             <div class="rc-card-sub" id="rcB_riskCheck">—</div>
                         </div>
                         <div style="text-align:right">
-                            <div class="rc-card-label">Потенциальная прибыль</div>
+                            <div class="rc-card-label">Потенциальная прибыль
+                                <span class="rc-help">?<span class="rc-help-pop">Сколько вы заработаете в долларах, если сделка дойдёт до тейк-профита.</span></span>
+                            </div>
                             <div style="font-size:13px;font-weight:600;color:#4caf82" id="rcB_tpProfit">—</div>
                             <div class="rc-card-sub" id="rcB_rrLabel">—</div>
                         </div>
@@ -1778,12 +1859,16 @@
                     <div id="rcB_levInfo" style="display:none;margin-top:8px">
                         <div class="rc-stop-result" style="margin-bottom:6px">
                             <div>
-                                <div class="rc-card-label">Эффективная позиция</div>
+                                <div class="rc-card-label">Эффективная позиция
+                                    <span class="rc-help">?<span class="rc-help-pop">Реальный размер позиции с учётом плеча: ваша маржа × плечо. Именно эта сумма фактически работает на рынке, хотя вы внесли меньше.</span></span>
+                                </div>
                                 <div style="font-size:13px;font-weight:600" id="rcB_effPos">—</div>
                                 <div class="rc-card-sub" id="rcB_margin">—</div>
                             </div>
                             <div style="text-align:right">
-                                <div class="rc-card-label">~Цена ликвидации</div>
+                                <div class="rc-card-label">~Цена ликвидации
+                                    <span class="rc-help">?<span class="rc-help-pop">Примерная цена, при которой биржа принудительно закроет позицию из-за нехватки залога (маржи) — до того, как сработает ваш стоп-лосс. Чем выше плечо, тем ближе эта цена к цене входа. Если стоп стоит дальше цены ликвидации — сделка рискует закрыться принудительно раньше, чем вы рассчитывали.</span></span>
+                                </div>
                                 <div style="font-size:13px;font-weight:600;color:#e05252" id="rcB_liqPrice">—</div>
                                 <div class="rc-card-sub" id="rcB_liqPct">—</div>
                             </div>
@@ -1797,7 +1882,9 @@
 
                     <hr class="rc-divider">
 
-                    <div class="rc-label">Тип сетапа</div>
+                    <div class="rc-label">Тип сетапа
+                        <span class="rc-help">?<span class="rc-help-pop">Отметьте, по какой торговой модели открыта сделка — это нужно только для статистики в журнале сделок (чтобы потом видеть, какие сетапы приносят больше прибыли). «Дивербар», «Пробой Боллинджера», «Фильтр Аллигатора» — сетапы на основе индикаторов, уже доступных на графике. «Своя стратегия» — впишите название, если используете другой подход.</span></span>
+                    </div>
                     <div class="rc-radio-group" id="rcSetupGroup" style="flex-wrap:wrap">
                         <button class="rc-radio-btn active" data-setup="Дивербар" onclick="setRcSetup(this)" style="flex:1 1 45%">Дивербар</button>
                         <button class="rc-radio-btn" data-setup="Пробой Боллинджера" onclick="setRcSetup(this)" style="flex:1 1 45%">Пробой Боллинджера</button>
@@ -1807,21 +1894,27 @@
                     <input class="rc-input" id="rcSetupCustom" type="text" placeholder="Название своей стратегии" style="display:none;margin-top:6px" oninput="_rcSetup = this.value.trim() || 'Своя стратегия'">
                     <div style="margin-top:8px">
                         <div class="rc-label" style="display:flex;align-items:center;justify-content:space-between">
-                            <span>Причина входа</span>
+                            <span>Причина входа
+                                <span class="rc-help">?<span class="rc-help-pop">Поле торгового дневника: кратко опишите, почему вы входите в сделку именно сейчас. Помогает потом разобрать сделку и не повторять необдуманные входы.</span></span>
+                            </span>
                             <button type="button" class="rc-mic-btn" id="rcReason_mic" onclick="startVoiceInput('rcReason', this)" title="Голосовой ввод">&#127908;</button>
                         </div>
                         <textarea class="rc-input" id="rcReason" rows="2" style="resize:vertical;font-family:inherit" placeholder="Почему вхожу именно сейчас"></textarea>
                     </div>
                     <div style="margin-top:8px">
                         <div class="rc-label" style="display:flex;align-items:center;justify-content:space-between">
-                            <span>Что подтверждает идею</span>
+                            <span>Что подтверждает идею
+                                <span class="rc-help">?<span class="rc-help-pop">Какие конкретные сигналы (индикаторы, паттерны, уровни) говорят, что идея верна. Пригодится при разборе сделки после закрытия.</span></span>
+                            </span>
                             <button type="button" class="rc-mic-btn" id="rcConfirms_mic" onclick="startVoiceInput('rcConfirms', this)" title="Голосовой ввод">&#127908;</button>
                         </div>
                         <textarea class="rc-input" id="rcConfirms" rows="2" style="resize:vertical;font-family:inherit" placeholder="Дивербар + фрактал, ангуляция от Аллигатора..."></textarea>
                     </div>
                     <div style="margin-top:8px">
                         <div class="rc-label" style="display:flex;align-items:center;justify-content:space-between">
-                            <span>Что отменяет идею</span>
+                            <span>Что отменяет идею
+                                <span class="rc-help">?<span class="rc-help-pop">При каких условиях сделка считается неверной ещё до срабатывания стопа — например, разворот на старшем таймфрейме. Помогает выходить из сделки дисциплинированно, а не по эмоциям.</span></span>
+                            </span>
                             <button type="button" class="rc-mic-btn" id="rcInvalidates_mic" onclick="startVoiceInput('rcInvalidates', this)" title="Голосовой ввод">&#127908;</button>
                         </div>
                         <textarea class="rc-input" id="rcInvalidates" rows="2" style="resize:vertical;font-family:inherit" placeholder="Пробой стопа без реакции, разворот старшего ТФ..."></textarea>
@@ -1849,19 +1942,27 @@
                 </div>
                 <div class="rc-cards">
                     <div class="rc-card">
-                        <div class="rc-card-label">Пиковый капитал</div>
+                        <div class="rc-card-label">Пиковый капитал
+                            <span class="rc-help">?<span class="rc-help-pop">Максимум, которого ваш капитал достигал сегодня. Обновляется только вверх — если капитал потом падает, этот показатель не уменьшается.</span></span>
+                        </div>
                         <div class="rc-card-val" id="rcPeakVal">—</div>
                     </div>
                     <div class="rc-card">
-                        <div class="rc-card-label">Текущий капитал</div>
+                        <div class="rc-card-label">Текущий капитал
+                            <span class="rc-help">?<span class="rc-help-pop">Актуальный капитал прямо сейчас — то же значение, что и в поле «Ваш капитал» блока А.</span></span>
+                        </div>
                         <div class="rc-card-val" id="rcCurrentVal">—</div>
                     </div>
                     <div class="rc-card danger">
-                        <div class="rc-card-label">Уровень стоп-аута</div>
+                        <div class="rc-card-label">Уровень стоп-аута
+                            <span class="rc-help">?<span class="rc-help-pop">Пиковый капитал минус лимит сессии. Как только текущий капитал опускается до этого уровня, новые сделки блокируются до сброса сессии или следующего дня. Уровень трейлится только вверх вслед за пиком.</span></span>
+                        </div>
                         <div class="rc-card-val" id="rcStopOutVal">—</div>
                     </div>
                     <div class="rc-card highlight">
-                        <div class="rc-card-label">Остаток бюджета на потери</div>
+                        <div class="rc-card-label">Остаток бюджета на потери
+                            <span class="rc-help">?<span class="rc-help-pop">Сколько ещё можно потерять сегодня, прежде чем сессия заблокируется: текущий капитал минус уровень стоп-аута.</span></span>
+                        </div>
                         <div class="rc-card-val" id="rcRemain">—</div>
                     </div>
                 </div>
@@ -3851,6 +3952,18 @@
     let _rcSessionLockNotified = false; // показывали ли уже блокирующее окно для текущей блокировки сессии
     let _rcSetup     = 'Дивербар';
     let _rcLastCalc  = null; // последний расчёт блока Б — используется для "Сохранить как план"
+
+    // Подсказки (?) — открытие/закрытие по клику или тапу (наведение работает через CSS :hover)
+    document.addEventListener('click', function(e) {
+        const help = e.target.closest('.rc-help');
+        document.querySelectorAll('.rc-help.open').forEach(function(h) {
+            if (h !== help) h.classList.remove('open');
+        });
+        if (help) {
+            help.classList.toggle('open');
+            e.stopPropagation();
+        }
+    });
 
     function openRiskCalc() {
         document.getElementById('riskCalcModal').style.display = 'flex';
