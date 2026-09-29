@@ -77,12 +77,12 @@ async def get_finam_symbols(category: str = "stocks", current_user: User = Depen
     return {"category": category, "symbols": await _category_instruments(category)}
 
 
-async def _build_finam_chart_data(symbol: str, timeframe: str, limit: int) -> dict:
+async def _build_finam_chart_data(symbol: str, timeframe: str, limit: int, deep_history: bool = True) -> dict:
     """
     Собирает ответ /finam/chart-data (OHLCV + индикаторы) без обращения к кешу —
     переиспользуется и самим эндпоинтом, и фоновым прогревом кеша.
     """
-    df = await fetch_ohlcv_finam(symbol, timeframe, limit)
+    df = await fetch_ohlcv_finam(symbol, timeframe, limit, deep_history=deep_history)
 
     ohlcv = df.to_dict("records")
     df_alligator = calculate_alligator(df)
@@ -125,17 +125,25 @@ async def get_finam_chart_data(
     symbol: str = "SBER@MISX",
     timeframe: str = "1d",
     limit: int = 200,
+    deep_history: bool = True,
     current_user: User = Depends(get_current_user),
 ):
-    """Комбинированный Finam endpoint: OHLCV + все индикаторы."""
-    key = get_cache_key(symbol, timeframe, limit, "finam_chart")
+    """
+    Комбинированный Finam endpoint: OHLCV + все индикаторы.
+    deep_history=false — лёгкий одиночный запрос на последние ~limit баров без
+    постраничной загрузки всей истории; используется фронтом для частого
+    живого доопроса хвоста графика (см. refreshLiveTail), чтобы не повторять
+    тяжёлую пагинацию при каждом обновлении.
+    """
+    key = get_cache_key(symbol, timeframe, limit, f"finam_chart_{deep_history}")
     cached = await get_cached_data(key)
     if cached:
         return cached
 
     try:
-        response = await _build_finam_chart_data(symbol, timeframe, limit)
-        await set_cached_data(key, response, ttl=_finam_chart_ttl(timeframe))
+        response = await _build_finam_chart_data(symbol, timeframe, limit, deep_history=deep_history)
+        ttl = _finam_chart_ttl(timeframe) if deep_history else 15
+        await set_cached_data(key, response, ttl=ttl)
         return response
     except HTTPException:
         raise

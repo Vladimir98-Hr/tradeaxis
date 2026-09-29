@@ -2338,6 +2338,7 @@
             applyAllMarkers();
             mainChart.timeScale().fitContent();
             startCandleTimer();
+            startLiveTail();
 
             // Применяем priceFormat ко всем сериям основного графика исходя из реальной цены
             if (lastCandle) {
@@ -2374,6 +2375,111 @@
         }
         document.getElementById('lastUpdate').textContent =
             `Последнее обновление: ${new Date().toLocaleTimeString()}`;
+    }
+
+    // ============================================================
+    // Живой хвост графика: лёгкий доопрос последних баров без полного
+    // reload (без сброса зума/скролла) — двигает свечу, объём, Аллигатор,
+    // AO, Bollinger между полными fetchAll() на закрытии бара.
+    // ============================================================
+    let liveTailInterval = null;
+    let liveTailGen = 0;
+
+    function startLiveTail() {
+        clearInterval(liveTailInterval);
+        const period = currentMarket === 'finam' ? 20000 : 5000;
+        liveTailInterval = setInterval(refreshLiveTail, period);
+    }
+
+    async function refreshLiveTail() {
+        if (!lastCandle) return;
+        const myGen = ++liveTailGen;
+        try {
+            const isFinam = currentMarket === 'finam';
+            const tailLimit = 200;
+            const url = isFinam
+                ? `${API_BASE}/finam/chart-data?symbol=${encodeURIComponent(currentSymbol)}&timeframe=${currentTimeframe}&limit=${tailLimit}&deep_history=false`
+                : `${API_BASE}/chart-data?symbol=${currentSymbol}&timeframe=${currentTimeframe}&limit=${tailLimit}`;
+            const res = isFinam ? await _authFetch(url) : await fetch(url);
+            const json = await res.json();
+            if (myGen !== liveTailGen) return;
+            if (!res.ok || !json.data || !json.data.length) return;
+
+            const tailSquat = new Set(
+                (json.bwmfi || []).filter(d => d.color === '#E91E63').map(d => toUnix(d.timestamp))
+            );
+
+            const tailCandles = json.data.map(d => {
+                const t = toUnix(d.timestamp);
+                const isSquat = tailSquat.has(t);
+                return {
+                    time: t,
+                    open: d.Open, high: d.High, low: d.Low, close: d.Close,
+                    ...(isSquat ? { color: '#FFD700', borderColor: '#FFD700', wickColor: '#FFD700' } : {})
+                };
+            });
+
+            const freshCandles = tailCandles.filter(c => c.time >= lastCandle.time);
+            if (!freshCandles.length) return;
+
+            freshCandles.forEach(c => candleSeries.update(c));
+
+            const tailVol = json.data.map(d => ({
+                time: toUnix(d.timestamp),
+                value: d.Volume,
+                color: d.Close >= d.Open ? 'rgba(38,166,154,0.5)' : 'rgba(239,83,80,0.5)',
+            }));
+            tailVol.filter(v => v.time >= lastCandle.time).forEach(v => volumeSeries.update(v));
+
+            if (json.alligator) {
+                const freshAlligator = json.alligator.filter(d => toUnix(d.timestamp) >= lastCandle.time);
+                freshAlligator.filter(d => d.Jaw > 0).forEach(d => jawSeries.update({ time: toUnix(d.timestamp), value: d.Jaw }));
+                freshAlligator.filter(d => d.Teeth > 0).forEach(d => teethSeries.update({ time: toUnix(d.timestamp), value: d.Teeth }));
+                freshAlligator.filter(d => d.Lips > 0).forEach(d => lipsSeries.update({ time: toUnix(d.timestamp), value: d.Lips }));
+            }
+
+            if (json.ao) {
+                const _as = loadSettings();
+                json.ao.forEach((d, i, arr) => {
+                    const t = toUnix(d.timestamp);
+                    if (t < lastCandle.time) return;
+                    const color = (i > 0 && d.AO >= arr[i - 1].AO) ? _as.aoUp : _as.aoDown;
+                    aoSeries.update({ time: t, value: d.AO, color });
+                });
+            }
+
+            const bbData = calcBB(tailCandles);
+            bbData.filter(d => d.time >= lastCandle.time).forEach(d => {
+                bbUpperSeries.update({ time: d.time, value: d.upper });
+                bbLowerSeries.update({ time: d.time, value: d.lower });
+            });
+
+            lastCandle = tailCandles[tailCandles.length - 1];
+            lastChartData = json.data.map(d => ({
+                timestamp: d.timestamp,
+                open: d.Open ?? d.open, high: d.High ?? d.high,
+                low: d.Low ?? d.low, close: d.Close ?? d.close,
+                volume: d.Volume ?? d.volume ?? 0
+            }));
+            if (activeIndicators.length) renderAllActiveIndicators(lastChartData);
+
+            if (currentMarket === 'finam') {
+                const lastRaw = json.data[json.data.length - 1];
+                const change = ((lastRaw.Close - lastRaw.Open) / lastRaw.Open * 100).toFixed(2);
+                const changeEl = document.getElementById('liveChange');
+                document.getElementById('livePrice').textContent = formatPrice(lastRaw.Close);
+                changeEl.textContent = `${change > 0 ? '+' : ''}${change}%`;
+                changeEl.className = `symbol-change ${change >= 0 ? 'positive' : 'negative'}`;
+                document.getElementById('liveHigh').textContent = lastRaw.High.toLocaleString('ru-RU');
+                document.getElementById('liveLow').textContent = lastRaw.Low.toLocaleString('ru-RU');
+                const vol = lastRaw.Volume >= 1_000_000
+                    ? `${(lastRaw.Volume / 1_000_000).toFixed(2)}M`
+                    : lastRaw.Volume.toLocaleString('ru-RU');
+                document.getElementById('liveVolume').textContent = vol;
+            }
+        } catch (e) {
+            console.error('Live tail refresh error:', e);
+        }
     }
 
     // ============================================================
