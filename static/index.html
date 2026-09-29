@@ -2419,40 +2419,52 @@
                 };
             });
 
+            // Хвост может начинаться раньше уже отрисованного lastCandle (обычный случай —
+            // текущий формирующийся бар всегда попадает "на границе"), но если время в хвосте
+            // почему-то отстаёт (например, сервер ещё не досчитал новый бар), не откатываем
+            // время назад ни для одной серии — каждая обновляется независимо и без взаимной
+            // блокировки, чтобы сбой одной серии не морозил остальные.
             const freshCandles = tailCandles.filter(c => c.time >= lastCandle.time);
             if (!freshCandles.length) return;
 
-            freshCandles.forEach(c => candleSeries.update(c));
-
-            const tailVol = json.data.map(d => ({
-                time: toUnix(d.timestamp),
-                value: d.Volume,
-                color: d.Close >= d.Open ? 'rgba(38,166,154,0.5)' : 'rgba(239,83,80,0.5)',
-            }));
-            tailVol.filter(v => v.time >= lastCandle.time).forEach(v => volumeSeries.update(v));
+            try {
+                freshCandles.forEach(c => candleSeries.update(c));
+                const tailVol = json.data.map(d => ({
+                    time: toUnix(d.timestamp),
+                    value: d.Volume,
+                    color: d.Close >= d.Open ? 'rgba(38,166,154,0.5)' : 'rgba(239,83,80,0.5)',
+                }));
+                tailVol.filter(v => v.time >= lastCandle.time).forEach(v => volumeSeries.update(v));
+            } catch (e) { console.error('Live tail candle/volume update error:', e); }
 
             if (json.alligator) {
-                const freshAlligator = json.alligator.filter(d => toUnix(d.timestamp) >= lastCandle.time);
-                freshAlligator.filter(d => d.Jaw > 0).forEach(d => jawSeries.update({ time: toUnix(d.timestamp), value: d.Jaw }));
-                freshAlligator.filter(d => d.Teeth > 0).forEach(d => teethSeries.update({ time: toUnix(d.timestamp), value: d.Teeth }));
-                freshAlligator.filter(d => d.Lips > 0).forEach(d => lipsSeries.update({ time: toUnix(d.timestamp), value: d.Lips }));
+                try {
+                    const freshAlligator = json.alligator.filter(d => toUnix(d.timestamp) >= lastCandle.time);
+                    freshAlligator.filter(d => d.Jaw > 0).forEach(d => jawSeries.update({ time: toUnix(d.timestamp), value: d.Jaw }));
+                    freshAlligator.filter(d => d.Teeth > 0).forEach(d => teethSeries.update({ time: toUnix(d.timestamp), value: d.Teeth }));
+                    freshAlligator.filter(d => d.Lips > 0).forEach(d => lipsSeries.update({ time: toUnix(d.timestamp), value: d.Lips }));
+                } catch (e) { console.error('Live tail alligator update error:', e); }
             }
 
             if (json.ao) {
-                const _as = loadSettings();
-                json.ao.forEach((d, i, arr) => {
-                    const t = toUnix(d.timestamp);
-                    if (t < lastCandle.time) return;
-                    const color = (i > 0 && d.AO >= arr[i - 1].AO) ? _as.aoUp : _as.aoDown;
-                    aoSeries.update({ time: t, value: d.AO, color });
-                });
+                try {
+                    const _as = loadSettings();
+                    json.ao.forEach((d, i, arr) => {
+                        const t = toUnix(d.timestamp);
+                        if (t < lastCandle.time) return;
+                        const color = (i > 0 && d.AO >= arr[i - 1].AO) ? _as.aoUp : _as.aoDown;
+                        aoSeries.update({ time: t, value: d.AO, color });
+                    });
+                } catch (e) { console.error('Live tail AO update error:', e); }
             }
 
-            const bbData = calcBB(tailCandles);
-            bbData.filter(d => d.time >= lastCandle.time).forEach(d => {
-                bbUpperSeries.update({ time: d.time, value: d.upper });
-                bbLowerSeries.update({ time: d.time, value: d.lower });
-            });
+            try {
+                const bbData = calcBB(tailCandles);
+                bbData.filter(d => d.time >= lastCandle.time).forEach(d => {
+                    bbUpperSeries.update({ time: d.time, value: d.upper });
+                    bbLowerSeries.update({ time: d.time, value: d.lower });
+                });
+            } catch (e) { console.error('Live tail BB update error:', e); }
 
             lastCandle = tailCandles[tailCandles.length - 1];
             lastChartData = json.data.map(d => ({
@@ -2522,19 +2534,13 @@
         document.getElementById('wsStatus').className = 'connected';
 
         if (lastCandle && candleSeries) {
-            const tfSec = getTimeframeMs(currentTimeframe) / 1000;
-            const _localOffSec = -new Date().getTimezoneOffset() * 60;
-            const expectedTime = Math.floor((Date.now() / 1000 + _localOffSec) / tfSec) * tfSec;
-            if (expectedTime > lastCandle.time) {
-                // Новый бар
-                const newCandle = { time: expectedTime, open: data.price, high: data.price, low: data.price, close: data.price };
-                candleSeries.update(newCandle);
-                lastCandle = newCandle;
-            } else {
-                const updated = { ...lastCandle, close: data.price, high: Math.max(lastCandle.high, data.price), low: Math.min(lastCandle.low, data.price) };
-                candleSeries.update(updated);
-                lastCandle = updated;
-            }
+            // Открытие нового бара — прерогатива refreshLiveTail() (реальные OHLCV с сервера).
+            // Здесь только подтягиваем цену текущего бара, без угадывания времени по часам клиента —
+            // иначе получаем "фантомный" бар раньше, чем он реально появится на бэкенде, и
+            // индикаторы в refreshLiveTail() перестают обновляться (time < lastCandle.time).
+            const updated = { ...lastCandle, close: data.price, high: Math.max(lastCandle.high, data.price), low: Math.min(lastCandle.low, data.price) };
+            candleSeries.update(updated);
+            lastCandle = updated;
         }
     }
 
