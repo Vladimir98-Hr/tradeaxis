@@ -11,7 +11,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from auth import get_current_user
 from database import User
 from config import FINAM_SYMBOLS, FINAM_INSTRUMENTS, FINAM_SECRET_TOKEN
-from cache import get_cache_key, get_cached_data, set_cached_data
+from cache import get_cache_key, get_cached_data, set_cached_data, get_or_compute
 from indicators import calculate_alligator, calculate_ao, calculate_bw_mfi, find_fractals, find_divergences, calculate_bollinger_bands
 from finam import fetch_ohlcv_finam, fetch_finam_assets
 from routes import _check_last_bar_divergence
@@ -136,15 +136,13 @@ async def get_finam_chart_data(
     тяжёлую пагинацию при каждом обновлении.
     """
     key = get_cache_key(symbol, timeframe, limit, f"finam_chart_{deep_history}")
-    cached = await get_cached_data(key)
-    if cached:
-        return cached
+    ttl = _finam_chart_ttl(timeframe) if deep_history else 15
+
+    async def compute():
+        return await _build_finam_chart_data(symbol, timeframe, limit, deep_history=deep_history)
 
     try:
-        response = await _build_finam_chart_data(symbol, timeframe, limit, deep_history=deep_history)
-        ttl = _finam_chart_ttl(timeframe) if deep_history else 15
-        await set_cached_data(key, response, ttl=ttl)
-        return response
+        return await get_or_compute(key, compute, ttl=ttl)
     except HTTPException:
         raise
     except Exception as e:
@@ -189,10 +187,6 @@ async def finam_scan_volatile(threshold: float = 60.0, top: int = 20, current_us
     фронтенд мог переиспользовать общий рендер журнала сигналов без спец-веток.
     """
     key = get_cache_key("finam_vol", "5m", top, f"finam_impulse_{threshold}")
-    cached = await get_cached_data(key)
-    if cached:
-        return cached
-
     sem = asyncio.Semaphore(12)
 
     async def scan_one(inst):
@@ -290,23 +284,20 @@ async def finam_scan_volatile(threshold: float = 60.0, top: int = 20, current_us
             except Exception:
                 return None
 
-    instruments = await _all_instruments()
-    results = await asyncio.gather(*[scan_one(inst) for inst in instruments])
-    pairs = [r for r in results if r]
-    pairs.sort(key=lambda x: x["score"], reverse=True)
-    response = {"threshold": threshold, "count": len(pairs[:top]), "pairs": pairs[:top]}
-    await set_cached_data(key, response, ttl=45)
-    return response
+    async def compute():
+        instruments = await _all_instruments()
+        results = await asyncio.gather(*[scan_one(inst) for inst in instruments])
+        pairs = [r for r in results if r]
+        pairs.sort(key=lambda x: x["score"], reverse=True)
+        return {"threshold": threshold, "count": len(pairs[:top]), "pairs": pairs[:top]}
+
+    return await get_or_compute(key, compute, ttl=45)
 
 
 @router.get("/scan/spread")
 async def finam_scan_spread(threshold: float = 1.0, top: int = 20, current_user: User = Depends(get_current_user)):
     """Инструменты Finam с широким спредом свечи за 15 минут (High-Low)/Low >= threshold%."""
     key = get_cache_key("finam_spread", "15m", top, f"finam_spread15_{threshold}")
-    cached = await get_cached_data(key)
-    if cached:
-        return cached
-
     sem = asyncio.Semaphore(12)
 
     async def scan_one(inst):
@@ -333,13 +324,14 @@ async def finam_scan_spread(threshold: float = 1.0, top: int = 20, current_user:
             except Exception:
                 return None
 
-    instruments = await _all_instruments()
-    results = await asyncio.gather(*[scan_one(inst) for inst in instruments])
-    pairs = [r for r in results if r]
-    pairs.sort(key=lambda x: x["spread"], reverse=True)
-    response = {"threshold": threshold, "count": len(pairs[:top]), "pairs": pairs[:top]}
-    await set_cached_data(key, response, ttl=300)
-    return response
+    async def compute():
+        instruments = await _all_instruments()
+        results = await asyncio.gather(*[scan_one(inst) for inst in instruments])
+        pairs = [r for r in results if r]
+        pairs.sort(key=lambda x: x["spread"], reverse=True)
+        return {"threshold": threshold, "count": len(pairs[:top]), "pairs": pairs[:top]}
+
+    return await get_or_compute(key, compute, ttl=300)
 
 
 @router.get("/scan/divergences")
@@ -347,11 +339,6 @@ async def finam_scan_divergences(timeframe: str = "1d", limit: int = 50, current
     """Сканирует все инструменты Finam на дивергентный бар последнего закрытого бара."""
     cache_ttl = 3600 if timeframe in ("1d", "1w") else 900
     key = get_cache_key("finam_scan", timeframe, limit, "finam_scan_div")
-    cached = await get_cached_data(key)
-    if cached:
-        return cached
-
-    instruments = await _all_instruments()
     sem = asyncio.Semaphore(12)
 
     async def scan_one(inst):
@@ -372,16 +359,18 @@ async def finam_scan_divergences(timeframe: str = "1d", limit: int = 50, current
             except Exception:
                 return None
 
-    results = await asyncio.gather(*[scan_one(inst) for inst in instruments])
-    divergences = [r for r in results if r]
-    response = {
-        "timeframe": timeframe,
-        "count": len(divergences),
-        "scanned": len(instruments),
-        "divergences": divergences,
-    }
-    await set_cached_data(key, response, ttl=cache_ttl)
-    return response
+    async def compute():
+        instruments = await _all_instruments()
+        results = await asyncio.gather(*[scan_one(inst) for inst in instruments])
+        divergences = [r for r in results if r]
+        return {
+            "timeframe": timeframe,
+            "count": len(divergences),
+            "scanned": len(instruments),
+            "divergences": divergences,
+        }
+
+    return await get_or_compute(key, compute, ttl=cache_ttl)
 
 
 # Прогреваем кеш только для дневного/недельного графика — они самые тяжёлые при

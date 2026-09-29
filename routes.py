@@ -9,7 +9,7 @@ import pandas as pd
 from fastapi import APIRouter, HTTPException
 
 from config import EXCHANGE_ID
-from cache import get_cache_key, get_cached_data, set_cached_data
+from cache import get_cache_key, get_cached_data, set_cached_data, get_or_compute
 from exchange import async_fetch_ohlcv_df, async_fetch_ticker, async_fetch_symbols, async_fetch_all_tickers
 from indicators import calculate_alligator, calculate_ao, calculate_bw_mfi, find_fractals, find_divergences, calculate_bollinger_bands
 
@@ -218,19 +218,6 @@ async def scan_volatile(threshold: float = 60.0, top: int = 20):
     диапазона. threshold — минимальный score (0-100), не процент.
     """
     key = get_cache_key("", "1m", top, f"impulse_{threshold}")
-    cached = await get_cached_data(key)
-    if cached:
-        return cached
-
-    try:
-        all_tickers = await async_fetch_all_tickers()
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Tickers: {str(e)}")
-
-    # Минимальная ликвидность (volume24h уже в млн USDT) + топ по объёму
-    liquid = [t for t in all_tickers.values() if t.get('volume24h', 0) >= 1.0]
-    top_symbols = sorted(liquid, key=lambda t: t.get('volume24h', 0), reverse=True)[:60]
-
     sem = asyncio.Semaphore(6)
 
     async def scan_one(t_info):
@@ -336,30 +323,28 @@ async def scan_volatile(threshold: float = 60.0, top: int = 20):
             except Exception:
                 return None
 
-    results = await asyncio.gather(*[scan_one(t) for t in top_symbols])
-    pairs = [r for r in results if r]
-    pairs.sort(key=lambda x: x['score'], reverse=True)
-    response = {"threshold": threshold, "count": len(pairs[:top]), "pairs": pairs[:top]}
-    await set_cached_data(key, response, ttl=45)
-    return response
+    async def compute():
+        try:
+            all_tickers = await async_fetch_all_tickers()
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Tickers: {str(e)}")
+
+        # Минимальная ликвидность (volume24h уже в млн USDT) + топ по объёму
+        liquid = [t for t in all_tickers.values() if t.get('volume24h', 0) >= 1.0]
+        top_symbols = sorted(liquid, key=lambda t: t.get('volume24h', 0), reverse=True)[:60]
+
+        results = await asyncio.gather(*[scan_one(t) for t in top_symbols])
+        pairs = [r for r in results if r]
+        pairs.sort(key=lambda x: x['score'], reverse=True)
+        return {"threshold": threshold, "count": len(pairs[:top]), "pairs": pairs[:top]}
+
+    return await get_or_compute(key, compute, ttl=45)
 
 
 @router.get("/scan/spread")
 async def scan_spread(threshold: float = 1.0, top: int = 20):
     """Пары с широким спредом свечи за 15 минут (High-Low)/Low >= threshold%."""
     key = get_cache_key("", "15m", top, f"spread15_{threshold}")
-    cached = await get_cached_data(key)
-    if cached:
-        return cached
-
-    try:
-        all_tickers = await async_fetch_all_tickers()
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Tickers: {str(e)}")
-
-    sorted_tickers = sorted(all_tickers.values(), key=lambda t: t.get('volume24h', 0), reverse=True)
-    top_symbols = sorted_tickers[:50]
-
     sem = asyncio.Semaphore(6)
 
     async def scan_one(t_info):
@@ -388,23 +373,29 @@ async def scan_spread(threshold: float = 1.0, top: int = 20):
             except Exception:
                 return None
 
-    results = await asyncio.gather(*[scan_one(t) for t in top_symbols])
-    pairs = [r for r in results if r]
-    pairs.sort(key=lambda x: x['spread'], reverse=True)
-    response = {"threshold": threshold, "count": len(pairs[:top]), "pairs": pairs[:top]}
-    await set_cached_data(key, response, ttl=300)
-    return response
+    async def compute():
+        try:
+            all_tickers = await async_fetch_all_tickers()
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Tickers: {str(e)}")
+
+        sorted_tickers = sorted(all_tickers.values(), key=lambda t: t.get('volume24h', 0), reverse=True)
+        top_symbols = sorted_tickers[:50]
+
+        results = await asyncio.gather(*[scan_one(t) for t in top_symbols])
+        pairs = [r for r in results if r]
+        pairs.sort(key=lambda x: x['spread'], reverse=True)
+        return {"threshold": threshold, "count": len(pairs[:top]), "pairs": pairs[:top]}
+
+    return await get_or_compute(key, compute, ttl=300)
 
 
 @router.get("/chart-data")
 async def get_chart_data(symbol: str = "BTCUSDT", timeframe: str = "1h", limit: int = 200):
     """Комбинированный endpoint: OHLCV + все индикаторы за один запрос к бирже."""
     key = get_cache_key(symbol, timeframe, limit, "chart_data")
-    cached = await get_cached_data(key)
-    if cached:
-        return cached
 
-    try:
+    async def compute():
         # Один вызов к бирже
         df = await async_fetch_ohlcv_df(symbol, timeframe, limit)
 
@@ -435,7 +426,7 @@ async def get_chart_data(symbol: str = "BTCUSDT", timeframe: str = "1h", limit: 
         df_bb = calculate_bollinger_bands(df)
         bollinger = df_bb.to_dict('records')
 
-        response = {
+        return {
             "symbol": symbol,
             "timeframe": timeframe,
             "data": ohlcv,
@@ -448,11 +439,14 @@ async def get_chart_data(symbol: str = "BTCUSDT", timeframe: str = "1h", limit: 
             "bullish": bullish,
             "bollinger": bollinger,
         }
+
+    try:
         # Короткий TTL: эндпоинт опрашивается часто для живого обновления графика
         # (refreshLiveTail на фронте), пятиминутный дефолтный кеш держал данные
         # замороженными по несколько минут — новая свеча физически не могла появиться.
-        await set_cached_data(key, response, ttl=5)
-        return response
+        # get_or_compute защищает от того, что при таком коротком TTL много
+        # одновременных запросов на популярный символ будут дублировать вызов биржи.
+        return await get_or_compute(key, compute, ttl=5)
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Chart data: {str(e)}")
 
@@ -462,15 +456,6 @@ async def scan_divergences(timeframe: str = "1d", limit: int = 50):
     """Сканирует все USDT пары на дивергентный бар последнего закрытого бара."""
     cache_ttl = 3600 if timeframe in ('1d', '1w') else 900
     key = get_cache_key("scan", timeframe, limit, "scan_div")
-    cached = await get_cached_data(key)
-    if cached:
-        return cached
-
-    try:
-        symbols = await async_fetch_symbols()
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Symbols: {str(e)}")
-
     sem = asyncio.Semaphore(6)
 
     async def scan_one(sym_info):
@@ -493,16 +478,22 @@ async def scan_divergences(timeframe: str = "1d", limit: int = 50):
             except Exception:
                 return None
 
-    results = await asyncio.gather(*[scan_one(s) for s in symbols])
-    divergences = [r for r in results if r]
-    response = {
-        "timeframe": timeframe,
-        "count": len(divergences),
-        "scanned": len(symbols),
-        "divergences": divergences,
-    }
-    await set_cached_data(key, response, ttl=cache_ttl)
-    return response
+    async def compute():
+        try:
+            symbols = await async_fetch_symbols()
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Symbols: {str(e)}")
+
+        results = await asyncio.gather(*[scan_one(s) for s in symbols])
+        divergences = [r for r in results if r]
+        return {
+            "timeframe": timeframe,
+            "count": len(divergences),
+            "scanned": len(symbols),
+            "divergences": divergences,
+        }
+
+    return await get_or_compute(key, compute, ttl=cache_ttl)
 
 
 @router.get("/tickers")
