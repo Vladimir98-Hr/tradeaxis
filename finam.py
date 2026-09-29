@@ -151,18 +151,22 @@ async def _finam_get(
     return resp.json()
 
 
-async def fetch_ohlcv_finam(symbol: str, timeframe: str = '1d', limit: int = 100) -> pd.DataFrame:
+async def fetch_ohlcv_finam(symbol: str, timeframe: str = '1d', limit: int = 100, deep_history: bool = True) -> pd.DataFrame:
     """
     Загружает OHLCV-свечи через Finam Trade API.
     symbol в формате TICKER@MIC, например SBER@MISX.
     Возвращает DataFrame с колонками: timestamp, Open, High, Low, Close, Volume —
     тем же форматом, что и moex.fetch_ohlcv_moex(), чтобы indicators.py работал без изменений.
+
+    deep_history=False отключает постраничную загрузку глубокой истории (см. _HISTORY_DAYS)
+    и всегда тянет один запрос на ~limit последних баров — для сканеров, которым нужен
+    только короткий хвост по многим инструментам сразу, а не вся история по одному.
     """
     tf = FINAM_TIMEFRAMES.get(timeframe, 'TIME_FRAME_D')
     delta = _INTERVAL_DELTA.get(timeframe, timedelta(days=1))
     max_range_days = _MAX_RANGE_DAYS.get(timeframe, 360)
     end_time = datetime.now(timezone.utc)
-    history_days = _HISTORY_DAYS.get(timeframe)
+    history_days = _HISTORY_DAYS.get(timeframe) if deep_history else None
 
     if history_days:
         # Глубокая история: разбиваем весь диапазон на окна по max_range_days

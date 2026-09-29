@@ -190,7 +190,7 @@ async def finam_scan_volatile(threshold: float = 60.0, top: int = 20, current_us
     async def scan_one(inst):
         async with sem:
             try:
-                df = await fetch_ohlcv_finam(inst["symbol"], "5m", 90)
+                df = await fetch_ohlcv_finam(inst["symbol"], "5m", 90, deep_history=False)
                 if len(df) < 65:
                     return None
 
@@ -304,7 +304,7 @@ async def finam_scan_spread(threshold: float = 1.0, top: int = 20, current_user:
     async def scan_one(inst):
         async with sem:
             try:
-                df = await fetch_ohlcv_finam(inst["symbol"], "15m", 3)
+                df = await fetch_ohlcv_finam(inst["symbol"], "15m", 3, deep_history=False)
                 if len(df) < 1:
                     return None
                 high = float(df["High"].iloc[-1])
@@ -349,7 +349,7 @@ async def finam_scan_divergences(timeframe: str = "1d", limit: int = 50, current
     async def scan_one(inst):
         async with sem:
             try:
-                df = await fetch_ohlcv_finam(inst["symbol"], timeframe, limit)
+                df = await fetch_ohlcv_finam(inst["symbol"], timeframe, limit, deep_history=False)
                 if len(df) < 10:
                     return None
                 ao = calculate_ao(df)
