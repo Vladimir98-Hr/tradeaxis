@@ -2079,6 +2079,7 @@
     let aoChart, aoSeries;
     let mfiSquatTimes = new Set();
     let lastCandle = null;
+    let fetchAllGen = 0;
     let fractalHighs = [];
     let fractalLows = [];
     let divergenceBearish = [];
@@ -2345,6 +2346,24 @@
 
     /** Один запрос к /chart-data (или /finam/chart-data) — все данные за раз */
     async function fetchAll() {
+        // Гасим предыдущий график сразу — иначе при смене символа/рынка (особенно
+        // Finam, где загрузка может занять секунды и иногда падает с 429) на экране
+        // под уже обновлённым заголовком продолжает висеть график ПРЕДЫДУЩЕГО
+        // символа/рынка как будто это текущие данные — опасно для торгового инструмента.
+        const myGen = ++fetchAllGen;
+        lastCandle = null;
+        candleSeries.setData([]);
+        volumeSeries.setData([]);
+        jawSeries.setData([]);
+        teethSeries.setData([]);
+        lipsSeries.setData([]);
+        aoSeries.setData([]);
+        bbUpperSeries.setData([]);
+        bbLowerSeries.setData([]);
+        stopCandleTimer();
+        clearInterval(liveTailInterval);
+        showError('mainChart', 'Загрузка...');
+
         try {
             const { chartLimit } = loadSettings();
             const isFinam = currentMarket === 'finam';
@@ -2353,6 +2372,7 @@
                 : `${API_BASE}/chart-data?symbol=${currentSymbol}&timeframe=${currentTimeframe}&limit=${chartLimit}`;
             const res = isFinam ? await _authFetch(url) : await fetch(url);
             const json = await res.json();
+            if (myGen !== fetchAllGen) return; // пришёл ответ на уже неактуальный запрос — отброшен более новым fetchAll()
             if (!res.ok || !json.data) {
                 showError('mainChart', `${json.detail || 'Нет данных'}`);
                 return;

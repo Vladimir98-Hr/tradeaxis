@@ -114,20 +114,25 @@ async def get_jwt_token() -> str:
 async def _finam_get(
     path: str,
     params: dict | None = None,
-    retries: int = 0,
+    retries: int = 2,
     client: httpx.AsyncClient | None = None,
 ) -> dict:
     """
     client — переиспользуемое HTTP-соединение для серии запросов подряд
     (пагинация), чтобы не тратить время на TLS-хендшейк на каждый вызов.
     Без него открывается разовое соединение, как раньше.
+
+    429 обрабатывается отдельным retry-с-backoff прямо здесь: при загрузке
+    глубокой истории уходит до ~11 параллельных запросов на один график, и
+    без этого один-единственный 429 среди них ронял всю загрузку целиком —
+    именно так возникала картина "шапка уже Сбер, а график всё ещё биткоин".
     """
     token = await get_jwt_token()
 
     async def _request(c: httpx.AsyncClient):
         for attempt in range(retries + 1):
             try:
-                return await c.get(
+                resp = await c.get(
                     f"{FINAM_BASE_URL}{path}",
                     params=params or {},
                     headers={"Authorization": token},
@@ -135,7 +140,16 @@ async def _finam_get(
             except httpx.HTTPError as e:
                 if attempt >= retries:
                     raise HTTPException(status_code=502, detail=f"Finam Trade API недоступен: {e}")
-                await asyncio.sleep(0.5)
+                await asyncio.sleep(0.5 * (attempt + 1))
+                continue
+
+            if resp.status_code == 429 and attempt < retries:
+                retry_after = resp.headers.get("Retry-After")
+                delay = float(retry_after) if retry_after and retry_after.replace('.', '', 1).isdigit() else 0.8 * (attempt + 1)
+                await asyncio.sleep(delay)
+                continue
+
+            return resp
 
     if client is not None:
         resp = await _request(client)
@@ -147,6 +161,8 @@ async def _finam_get(
         # Токен мог протухнуть раньше срока — сбрасываем кеш на следующий запрос
         _jwt_cache["token"] = None
         raise HTTPException(status_code=502, detail="Finam Trade API отклонил запрос (401/403)")
+    if resp.status_code == 429:
+        raise HTTPException(status_code=429, detail="Finam Trade API: превышен лимит запросов, попробуйте через несколько секунд")
     resp.raise_for_status()
     return resp.json()
 
@@ -197,7 +213,7 @@ async def fetch_ohlcv_finam(symbol: str, timeframe: str = '1d', limit: int = 100
                         "interval.start_time": ws.strftime('%Y-%m-%dT%H:%M:%SZ'),
                         "interval.end_time": we.strftime('%Y-%m-%dT%H:%M:%SZ'),
                     },
-                    retries=1,
+                    retries=3,
                     client=client,
                 )
                 return data.get("bars", [])
