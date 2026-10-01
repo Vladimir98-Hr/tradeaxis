@@ -9,6 +9,60 @@ import pandas as pd
 from scipy.signal import argrelextrema
 
 
+def sma(data: np.ndarray, period: int) -> np.ndarray:
+    """Простая скользящая средняя (Simple Moving Average)."""
+    return pd.Series(data).rolling(window=period).mean().fillna(0).values
+
+
+def ema(data: np.ndarray, period: int) -> np.ndarray:
+    """Экспоненциальная скользящая средняя (Exponential Moving Average)."""
+    return pd.Series(data).ewm(span=period, adjust=False).mean().values
+
+
+EMA_TOUCH_PERIODS = (20, 50, 100, 200)
+
+
+def detect_ma_ema_signal(df: pd.DataFrame) -> dict | None:
+    """
+    Скальпинг-сигналы по MA/EMA (сетап: MA20, EMA20/50/100/200):
+    - cross: пересечение MA20 и EMA20 на последнем баре ('up'/'down') —
+      краткосрочный сигнал смены импульса;
+    - touches: на каких из EMA20/50/100/200 цена последнего бара коснулась
+      линии (линия попадает в диапазон High..Low бара) — отработка уровня
+      поддержки/сопротивления.
+    Возвращает None, если истории мало или на последнем баре нет сигнала.
+    """
+    if len(df) < max(EMA_TOUCH_PERIODS) + 10:
+        return None
+
+    close = df['Close'].values
+    ma20 = sma(close, 20)
+    ema20 = ema(close, 20)
+
+    prev_diff = ma20[-2] - ema20[-2]
+    curr_diff = ma20[-1] - ema20[-1]
+    cross = None
+    if prev_diff <= 0 < curr_diff:
+        cross = 'up'
+    elif prev_diff >= 0 > curr_diff:
+        cross = 'down'
+
+    high = float(df['High'].iloc[-1])
+    low = float(df['Low'].iloc[-1])
+    touches = []
+    ema_values = {}
+    for period in EMA_TOUCH_PERIODS:
+        val = float(ema(close, period)[-1])
+        ema_values[f"ema{period}"] = round(val, 6)
+        if low <= val <= high:
+            touches.append(period)
+
+    if cross is None and not touches:
+        return None
+
+    return {"cross": cross, "touches": touches, **ema_values}
+
+
 def smma(data: np.ndarray, period: int) -> np.ndarray:
     """
     Сглаженная скользящая средняя (Smoothed Moving Average).

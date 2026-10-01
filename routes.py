@@ -11,7 +11,7 @@ from fastapi import APIRouter, HTTPException
 from config import EXCHANGE_ID
 from cache import get_cache_key, get_cached_data, set_cached_data, get_or_compute
 from exchange import async_fetch_ohlcv_df, async_fetch_ticker, async_fetch_symbols, async_fetch_all_tickers
-from indicators import calculate_alligator, calculate_ao, calculate_bw_mfi, find_fractals, find_divergences, calculate_bollinger_bands
+from indicators import calculate_alligator, calculate_ao, calculate_bw_mfi, find_fractals, find_divergences, calculate_bollinger_bands, detect_ma_ema_signal
 
 # Маршрутизатор для REST API
 router = APIRouter()
@@ -341,10 +341,15 @@ async def scan_volatile(threshold: float = 60.0, top: int = 20):
     return await get_or_compute(key, compute, ttl=45)
 
 
-@router.get("/scan/spread")
-async def scan_spread(threshold: float = 1.0, top: int = 20):
-    """Пары с широким спредом свечи за 15 минут (High-Low)/Low >= threshold%."""
-    key = get_cache_key("", "15m", top, f"spread15_{threshold}")
+@router.get("/scan/ema")
+async def scan_ma_ema(top: int = 30):
+    """
+    Скальпинг-сканер по MA20/EMA20/50/100/200 на 15-минутных свечах:
+    - пересечение MA20 и EMA20 на последнем баре (краткосрочный сигнал смены импульса);
+    - касание ценой последнего бара любой из EMA20/50/100/200 (отработка уровня).
+    См. indicators.detect_ma_ema_signal для точных правил.
+    """
+    key = get_cache_key("", "15m", top, "ma_ema_signal")
     sem = asyncio.Semaphore(6)
 
     async def scan_one(t_info):
@@ -352,23 +357,14 @@ async def scan_spread(threshold: float = 1.0, top: int = 20):
             try:
                 sym = t_info['symbol']
                 base = sym.replace('USDT', '')
-                df = await async_fetch_ohlcv_df(sym, '15m', 3)
-                if len(df) < 1:
-                    return None
-                high = float(df['High'].iloc[-1])
-                low = float(df['Low'].iloc[-1])
-                close = float(df['Close'].iloc[-1])
-                if low <= 0:
-                    return None
-                spread = (high - low) / low * 100
-                if spread < threshold:
+                df = await async_fetch_ohlcv_df(sym, '15m', 250)
+                signal = detect_ma_ema_signal(df)
+                if not signal:
                     return None
                 return {
                     "symbol": sym, "name": f"{base}/USDT", "base": base,
-                    "price": round(close, 8),
-                    "spread": round(spread, 2),
-                    "high": round(high, 8),
-                    "low": round(low, 8),
+                    "price": float(df['Close'].iloc[-1]),
+                    **signal,
                 }
             except Exception:
                 return None
@@ -379,15 +375,14 @@ async def scan_spread(threshold: float = 1.0, top: int = 20):
         except Exception as e:
             raise HTTPException(status_code=500, detail=f"Tickers: {str(e)}")
 
-        sorted_tickers = sorted(all_tickers.values(), key=lambda t: t.get('volume24h', 0), reverse=True)
-        top_symbols = sorted_tickers[:50]
+        liquid = [t for t in all_tickers.values() if t.get('volume24h', 0) >= 1.0]
+        top_symbols = sorted(liquid, key=lambda t: t.get('volume24h', 0), reverse=True)[:80]
 
         results = await asyncio.gather(*[scan_one(t) for t in top_symbols])
         pairs = [r for r in results if r]
-        pairs.sort(key=lambda x: x['spread'], reverse=True)
-        return {"threshold": threshold, "count": len(pairs[:top]), "pairs": pairs[:top]}
+        return {"count": len(pairs[:top]), "pairs": pairs[:top]}
 
-    return await get_or_compute(key, compute, ttl=300)
+    return await get_or_compute(key, compute, ttl=45)
 
 
 @router.get("/chart-data")

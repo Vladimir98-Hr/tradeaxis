@@ -1507,14 +1507,14 @@
             </div>
         </div>
 
-        <!-- Сканер спреда 15m -->
+        <!-- Сканер MA/EMA (скальпинг: пересечение MA20/EMA20, касание EMA20/50/100/200) -->
         <div class="card div-scan-card">
             <div class="div-scan-header">
-                <span id="spreadScanTitle">Сканер спреда</span>
-                <span class="vol-timer" id="spreadScanTimer"></span>
+                <span id="emaScanTitle">Сканер MA/EMA</span>
+                <span class="vol-timer" id="emaScanTimer"></span>
             </div>
-            <div class="div-scan-info" id="spreadScanInfo"></div>
-            <div class="div-scan-list" id="spreadScanList">
+            <div class="div-scan-info" id="emaScanInfo"></div>
+            <div class="div-scan-list" id="emaScanList">
                 <div class="div-scan-empty">Загрузка...</div>
             </div>
         </div>
@@ -2853,8 +2853,10 @@
             updateTimeframesForMarket('finam');
             fetchFinamSymbols(currentFinamCategory);
             fetchVolScan();
-            spreadNextRefresh = 0;
-            fetchSpreadScan();
+            emaNextRefresh = 0;
+            _emaLoadLog();
+            _emaRenderLog(new Set());
+            fetchEmaScan();
             wlRender();
             jRender();
         } else {
@@ -2869,8 +2871,10 @@
             updateTimeframesForMarket('crypto');
             fetchSymbolsList().then(() => { fetchAll(); startTicker(); });
             fetchVolScan();
-            spreadNextRefresh = 0;
-            fetchSpreadScan();
+            emaNextRefresh = 0;
+            _emaLoadLog();
+            _emaRenderLog(new Set());
+            fetchEmaScan();
             wlRender();
             jRender();
         }
@@ -3181,7 +3185,7 @@
         fetchCurrentTicker();
         fetchVisibleTickers();
         if (document.getElementById('volScanList')) fetchVolScan();
-        if (document.getElementById('spreadScanList')) fetchSpreadScan();
+        if (document.getElementById('emaScanList')) fetchEmaScan();
     });
 
     // Свайп вниз — обновление страницы (на мобиле). Раскладка держится на внутренних
@@ -3290,8 +3294,8 @@
     let volAutoRefreshEnabled = true;
     let rulerPending = false;   // ждём второй клик для линейки
     let hoveredRulerIdx = -1;   // индекс линейки под курсором
-    let spreadNextRefresh = 0;
-    let _spreadGen = 0;
+    let emaNextRefresh = 0;
+    let _emaGen = 0;
 
     // Журнал сигналов крипто-сканера: копится, не стирается при каждом обновлении
     // (раньше список полностью заменялся раз в минуту, и пары не успевали просмотреть).
@@ -3399,48 +3403,103 @@
     }
 
     // ============================================================
-    // Сканер спреда 15м
+    // Сканер MA/EMA (скальпинг): пересечение MA20×EMA20, касание EMA20/50/100/200.
+    // Журнал сигналов — по образцу volSignalLog: копится, не стирается при
+    // каждом обновлении, новые сигналы подсвечиваются и озвучиваются.
     // ============================================================
-    async function fetchSpreadScan() {
-        const myGen = ++_spreadGen;
-        const list = document.getElementById('spreadScanList');
-        const info = document.getElementById('spreadScanInfo');
-        list.innerHTML = '<div class="div-scan-empty">Сканирование...</div>';
+    let emaSignalLog = [];
+    let _emaPrevKeys = new Set();
+    const EMA_LOG_MAX = 150;
+    const EMA_LOG_KEY = 'emaSignalLog_v1';
+
+    function _emaLogKey() {
+        return `${EMA_LOG_KEY}_${currentMarket}`;
+    }
+    function _emaLoadLog() {
+        try { emaSignalLog = JSON.parse(localStorage.getItem(_emaLogKey()) || '[]'); } catch { emaSignalLog = []; }
+        _emaPrevKeys = new Set(emaSignalLog.map(p => p._key));
+    }
+    function _emaSaveLog() {
+        try { localStorage.setItem(_emaLogKey(), JSON.stringify(emaSignalLog.slice(0, EMA_LOG_MAX))); } catch {}
+    }
+    function emaLogClear() {
+        emaSignalLog = [];
+        _emaPrevKeys = new Set();
+        _emaSaveLog();
+        _emaRenderLog(new Set());
+    }
+    // Ключ сигнала: один и тот же символ не переалертит повторно на КАЖДОМ
+    // обновлении, пока активен один и тот же набор пересечение+касания —
+    // только когда состав сигнала реально меняется (новое касание и т.п.).
+    function _emaSignalKey(p) {
+        return `${p.symbol}:${p.cross || ''}:${(p.touches || []).join(',')}`;
+    }
+    function _emaRenderLog(freshKeys) {
+        const list = document.getElementById('emaScanList');
+        const info = document.getElementById('emaScanInfo');
+        info.textContent = emaSignalLog.length ? `Журнал: ${emaSignalLog.length} сигналов` : '';
+        list.innerHTML = emaSignalLog.length
+            ? emaSignalLog.map(p => {
+                const flash = freshKeys.has(p._key) ? ' vol-flash' : '';
+                const t = new Date(p.time).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
+                const crossBadge = p.cross
+                    ? `<span class="div-scan-badge ${p.cross === 'up' ? 'vol-pos' : 'vol-neg'}">MA20${p.cross === 'up' ? '↑' : '↓'}EMA20</span>`
+                    : '';
+                const touchBadges = (p.touches || [])
+                    .map(period => `<span class="div-scan-badge vol-info">EMA${period}</span>`)
+                    .join(' ');
+                return `<div class="div-scan-item${flash}" onclick="selectPair({symbol:'${p.symbol}',name:'${p.name}',base:'${p.base}'})">
+                    ${crossBadge}${crossBadge && touchBadges ? ' ' : ''}${touchBadges}
+                    <span class="div-scan-name">${p.name}<span class="vol-log-time">${t}</span></span>
+                </div>`;
+            }).join('')
+            : '<div class="div-scan-empty">Пока нет сигналов</div>';
+    }
+
+    async function fetchEmaScan() {
+        const myGen = ++_emaGen;
         const isFinam = currentMarket === 'finam';
+        if (!emaSignalLog.length && !_emaPrevKeys.size) {
+            document.getElementById('emaScanList').innerHTML = '<div class="div-scan-empty">Сканирование...</div>';
+        }
         try {
             const url = isFinam
-                ? `${API_BASE}/finam/scan/spread?threshold=1.0&top=20`
-                : `${API_BASE}/scan/spread?threshold=1.0&top=20`;
+                ? `${API_BASE}/finam/scan/ema?top=30`
+                : `${API_BASE}/scan/ema?top=30`;
             const res = isFinam ? await _authFetch(url) : await fetch(url);
             const json = await res.json();
-            if (myGen !== _spreadGen) return;
+            if (myGen !== _emaGen) return;
             if (!res.ok) throw new Error(json.detail || 'Ошибка');
-            const pairs = json.pairs ?? [];
-            info.textContent = `Найдено: ${pairs.length} ${isFinam ? 'инструментов' : 'пар'}`;
-            list.innerHTML = pairs.length
-                ? pairs.map(p => `<div class="div-scan-item" onclick="selectPair({symbol:'${p.symbol}',name:'${p.name}',base:'${p.base}'})">
-                    <span class="div-scan-badge vol-pos">${p.spread}%</span>
-                    <span class="div-scan-name">${p.name}</span>
-                  </div>`).join('')
-                : '<div class="div-scan-empty">Нет пар выше порога</div>';
-            spreadNextRefresh = Date.now() + 15 * 60 * 1000;
+            const pairs = (json.pairs ?? []).map(p => ({ ...p, _key: _emaSignalKey(p) }));
+
+            const currentKeys = new Set(pairs.map(p => p._key));
+            const freshKeys = new Set([...currentKeys].filter(k => !_emaPrevKeys.has(k)));
+            const now = Date.now();
+            pairs.filter(p => freshKeys.has(p._key)).forEach(p => {
+                emaSignalLog.unshift({ ...p, time: now });
+            });
+            if (emaSignalLog.length > EMA_LOG_MAX) emaSignalLog.length = EMA_LOG_MAX;
+            _emaPrevKeys = currentKeys;
+            _emaSaveLog();
+            _emaRenderLog(freshKeys);
+            if (freshKeys.size > 0) _volBeep();
+            emaNextRefresh = Date.now() + 60 * 1000;
         } catch(e) {
-            if (myGen !== _spreadGen) return;
-            list.innerHTML = `<div class="div-scan-empty" style="color:var(--red)">${e.message}</div>`;
+            if (myGen !== _emaGen) return;
             // Не оставляем сканер зависшим на ошибке (например, после сна компьютера) —
             // сами повторим попытку через 15 сек, без перезагрузки страницы.
-            spreadNextRefresh = Date.now() + 15 * 1000;
+            emaNextRefresh = Date.now() + 15 * 1000;
         }
     }
 
-    function tickSpreadTimer() {
-        const el = document.getElementById('spreadScanTimer');
+    function tickEmaTimer() {
+        const el = document.getElementById('emaScanTimer');
         if (!el) return;
         if (!volAutoRefreshEnabled) { el.textContent = ''; return; }
-        const left = Math.max(0, Math.round((spreadNextRefresh - Date.now()) / 1000));
+        const left = Math.max(0, Math.round((emaNextRefresh - Date.now()) / 1000));
         const m = Math.floor(left / 60), s = left % 60;
         el.textContent = left > 0 ? `↻ ${m}:${s.toString().padStart(2,'0')}` : '';
-        if (left === 0 && spreadNextRefresh > 0) { spreadNextRefresh = 0; fetchSpreadScan(); }
+        if (left === 0 && emaNextRefresh > 0) { emaNextRefresh = 0; fetchEmaScan(); }
     }
 
     // ============================================================
@@ -3923,8 +3982,9 @@
             _volLoadLog();
             setTimeout(fetchVolScan, 5000);
             setInterval(tickVolTimer, 1000);
-            setTimeout(fetchSpreadScan, 6000);
-            setInterval(tickSpreadTimer, 1000);
+            _emaLoadLog();
+            setTimeout(fetchEmaScan, 6000);
+            setInterval(tickEmaTimer, 1000);
         });
     };
 
@@ -4977,10 +5037,10 @@
         const wasEnabled = volAutoRefreshEnabled;
         volAutoRefreshEnabled = s.volAutoRefresh;
         if (s.volAutoRefresh && !wasEnabled) {
-            volNextRefresh = 0; spreadNextRefresh = 0;
-            fetchVolScan(); fetchSpreadScan();
+            volNextRefresh = 0; emaNextRefresh = 0;
+            fetchVolScan(); fetchEmaScan();
         } else if (!s.volAutoRefresh) {
-            volNextRefresh = 0; spreadNextRefresh = 0;
+            volNextRefresh = 0; emaNextRefresh = 0;
         }
     }
 
@@ -6846,11 +6906,14 @@
           </div>
           <div class="info-card" style="border-left:3px solid #ff9800">
             <div class="info-card-header">
-              <span class="info-badge" style="background:rgba(255,152,0,.2);color:#ff9800">3. Сканер спредов (15m)</span>
+              <span class="info-badge" style="background:rgba(255,152,0,.2);color:#ff9800">3. Сканер MA/EMA (15m)</span>
             </div>
-            <p style="font-size:13px;color:var(--text-secondary);margin:8px 0 0">Анализирует разницу между верхней и нижней точками свечи за 15 минут:</p>
-            <div class="info-formula" style="margin:10px 0 8px">Спред = (High &minus; Low) / Low &times; 100%</div>
-            <p style="font-size:13px;color:var(--text-secondary);margin:0">Хорошо работает в связке с дивербаром — широкий спред подтверждает силу движения.</p>
+            <p style="font-size:13px;color:var(--text-secondary);margin:8px 0 0">Скальпинг-сетап по MA20 и EMA20/50/100/200 на 15-минутных свечах. Два типа сигналов:</p>
+            <div style="margin-top:10px;display:flex;flex-direction:column;gap:6px">
+              <div style="display:flex;align-items:center;gap:8px;font-size:13px"><span class="div-scan-badge vol-pos" style="flex-shrink:0">MA20↑EMA20</span><span>пересечение MA20 и EMA20 — краткосрочный сигнал смены импульса</span></div>
+              <div style="display:flex;align-items:center;gap:8px;font-size:13px"><span class="div-scan-badge vol-info" style="flex-shrink:0">EMA50</span><span>цена последнего бара коснулась EMA20/50/100/200 — отработка уровня поддержки/сопротивления</span></div>
+            </div>
+            <p style="font-size:13px;color:var(--text-secondary);margin:10px 0 0">Отдельно считается для крипто и Финама. Сигналы копятся в журнале (как у сканера волатильности), а не затираются при каждом обновлении.</p>
           </div>
         </div>
         <div class="info-highlight" style="border-left-color:#ff9800;background:rgba(255,152,0,.06)">

@@ -12,7 +12,7 @@ from auth import get_current_user
 from database import User
 from config import FINAM_SYMBOLS, FINAM_INSTRUMENTS, FINAM_SECRET_TOKEN
 from cache import get_cache_key, get_cached_data, set_cached_data, get_or_compute
-from indicators import calculate_alligator, calculate_ao, calculate_bw_mfi, find_fractals, find_divergences, calculate_bollinger_bands
+from indicators import calculate_alligator, calculate_ao, calculate_bw_mfi, find_fractals, find_divergences, calculate_bollinger_bands, detect_ma_ema_signal
 from finam import fetch_ohlcv_finam, fetch_finam_assets
 from routes import _check_last_bar_divergence
 
@@ -294,32 +294,27 @@ async def finam_scan_volatile(threshold: float = 60.0, top: int = 20, current_us
     return await get_or_compute(key, compute, ttl=45)
 
 
-@router.get("/scan/spread")
-async def finam_scan_spread(threshold: float = 1.0, top: int = 20, current_user: User = Depends(get_current_user)):
-    """Инструменты Finam с широким спредом свечи за 15 минут (High-Low)/Low >= threshold%."""
-    key = get_cache_key("finam_spread", "15m", top, f"finam_spread15_{threshold}")
+@router.get("/scan/ema")
+async def finam_scan_ma_ema(top: int = 30, current_user: User = Depends(get_current_user)):
+    """
+    Скальпинг-сканер Finam по MA20/EMA20/50/100/200 на 15-минутных свечах
+    (аналог крипто-сканера /scan/ema) — пересечение MA20/EMA20 и касание
+    ценой любой из EMA20/50/100/200. См. indicators.detect_ma_ema_signal.
+    """
+    key = get_cache_key("finam_ema", "15m", top, "finam_ma_ema_signal")
     sem = asyncio.Semaphore(12)
 
     async def scan_one(inst):
         async with sem:
             try:
-                df = await fetch_ohlcv_finam(inst["symbol"], "15m", 3, deep_history=False)
-                if len(df) < 1:
-                    return None
-                high = float(df["High"].iloc[-1])
-                low = float(df["Low"].iloc[-1])
-                close = float(df["Close"].iloc[-1])
-                if low <= 0:
-                    return None
-                spread = (high - low) / low * 100
-                if spread < threshold:
+                df = await fetch_ohlcv_finam(inst["symbol"], "15m", 250, deep_history=False)
+                signal = detect_ma_ema_signal(df)
+                if not signal:
                     return None
                 return {
                     "symbol": inst["symbol"], "name": inst["name"], "base": inst["base"],
-                    "price": round(close, 4),
-                    "spread": round(spread, 2),
-                    "high": round(high, 4),
-                    "low": round(low, 4),
+                    "price": float(df["Close"].iloc[-1]),
+                    **signal,
                 }
             except Exception:
                 return None
@@ -328,10 +323,9 @@ async def finam_scan_spread(threshold: float = 1.0, top: int = 20, current_user:
         instruments = await _all_instruments()
         results = await asyncio.gather(*[scan_one(inst) for inst in instruments])
         pairs = [r for r in results if r]
-        pairs.sort(key=lambda x: x["spread"], reverse=True)
-        return {"threshold": threshold, "count": len(pairs[:top]), "pairs": pairs[:top]}
+        return {"count": len(pairs[:top]), "pairs": pairs[:top]}
 
-    return await get_or_compute(key, compute, ttl=300)
+    return await get_or_compute(key, compute, ttl=45)
 
 
 @router.get("/scan/divergences")
