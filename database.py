@@ -12,8 +12,10 @@ from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sess
 from config import DATABASE_URL
 
 
-# Движок и фабрика сессий
-engine = create_async_engine(DATABASE_URL, echo=False)
+# Движок и фабрика сессий. Пул поднят с дефолтных 5+10=15 до 20+20=40 —
+# SQLite-соединения дешёвые (это файл, не сетевая БД), а запас нужен на случай,
+# если где-то ещё держится сессия дольше, чем следовало бы (см. auth.py).
+engine = create_async_engine(DATABASE_URL, echo=False, pool_size=20, max_overflow=20)
 async_session = async_sessionmaker(engine, expire_on_commit=False)
 
 

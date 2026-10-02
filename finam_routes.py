@@ -309,11 +309,10 @@ async def finam_scan_ma_ema(top: int = 30, current_user: User = Depends(get_curr
             try:
                 # limit здесь определяет и глубину окна запроса (end_time - 15м*(limit+5)),
                 # не только число возвращаемых баров — а Мосбиржа торгует не 24/7, в отличие
-                # от крипты. Берём заведомо большое окно (~16 дней календарных), чтобы даже
-                # с учётом выходных/вечерней сессии набралось от 210 реальных 15м-баров,
-                # нужных detect_ma_ema_signal() для EMA200; .tail() внутри fetch_ohlcv_finam
-                # всё равно оставит только последние реально торговавшиеся бары.
-                df = await fetch_ohlcv_finam(inst["symbol"], "15m", 1500, deep_history=False)
+                # от крипты. 900 -> окно ~9.5 календарных дней, с запасом на выходные даёт
+                # ~250-300 реальных 15м-баров — хватает detect_ma_ema_signal() для EMA200,
+                # не раздувая объём данных/вычислений на инструмент сильнее необходимого.
+                df = await fetch_ohlcv_finam(inst["symbol"], "15m", 900, deep_history=False)
                 signal = detect_ma_ema_signal(df)
                 if not signal:
                     return None

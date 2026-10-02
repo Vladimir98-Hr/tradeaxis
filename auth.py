@@ -14,14 +14,13 @@ from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from jose import JWTError, jwt
 from passlib.context import CryptContext
-from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
 from config import (
     JWT_SECRET, JWT_ALGORITHM, JWT_EXPIRE_DAYS,
     SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASSWORD, SMTP_FROM, FRONTEND_URL,
 )
-from database import User, get_db
+from database import User, async_session
 
 logger = logging.getLogger(__name__)
 
@@ -59,9 +58,19 @@ def decode_token(token: str) -> Optional[dict]:
 
 async def get_current_user(
     credentials: Optional[HTTPAuthorizationCredentials] = Depends(bearer_scheme),
-    db: AsyncSession = Depends(get_db),
 ) -> User:
-    """Зависимость: обязательная авторизация. Кидает 401 если токен невалидный."""
+    """
+    Зависимость: обязательная авторизация. Кидает 401 если токен невалидный.
+
+    Сознательно НЕ берёт сессию БД через Depends(get_db) — такая сессия жила бы
+    до конца всего запроса (FastAPI закрывает yield-зависимости только после
+    возврата ответа), а это держит занятым слот пула соединений на всё время
+    выполнения эндпоинта. Для медленных Finam-эндпоинтов (сканеры, глубокая
+    история) это означало, что несколько одновременных запросов выедали весь
+    пул (5+10=15) простым удержанием соединения, и /auth/login у других
+    пользователей падал с QueuePool timeout. Здесь сессия открывается и
+    закрывается сама — только на миг короткого запроса пользователя.
+    """
     if not credentials:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Токен не предоставлен")
 
@@ -69,8 +78,9 @@ async def get_current_user(
     if not payload or "sub" not in payload:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Невалидный токен")
 
-    result = await db.execute(select(User).where(User.id == int(payload["sub"])))
-    user = result.scalar_one_or_none()
+    async with async_session() as session:
+        result = await session.execute(select(User).where(User.id == int(payload["sub"])))
+        user = result.scalar_one_or_none()
     if not user:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Пользователь не найден")
     return user
@@ -113,7 +123,6 @@ async def send_reset_email(to_email: str, token: str) -> None:
 
 async def get_current_user_optional(
     credentials: Optional[HTTPAuthorizationCredentials] = Depends(bearer_scheme),
-    db: AsyncSession = Depends(get_db),
 ) -> Optional[User]:
     """Зависимость: опциональная авторизация. Возвращает None если токена нет или он невалидный."""
     if not credentials:
@@ -121,5 +130,6 @@ async def get_current_user_optional(
     payload = decode_token(credentials.credentials)
     if not payload or "sub" not in payload:
         return None
-    result = await db.execute(select(User).where(User.id == int(payload["sub"])))
-    return result.scalar_one_or_none()
+    async with async_session() as session:
+        result = await session.execute(select(User).where(User.id == int(payload["sub"])))
+        return result.scalar_one_or_none()
