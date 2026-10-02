@@ -5889,9 +5889,17 @@
             });
             const data = await r.json();
             if (!r.ok) { err.textContent = data.detail || 'Не удалось изменить пароль'; return; }
+            // Сразу логиним тем же токеном, что вернул /auth/reset-password —
+            // без повторного ручного ввода логина/пароля (на телефоне там легко
+            // словить опечатку/автозамену сразу после того, как пароль уже введён выше).
+            authToken = data.access_token;
+            currentUser = data.user;
+            localStorage.setItem('auth_token', authToken);
             document.getElementById('resetPwModal').style.display = 'none';
-            alert('Пароль изменён. Теперь войдите с новым паролем.');
-            openAuthModal('login');
+            closeAuthModal();
+            _updateAuthUI();
+            await syncSettingsFromServer();
+            await syncWatchlistFromServer();
         } catch { err.textContent = 'Ошибка соединения'; }
     }
 

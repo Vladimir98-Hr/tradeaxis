@@ -173,9 +173,15 @@ async def forgot_password(body: ForgotPasswordRequest, db: AsyncSession = Depend
     return {"message": "Если такой email зарегистрирован, на него отправлено письмо со ссылкой для сброса пароля"}
 
 
-@router.post("/reset-password")
+@router.post("/reset-password", response_model=AuthResponse)
 async def reset_password(body: ResetPasswordRequest, db: AsyncSession = Depends(get_db)):
-    """Устанавливает новый пароль по токену из письма."""
+    """
+    Устанавливает новый пароль по токену из письма и сразу логинит пользователя
+    (возвращает access_token, как /login) — иначе после смены пароля человеку
+    приходится вручную набирать логин+пароль ещё раз в отдельной форме, и на
+    телефоне там легко словить опечатку/автозамену сразу после того, как он
+    только что ввёл этот же пароль в поле выше.
+    """
     result = await db.execute(select(User).where(User.reset_token == body.token))
     user = result.scalar_one_or_none()
     if not user or not user.reset_token_expires or user.reset_token_expires < datetime.utcnow():
@@ -185,4 +191,7 @@ async def reset_password(body: ResetPasswordRequest, db: AsyncSession = Depends(
     user.reset_token = None
     user.reset_token_expires = None
     await db.commit()
-    return {"message": "Пароль успешно изменён"}
+    await db.refresh(user)
+
+    token = create_access_token({"sub": str(user.id)})
+    return AuthResponse(access_token=token, user=UserResponse.model_validate(user))
