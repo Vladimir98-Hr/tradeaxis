@@ -178,6 +178,116 @@ def _true_range(high, low, prev_close):
     return max(high - low, abs(high - prev_close), abs(low - prev_close))
 
 
+_SCAN_REFRESH_INTERVAL = 180  # фоновый цикл волатильности+EMA Finam — раз в 3 минуты
+_scan_sem = asyncio.Semaphore(4)  # низкая параллельность — делим лимит Finam с остальными потребителями (чарты, живой хвост)
+_FINAM_VOL_RAW_KEY = get_cache_key("finam_vol_raw", "5m", 0, "finam_impulse_raw")
+_FINAM_EMA_RAW_KEY = get_cache_key("finam_ema_raw", "15m", 0, "finam_ma_ema_raw")
+
+
+async def _scan_volatile_one(inst):
+    """Считает impulse-score одного инструмента без фильтра по threshold —
+    отсечение по порогу теперь делается на чтении из уже готового кэша
+    (см. finam_scan_volatile), а не на каждом фоновом пересчёте."""
+    async with _scan_sem:
+        try:
+            df = await fetch_ohlcv_finam(inst["symbol"], "5m", 90, deep_history=False)
+            if len(df) < 65:
+                return None
+
+            closes = df["Close"].values
+            highs = df["High"].values
+            lows = df["Low"].values
+            volumes = df["Volume"].values
+            n = len(closes)
+
+            def ret(k):
+                prev = closes[n - 1 - k]
+                return (closes[-1] - prev) / prev * 100 if prev else 0.0
+
+            return_1m = ret(1)
+            return_5m = ret(3)
+            return_15m = ret(6)
+
+            prev_volumes = volumes[-61:-1]
+            median_vol = _median(prev_volumes)
+            rvol_1m = (volumes[-1] / median_vol) if median_vol > 0 else 0.0
+
+            trs = [
+                _true_range(highs[i], lows[i], closes[i - 1])
+                for i in range(n - 60, n)
+            ]
+            current_tr = trs[-1]
+            median_tr = _median(trs[:-1])
+            range_expansion = (current_tr / median_tr) if median_tr > 0 else 0.0
+
+            three_bar_rets = [
+                abs((closes[i] - closes[i - 3]) / closes[i - 3] * 100)
+                for i in range(n - 60, n) if closes[i - 3]
+            ]
+            mean_3b = sum(three_bar_rets) / len(three_bar_rets) if three_bar_rets else 0.0
+            var_3b = sum((x - mean_3b) ** 2 for x in three_bar_rets) / len(three_bar_rets) if three_bar_rets else 0.0
+            std_3b = var_3b ** 0.5
+            z_abs_5m = ((abs(return_5m) - mean_3b) / std_3b) if std_3b > 0 else 0.0
+
+            window_high = max(highs[-31:-1])
+            window_low = min(lows[-31:-1])
+            if closes[-1] > window_high:
+                breakout = "up"
+            elif closes[-1] < window_low:
+                breakout = "down"
+            else:
+                breakout = "none"
+
+            overheat = mean_3b > 0 and abs(return_15m) > mean_3b * 6
+
+            def clamp01(x):
+                return max(0.0, min(1.0, x))
+
+            s_price = clamp01(max(abs(return_1m) / 2, abs(return_5m) / 5, abs(return_15m) / 8))
+            s_z = clamp01(z_abs_5m / 4)
+            s_rvol = clamp01(rvol_1m / 5)
+            s_range = clamp01(range_expansion / 3)
+            s_breakout = 1.0 if breakout != "none" else 0.0
+
+            score = (
+                25 * s_price + 20 * s_z + 20 * s_rvol +
+                15 * s_range + 20 * s_breakout
+            )
+
+            if overheat:
+                phase = "POST-PUMP"
+            elif breakout == "up" and return_5m > 0:
+                phase = "UP-EXPANSION"
+            elif breakout == "down" and return_5m < 0:
+                phase = "DOWN-EXPANSION"
+            else:
+                phase = "HIGH-VOL-RANGE"
+
+            return {
+                "symbol": inst["symbol"], "name": inst["name"], "base": inst["base"],
+                "price": float(closes[-1]),
+                "return_1m": round(return_1m, 2),
+                "return_5m": round(return_5m, 2),
+                "return_15m": round(return_15m, 2),
+                "rvol_1m": round(rvol_1m, 2),
+                "range_expansion": round(range_expansion, 2),
+                "z_abs_5m": round(z_abs_5m, 2),
+                "breakout": breakout,
+                "score": round(score, 1),
+                "phase": phase,
+            }
+        except Exception:
+            return None
+
+
+async def _compute_finam_volatile_raw() -> list:
+    instruments = await _all_instruments()
+    results = await asyncio.gather(*[_scan_volatile_one(inst) for inst in instruments])
+    pairs = [r for r in results if r]
+    pairs.sort(key=lambda x: x["score"], reverse=True)
+    return pairs
+
+
 @router.get("/scan/volatile")
 async def finam_scan_volatile(threshold: float = 60.0, top: int = 20, current_user: User = Depends(get_current_user)):
     """
@@ -185,113 +295,44 @@ async def finam_scan_volatile(threshold: float = 60.0, top: int = 20, current_us
     5-минутных свечах — Finam не отдаёт минутные данные. return_1m/5m/15m здесь на
     самом деле означают 1/3/6 пятиминутных баров (~5м/15м/30м), названы так же, чтобы
     фронтенд мог переиспользовать общий рендер журнала сигналов без спец-веток.
+
+    Сам эндпоинт только читает уже готовый результат фонового цикла
+    (run_finam_scanner_refresher) и фильтрует по threshold в памяти — никаких
+    обращений к Finam API на пользовательский запрос, поэтому открытие любого
+    числа вкладок с автообновлением не увеличивает нагрузку на Finam.
     """
-    key = get_cache_key("finam_vol", "5m", top, f"finam_impulse_{threshold}")
-    sem = asyncio.Semaphore(12)
+    raw = await get_cached_data(_FINAM_VOL_RAW_KEY)
+    if raw is None:
+        return {"threshold": threshold, "count": 0, "pairs": [], "warming_up": True}
+    pairs = [p for p in raw if p["score"] >= threshold]
+    return {"threshold": threshold, "count": len(pairs[:top]), "pairs": pairs[:top]}
 
-    async def scan_one(inst):
-        async with sem:
-            try:
-                df = await fetch_ohlcv_finam(inst["symbol"], "5m", 90, deep_history=False)
-                if len(df) < 65:
-                    return None
 
-                closes = df["Close"].values
-                highs = df["High"].values
-                lows = df["Low"].values
-                volumes = df["Volume"].values
-                n = len(closes)
-
-                def ret(k):
-                    prev = closes[n - 1 - k]
-                    return (closes[-1] - prev) / prev * 100 if prev else 0.0
-
-                return_1m = ret(1)
-                return_5m = ret(3)
-                return_15m = ret(6)
-
-                prev_volumes = volumes[-61:-1]
-                median_vol = _median(prev_volumes)
-                rvol_1m = (volumes[-1] / median_vol) if median_vol > 0 else 0.0
-
-                trs = [
-                    _true_range(highs[i], lows[i], closes[i - 1])
-                    for i in range(n - 60, n)
-                ]
-                current_tr = trs[-1]
-                median_tr = _median(trs[:-1])
-                range_expansion = (current_tr / median_tr) if median_tr > 0 else 0.0
-
-                three_bar_rets = [
-                    abs((closes[i] - closes[i - 3]) / closes[i - 3] * 100)
-                    for i in range(n - 60, n) if closes[i - 3]
-                ]
-                mean_3b = sum(three_bar_rets) / len(three_bar_rets) if three_bar_rets else 0.0
-                var_3b = sum((x - mean_3b) ** 2 for x in three_bar_rets) / len(three_bar_rets) if three_bar_rets else 0.0
-                std_3b = var_3b ** 0.5
-                z_abs_5m = ((abs(return_5m) - mean_3b) / std_3b) if std_3b > 0 else 0.0
-
-                window_high = max(highs[-31:-1])
-                window_low = min(lows[-31:-1])
-                if closes[-1] > window_high:
-                    breakout = "up"
-                elif closes[-1] < window_low:
-                    breakout = "down"
-                else:
-                    breakout = "none"
-
-                overheat = mean_3b > 0 and abs(return_15m) > mean_3b * 6
-
-                def clamp01(x):
-                    return max(0.0, min(1.0, x))
-
-                s_price = clamp01(max(abs(return_1m) / 2, abs(return_5m) / 5, abs(return_15m) / 8))
-                s_z = clamp01(z_abs_5m / 4)
-                s_rvol = clamp01(rvol_1m / 5)
-                s_range = clamp01(range_expansion / 3)
-                s_breakout = 1.0 if breakout != "none" else 0.0
-
-                score = (
-                    25 * s_price + 20 * s_z + 20 * s_rvol +
-                    15 * s_range + 20 * s_breakout
-                )
-
-                if overheat:
-                    phase = "POST-PUMP"
-                elif breakout == "up" and return_5m > 0:
-                    phase = "UP-EXPANSION"
-                elif breakout == "down" and return_5m < 0:
-                    phase = "DOWN-EXPANSION"
-                else:
-                    phase = "HIGH-VOL-RANGE"
-
-                if score < threshold:
-                    return None
-
-                return {
-                    "symbol": inst["symbol"], "name": inst["name"], "base": inst["base"],
-                    "price": float(closes[-1]),
-                    "return_1m": round(return_1m, 2),
-                    "return_5m": round(return_5m, 2),
-                    "return_15m": round(return_15m, 2),
-                    "rvol_1m": round(rvol_1m, 2),
-                    "range_expansion": round(range_expansion, 2),
-                    "z_abs_5m": round(z_abs_5m, 2),
-                    "breakout": breakout,
-                    "score": round(score, 1),
-                    "phase": phase,
-                }
-            except Exception:
+async def _scan_ema_one(inst):
+    async with _scan_sem:
+        try:
+            # limit здесь определяет и глубину окна запроса (end_time - 15м*(limit+5)),
+            # не только число возвращаемых баров — а Мосбиржа торгует не 24/7, в отличие
+            # от крипты. 900 -> окно ~9.5 календарных дней, с запасом на выходные даёт
+            # ~250-300 реальных 15м-баров — хватает detect_ma_ema_signal() для EMA200,
+            # не раздувая объём данных/вычислений на инструмент сильнее необходимого.
+            df = await fetch_ohlcv_finam(inst["symbol"], "15m", 900, deep_history=False)
+            signal = detect_ma_ema_signal(df)
+            if not signal:
                 return None
+            return {
+                "symbol": inst["symbol"], "name": inst["name"], "base": inst["base"],
+                "price": float(df["Close"].iloc[-1]),
+                **signal,
+            }
+        except Exception:
+            return None
 
-    async def compute():
-        instruments = await _all_instruments()
-        results = await asyncio.gather(*[scan_one(inst) for inst in instruments])
-        pairs = [r for r in results if r]
-        pairs.sort(key=lambda x: x["score"], reverse=True)
-        return {"threshold": threshold, "count": len(pairs[:top]), "pairs": pairs[:top]}
 
-    return await get_or_compute(key, compute, ttl=45)
+async def _compute_finam_ema_raw() -> list:
+    instruments = await _all_instruments()
+    results = await asyncio.gather(*[_scan_ema_one(inst) for inst in instruments])
+    return [r for r in results if r]
 
 
 @router.get("/scan/ema")
@@ -300,37 +341,14 @@ async def finam_scan_ma_ema(top: int = 30, current_user: User = Depends(get_curr
     Скальпинг-сканер Finam по MA20/EMA20/50/100/200 на 15-минутных свечах
     (аналог крипто-сканера /scan/ema) — пересечение MA20/EMA20 и касание
     ценой любой из EMA20/50/100/200. См. indicators.detect_ma_ema_signal.
+
+    Как и /finam/scan/volatile — только читает кэш фонового цикла
+    (run_finam_scanner_refresher), без обращений к Finam на запрос.
     """
-    key = get_cache_key("finam_ema", "15m", top, "finam_ma_ema_signal")
-    sem = asyncio.Semaphore(12)
-
-    async def scan_one(inst):
-        async with sem:
-            try:
-                # limit здесь определяет и глубину окна запроса (end_time - 15м*(limit+5)),
-                # не только число возвращаемых баров — а Мосбиржа торгует не 24/7, в отличие
-                # от крипты. 900 -> окно ~9.5 календарных дней, с запасом на выходные даёт
-                # ~250-300 реальных 15м-баров — хватает detect_ma_ema_signal() для EMA200,
-                # не раздувая объём данных/вычислений на инструмент сильнее необходимого.
-                df = await fetch_ohlcv_finam(inst["symbol"], "15m", 900, deep_history=False)
-                signal = detect_ma_ema_signal(df)
-                if not signal:
-                    return None
-                return {
-                    "symbol": inst["symbol"], "name": inst["name"], "base": inst["base"],
-                    "price": float(df["Close"].iloc[-1]),
-                    **signal,
-                }
-            except Exception:
-                return None
-
-    async def compute():
-        instruments = await _all_instruments()
-        results = await asyncio.gather(*[scan_one(inst) for inst in instruments])
-        pairs = [r for r in results if r]
-        return {"count": len(pairs[:top]), "pairs": pairs[:top]}
-
-    return await get_or_compute(key, compute, ttl=45)
+    raw = await get_cached_data(_FINAM_EMA_RAW_KEY)
+    if raw is None:
+        return {"count": 0, "pairs": [], "warming_up": True}
+    return {"count": len(raw[:top]), "pairs": raw[:top]}
 
 
 @router.get("/scan/divergences")
@@ -338,7 +356,9 @@ async def finam_scan_divergences(timeframe: str = "1d", limit: int = 50, current
     """Сканирует все инструменты Finam на дивергентный бар последнего закрытого бара."""
     cache_ttl = 3600 if timeframe in ("1d", "1w") else 900
     key = get_cache_key("finam_scan", timeframe, limit, "finam_scan_div")
-    sem = asyncio.Semaphore(12)
+    # Низкая параллельность — этот сканер дёргается вручную (кнопка), но делит
+    # лимит Finam API с фоновым циклом волатильности/EMA (см. _scan_sem выше).
+    sem = asyncio.Semaphore(4)
 
     async def scan_one(inst):
         async with sem:
@@ -416,3 +436,34 @@ async def run_finam_chart_prewarmer() -> None:
         except Exception:
             pass
         await asyncio.sleep(2.5 * 3600)
+
+
+async def run_finam_scanner_refresher() -> None:
+    """
+    Фоновый цикл: считает волатильность и MA/EMA по ВСЕМ инструментам Finam раз
+    в _SCAN_REFRESH_INTERVAL и кладёт результат в кэш без фильтра по threshold/top
+    — сами эндпоинты /finam/scan/volatile и /finam/scan/ema только читают этот
+    кэш и фильтруют в памяти (см. выше).
+
+    Без этого несколько открытых вкладок с автообновлением сканеров раз в
+    минуту КАЖДАЯ быстро выедают лимит запросов Finam API сами на себя — именно
+    так случился инцидент с массовыми 429 и зависанием сканеров на 10+ минут.
+    Теперь нагрузка на Finam от этих двух сканеров фиксированная и не растёт
+    с числом открытых вкладок/пользователей.
+    """
+    if not FINAM_SECRET_TOKEN:
+        return
+    await asyncio.sleep(40)  # запускаемся после каталога и прогрева графиков
+    while True:
+        try:
+            vol_raw = await _compute_finam_volatile_raw()
+            await set_cached_data(_FINAM_VOL_RAW_KEY, vol_raw, ttl=_SCAN_REFRESH_INTERVAL * 2)
+        except Exception:
+            pass
+        await asyncio.sleep(5)  # пауза между сканерами — не бьём по Finam двумя полными обходами подряд
+        try:
+            ema_raw = await _compute_finam_ema_raw()
+            await set_cached_data(_FINAM_EMA_RAW_KEY, ema_raw, ttl=_SCAN_REFRESH_INTERVAL * 2)
+        except Exception:
+            pass
+        await asyncio.sleep(_SCAN_REFRESH_INTERVAL)
