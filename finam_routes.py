@@ -190,7 +190,12 @@ async def _scan_volatile_one(inst):
     (см. finam_scan_volatile), а не на каждом фоновом пересчёте."""
     async with _scan_sem:
         try:
-            df = await fetch_ohlcv_finam(inst["symbol"], "5m", 90, deep_history=False)
+            # 90 было мало: лимит для не-deep_history запроса задаёт КАЛЕНДАРНОЕ окно
+            # (end_time - 5м*(limit+5)), а не гарантированное число баров — а Мосбиржа
+            # не торгует по выходным/вечерам. 900 -> окно ~3.1 календарных дня, надёжно
+            # захватывает последнюю реальную торговую сессию даже после выходных
+            # (тот же фикс, что уже сделан для EMA-сканера — см. _scan_ema_one).
+            df = await fetch_ohlcv_finam(inst["symbol"], "5m", 900, deep_history=False)
             if len(df) < 65:
                 return None
 
