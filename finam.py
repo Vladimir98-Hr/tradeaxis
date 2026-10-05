@@ -65,6 +65,39 @@ _jwt_cache: dict = {"token": None, "expires_at": None}
 _assets_cache: dict = {"data": None, "expires_at": None}
 
 
+class _RateLimiter:
+    """
+    Глобальный троттлинг запросов к Finam API — не "сколько одновременно",
+    а "сколько в секунду" суммарно по всему приложению (фоновые сканеры,
+    прогрев кеша, живые запросы пользователей — все идут через одну точку,
+    _finam_get). Семафоры на конкурентность (asyncio.Semaphore в сканерах)
+    ограничивают только число ОДНОВРЕМЕННЫХ запросов, но не защищают от
+    превышения лимита, если разные задачи шлют запросы по очереди быстрее,
+    чем Finam готов их принимать — именно так сервис упал в понедельник
+    утром: несколько независимых фоновых циклов + реальные пользователи
+    в сумме превысили лимit, хотя каждый по отдельности был в рамках своих
+    локальных ограничений.
+    """
+    def __init__(self, min_interval: float):
+        self._min_interval = min_interval
+        self._lock = asyncio.Lock()
+        self._next_allowed = 0.0
+
+    async def wait(self):
+        async with self._lock:
+            loop = asyncio.get_event_loop()
+            now = loop.time()
+            delay = self._next_allowed - now
+            if delay > 0:
+                await asyncio.sleep(delay)
+                now = loop.time()
+            self._next_allowed = now + self._min_interval
+
+
+# Не более ~2 запросов в секунду к Finam суммарно от всего приложения.
+_finam_rate_limiter = _RateLimiter(min_interval=0.5)
+
+
 def _require_token():
     if not FINAM_SECRET_TOKEN:
         raise HTTPException(
@@ -131,6 +164,7 @@ async def _finam_get(
 
     async def _request(c: httpx.AsyncClient):
         for attempt in range(retries + 1):
+            await _finam_rate_limiter.wait()
             try:
                 resp = await c.get(
                     f"{FINAM_BASE_URL}{path}",
@@ -145,7 +179,7 @@ async def _finam_get(
 
             if resp.status_code == 429 and attempt < retries:
                 retry_after = resp.headers.get("Retry-After")
-                delay = float(retry_after) if retry_after and retry_after.replace('.', '', 1).isdigit() else 0.8 * (attempt + 1)
+                delay = float(retry_after) if retry_after and retry_after.replace('.', '', 1).isdigit() else 1.5 * (attempt + 1)
                 await asyncio.sleep(delay)
                 continue
 
