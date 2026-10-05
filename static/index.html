@@ -1653,7 +1653,7 @@
         <!-- Сканер дивергентных баров -->
         <div class="card div-scan-card">
             <div class="div-scan-header">
-                <span id="divScanTitle">Дивергенции 1D · Крипто</span>
+                <span id="divScanTitle">Дивергенции</span>
                 <button class="div-scan-btn" id="divScanBtn" onclick="fetchDivScan()">⟳ Сканировать</button>
             </div>
             <div class="div-scan-info" id="divScanInfo"></div>
@@ -2853,7 +2853,7 @@
             if (visibleTickerInterval) clearInterval(visibleTickerInterval);
             document.getElementById('wsStatus').textContent = 'Finam: исторические данные';
             document.getElementById('wsStatus').className = '';
-            document.getElementById('divScanTitle').textContent = 'Дивергенции 1D · Finam';
+            document.getElementById('divScanTitle').textContent = 'Дивергенции';
             document.getElementById('divScanList').innerHTML = '<div class="div-scan-empty">Нажмите «Сканировать»</div>';
             document.getElementById('divScanInfo').textContent = '';
             volNextRefresh = 0;
@@ -2869,7 +2869,7 @@
             wlRender();
             jRender();
         } else {
-            document.getElementById('divScanTitle').textContent = 'Дивергенции 1D · Крипто';
+            document.getElementById('divScanTitle').textContent = 'Дивергенции';
             document.getElementById('divScanList').innerHTML = '<div class="div-scan-empty">Нажмите «Сканировать»</div>';
             document.getElementById('divScanInfo').textContent = '';
             volNextRefresh = 0;
@@ -3553,8 +3553,6 @@
         info.textContent = '';
         try {
             const divTf = loadSettings().divScanTimeframe || '1d';
-            const divTfLabel = divTf === '1d' ? '1D' : divTf === '4h' ? '4H' : divTf === '1h' ? '1H' : divTf.toUpperCase();
-            document.getElementById('divScanTitle').textContent = `Дивергенции ${divTfLabel} · ${isFinam ? 'Finam' : 'Крипто'}`;
             const url = isFinam
                 ? `${API_BASE}/finam/scan/divergences?timeframe=${divTf}`
                 : `${API_BASE}/scan/divergences?timeframe=${divTf}&limit=50`;
