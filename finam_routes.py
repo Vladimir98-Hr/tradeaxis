@@ -401,45 +401,61 @@ async def finam_scan_ma_ema(timeframe: str = "15m", top: int = 30, current_user:
     return {"count": len(raw[:top]), "pairs": raw[:top]}
 
 
+_DIV_SCAN_TIMEFRAMES = ("15m", "1h", "4h", "1d")
+
+
+def _finam_div_raw_key(timeframe: str) -> str:
+    return get_cache_key("finam_div_raw", timeframe, 50, "finam_scan_div_raw")
+
+
+async def _scan_div_one(inst, timeframe: str):
+    async with _scan_sem:
+        try:
+            df = await fetch_ohlcv_finam(inst["symbol"], timeframe, 50, deep_history=False)
+            if len(df) < 10:
+                return None
+            ao = calculate_ao(df)
+            is_bull, is_bear = _check_last_bar_divergence(df, ao)
+            if not is_bull and not is_bear:
+                return None
+            return {
+                "symbol": inst["symbol"], "name": inst["name"], "cat": inst["cat"],
+                "type": "bull" if is_bull else "bear",
+                "close": float(df["Close"].iloc[-1]),
+            }
+        except Exception:
+            return None
+
+
+async def _compute_finam_div_raw(timeframe: str) -> dict:
+    instruments = await _all_instruments()
+    results = await asyncio.gather(*[_scan_div_one(inst, timeframe) for inst in instruments])
+    divergences = [r for r in results if r]
+    return {
+        "timeframe": timeframe,
+        "count": len(divergences),
+        "scanned": len(instruments),
+        "divergences": divergences,
+    }
+
+
 @router.get("/scan/divergences")
 async def finam_scan_divergences(timeframe: str = "1d", limit: int = 50, current_user: User = Depends(get_current_user)):
-    """Сканирует все инструменты Finam на дивергентный бар последнего закрытого бара."""
-    cache_ttl = 3600 if timeframe in ("1d", "1w") else 900
-    key = get_cache_key("finam_scan", timeframe, limit, "finam_scan_div")
-    # Низкая параллельность — этот сканер дёргается вручную (кнопка), но делит
-    # лимит Finam API с фоновым циклом волатильности/EMA (см. _scan_sem выше).
-    sem = asyncio.Semaphore(4)
+    """
+    Сканирует все инструменты Finam на дивергентный бар последнего закрытого бара.
 
-    async def scan_one(inst):
-        async with sem:
-            try:
-                df = await fetch_ohlcv_finam(inst["symbol"], timeframe, limit, deep_history=False)
-                if len(df) < 10:
-                    return None
-                ao = calculate_ao(df)
-                is_bull, is_bear = _check_last_bar_divergence(df, ao)
-                if not is_bull and not is_bear:
-                    return None
-                return {
-                    "symbol": inst["symbol"], "name": inst["name"], "cat": inst["cat"],
-                    "type": "bull" if is_bull else "bear",
-                    "close": float(df["Close"].iloc[-1]),
-                }
-            except Exception:
-                return None
-
-    async def compute():
-        instruments = await _all_instruments()
-        results = await asyncio.gather(*[scan_one(inst) for inst in instruments])
-        divergences = [r for r in results if r]
-        return {
-            "timeframe": timeframe,
-            "count": len(divergences),
-            "scanned": len(instruments),
-            "divergences": divergences,
-        }
-
-    return await get_or_compute(key, compute, ttl=cache_ttl)
+    Раньше считалось синхронно на запрос (до ~30-40 сек на 65 инструментов) и
+    делило общий лимит Finam с фоновыми циклами волатильности/EMA — под
+    нагрузкой буднего дня запрос иногда не укладывался в разумное время и
+    превращался в ошибку на фронте. Теперь, как и остальные Finam-сканеры,
+    только читает уже готовый кэш фонового цикла (run_finam_div_refresher).
+    """
+    if timeframe not in _DIV_SCAN_TIMEFRAMES:
+        timeframe = "1d"
+    raw = await get_cached_data(_finam_div_raw_key(timeframe))
+    if raw is None:
+        return {"timeframe": timeframe, "count": 0, "scanned": 0, "divergences": [], "warming_up": True}
+    return raw
 
 
 # Прогреваем кеш только для дневного/недельного графика — они самые тяжёлые при
@@ -539,3 +555,28 @@ async def run_finam_ema_heavy_refresher() -> None:
             except Exception:
                 pass
             await asyncio.sleep(30)  # пауза между таймфреймами
+
+
+async def run_finam_div_refresher() -> None:
+    """
+    Фоновый цикл для сканера дивергенций Finam — по кругу считает все 4
+    поддерживаемых таймфрейма (15m/1h/4h/1d), каждый лёгким одиночным запросом
+    на инструмент (deep_history=False, 50 баров). Дивергенция — событие
+    закрытого бара, секундная свежесть не нужна, поэтому полный оборот на
+    ~8-10 минут более чем достаточен, а эндпоинт /finam/scan/divergences
+    всегда отвечает мгновенно из кэша, не деля ожидание ответа с остальным
+    Finam-трафиком на пользовательский запрос.
+    """
+    if not FINAM_SECRET_TOKEN:
+        return
+    await asyncio.sleep(60)
+    while True:
+        for tf in _DIV_SCAN_TIMEFRAMES:
+            try:
+                raw = await _compute_finam_div_raw(tf)
+                ttl = 3600 if tf == "1d" else 900
+                await set_cached_data(_finam_div_raw_key(tf), raw, ttl=ttl)
+            except Exception:
+                pass
+            await asyncio.sleep(15)  # пауза между таймфреймами
+        await asyncio.sleep(5 * 60)  # пауза перед новым полным кругом

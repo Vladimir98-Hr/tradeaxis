@@ -3527,7 +3527,7 @@
         btn.disabled = true;
         btn.textContent = '...';
         const isFinam = currentMarket === 'finam';
-        list.innerHTML = `<div class="div-scan-empty">Сканирование${isFinam ? ' Finam...' : ' всех пар...<br>Может занять 20–40 сек'}</div>`;
+        list.innerHTML = `<div class="div-scan-empty">${isFinam ? 'Загрузка...' : 'Сканирование всех пар...<br>Может занять 20–40 сек'}</div>`;
         info.textContent = '';
         try {
             const divTf = loadSettings().divScanTimeframe || '1d';
@@ -3539,6 +3539,12 @@
             const res = isFinam ? await _authFetch(url) : await fetch(url);
             const json = await res.json();
             if (!res.ok) throw new Error(json.detail || 'Ошибка');
+            if (json.warming_up) {
+                list.innerHTML = '<div class="div-scan-empty">Считается в фоне, обновится в течение пары минут...</div>';
+                btn.disabled = false;
+                btn.textContent = '⟳ Сканировать';
+                return;
+            }
             info.textContent = `Найдено: ${json.count} из ${json.scanned}`;
             if (!json.divergences?.length) {
                 list.innerHTML = '<div class="div-scan-empty">Дивергенций не найдено</div>';
