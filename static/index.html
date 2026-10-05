@@ -1645,7 +1645,15 @@
         <div class="card div-scan-card">
             <div class="div-scan-header">
                 <span id="divScanTitle">Дивергенции 1D · Крипто</span>
-                <button class="div-scan-btn" id="divScanBtn" onclick="fetchDivScan()">⟳ Сканировать</button>
+                <span style="display:flex;align-items:center;gap:6px">
+                    <select class="div-scan-btn" id="divScanTfSelect" onchange="_divTimeframeChanged(this.value)" style="padding:4px 6px">
+                        <option value="15m">15м</option>
+                        <option value="1h">1ч</option>
+                        <option value="4h">4ч</option>
+                        <option value="1d" selected>1Д</option>
+                    </select>
+                    <button class="div-scan-btn" id="divScanBtn" onclick="fetchDivScan()">⟳ Сканировать</button>
+                </span>
             </div>
             <div class="div-scan-info" id="divScanInfo"></div>
             <div class="div-scan-list" id="divScanList">
@@ -5074,8 +5082,32 @@
             fetchEmaScan();
         }
         _lastEmaTf = emaTf;
+
+        // Таймфрейм сканера дивергенций — держим селект на самой карточке в
+        // синхроне с настройками в обе стороны, и перезапрашиваем сразу при
+        // смене (раньше смена в настройках никак не триггерила fetchDivScan(),
+        // и карточка молча продолжала показывать старый таймфрейм до ручного
+        // нажатия "Сканировать").
+        const divTf = s.divScanTimeframe || '1d';
+        const divTfSelect = document.getElementById('divScanTfSelect');
+        if (divTfSelect) divTfSelect.value = divTf;
+        if (_lastDivTf !== null && _lastDivTf !== divTf) {
+            fetchDivScan();
+        }
+        _lastDivTf = divTf;
     }
     let _lastEmaTf = null;
+    let _lastDivTf = null;
+
+    // Переключатель таймфрейма прямо на карточке сканера дивергенций.
+    function _divTimeframeChanged(tf) {
+        const s = loadSettings();
+        s.divScanTimeframe = tf;
+        localStorage.setItem('cryptoSettings', JSON.stringify(s));
+        _lastDivTf = tf;
+        fetchDivScan();
+        pushSettingsToServer();
+    }
 
     function applySettingsLive() {
         if (document.getElementById('settingsModal').style.display === 'none') return;
