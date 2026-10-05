@@ -1511,7 +1511,16 @@
         <div class="card div-scan-card">
             <div class="div-scan-header">
                 <span id="emaScanTitle">Сканер MA/EMA</span>
-                <span class="vol-timer" id="emaScanTimer"></span>
+                <span style="display:flex;align-items:center;gap:6px">
+                    <select class="div-scan-btn" id="emaScanTfSelect" onchange="_emaTimeframeChanged(this.value)" style="padding:4px 6px">
+                        <option value="15m" selected>15м</option>
+                        <option value="1h">1ч</option>
+                        <option value="4h">4ч</option>
+                        <option value="1d">1Д</option>
+                        <option value="1w">1Н</option>
+                    </select>
+                    <span class="vol-timer" id="emaScanTimer"></span>
+                </span>
             </div>
             <div class="div-scan-info" id="emaScanInfo"></div>
             <div class="div-scan-list" id="emaScanList">
@@ -1645,15 +1654,7 @@
         <div class="card div-scan-card">
             <div class="div-scan-header">
                 <span id="divScanTitle">Дивергенции 1D · Крипто</span>
-                <span style="display:flex;align-items:center;gap:6px">
-                    <select class="div-scan-btn" id="divScanTfSelect" onchange="_divTimeframeChanged(this.value)" style="padding:4px 6px">
-                        <option value="15m">15м</option>
-                        <option value="1h">1ч</option>
-                        <option value="4h">4ч</option>
-                        <option value="1d" selected>1Д</option>
-                    </select>
-                    <button class="div-scan-btn" id="divScanBtn" onclick="fetchDivScan()">⟳ Сканировать</button>
-                </span>
+                <button class="div-scan-btn" id="divScanBtn" onclick="fetchDivScan()">⟳ Сканировать</button>
             </div>
             <div class="div-scan-info" id="divScanInfo"></div>
             <div class="div-scan-list" id="divScanList">
@@ -3436,11 +3437,24 @@
         _emaSaveLog();
         _emaRenderLog(new Set());
     }
-    // Смена таймфрейма в настройках — applySettings() сам сравнивает с
-    // предыдущим значением и чистит журнал/перезапрашивает сканер (сигналы
-    // разных ТФ нельзя мешать в одном журнале).
-    function _emaTimeframeChanged() {
-        applySettingsLive();
+    // Переключатель таймфрейма MA/EMA — живёт и на самой карточке сканера, и
+    // в настройках, вызывается из обоих мест с явным значением напрямую
+    // (раньше звал applySettingsLive(), которая тихо ничего не делала, если
+    // модалка настроек в этот момент закрыта — именно так карточка переставала
+    // реагировать на смену таймфрейма с самого сканера).
+    function _emaTimeframeChanged(tf) {
+        const s = loadSettings();
+        s.emaScanTimeframe = tf;
+        localStorage.setItem('cryptoSettings', JSON.stringify(s));
+        const cardSelect = document.getElementById('emaScanTfSelect');
+        if (cardSelect) cardSelect.value = tf;
+        const settingsSelect = document.getElementById('s_emaTimeframe');
+        if (settingsSelect) settingsSelect.value = tf;
+        emaLogClear();
+        emaNextRefresh = 0;
+        _lastEmaTf = tf;
+        fetchEmaScan();
+        pushSettingsToServer();
     }
     // Ключ сигнала: один и тот же символ не переалертит повторно на КАЖДОМ
     // обновлении, пока активен один и тот же набор пересечение+касания —
@@ -5076,38 +5090,16 @@
         // Смена таймфрейма EMA-сканера (сброс настроек/отмена/импорт — не только
         // прямой переключатель, у которого есть свой _emaTimeframeChanged())
         const emaTf = s.emaScanTimeframe || '15m';
+        const emaCardSelect = document.getElementById('emaScanTfSelect');
+        if (emaCardSelect) emaCardSelect.value = emaTf;
         if (_lastEmaTf !== null && _lastEmaTf !== emaTf) {
             emaLogClear();
             emaNextRefresh = 0;
             fetchEmaScan();
         }
         _lastEmaTf = emaTf;
-
-        // Таймфрейм сканера дивергенций — держим селект на самой карточке в
-        // синхроне с настройками в обе стороны, и перезапрашиваем сразу при
-        // смене (раньше смена в настройках никак не триггерила fetchDivScan(),
-        // и карточка молча продолжала показывать старый таймфрейм до ручного
-        // нажатия "Сканировать").
-        const divTf = s.divScanTimeframe || '1d';
-        const divTfSelect = document.getElementById('divScanTfSelect');
-        if (divTfSelect) divTfSelect.value = divTf;
-        if (_lastDivTf !== null && _lastDivTf !== divTf) {
-            fetchDivScan();
-        }
-        _lastDivTf = divTf;
     }
     let _lastEmaTf = null;
-    let _lastDivTf = null;
-
-    // Переключатель таймфрейма прямо на карточке сканера дивергенций.
-    function _divTimeframeChanged(tf) {
-        const s = loadSettings();
-        s.divScanTimeframe = tf;
-        localStorage.setItem('cryptoSettings', JSON.stringify(s));
-        _lastDivTf = tf;
-        fetchDivScan();
-        pushSettingsToServer();
-    }
 
     function applySettingsLive() {
         if (document.getElementById('settingsModal').style.display === 'none') return;
@@ -6530,7 +6522,7 @@
                             <div class="sv2-group-title">Сканер MA/EMA</div>
                             <div class="sv2-row" data-search="ema ma скальпинг таймфрейм">
                                 <div class="sv2-label">Таймфрейм</div>
-                                <select class="sv2-select" id="s_emaTimeframe" onchange="_emaTimeframeChanged()">
+                                <select class="sv2-select" id="s_emaTimeframe" onchange="_emaTimeframeChanged(this.value)">
                                     <option value="15m" selected>15 мин</option>
                                     <option value="1h">1 час</option>
                                     <option value="4h">4 часа</option>
