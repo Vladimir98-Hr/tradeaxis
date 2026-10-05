@@ -3428,6 +3428,12 @@
         _emaSaveLog();
         _emaRenderLog(new Set());
     }
+    // Смена таймфрейма в настройках — applySettings() сам сравнивает с
+    // предыдущим значением и чистит журнал/перезапрашивает сканер (сигналы
+    // разных ТФ нельзя мешать в одном журнале).
+    function _emaTimeframeChanged() {
+        applySettingsLive();
+    }
     // Ключ сигнала: один и тот же символ не переалертит повторно на КАЖДОМ
     // обновлении, пока активен один и тот же набор пересечение+касания —
     // только когда состав сигнала реально меняется (новое касание и т.п.).
@@ -3456,20 +3462,29 @@
             : '<div class="div-scan-empty">Пока нет сигналов</div>';
     }
 
+    const EMA_TF_LABELS = { '15m': '15м', '1h': '1Ч', '4h': '4Ч', '1d': '1Д', '1w': '1Н' };
+
     async function fetchEmaScan() {
         const myGen = ++_emaGen;
         const isFinam = currentMarket === 'finam';
+        const tf = loadSettings().emaScanTimeframe || '15m';
+        document.getElementById('emaScanTitle').textContent = `Сканер MA/EMA · ${EMA_TF_LABELS[tf] || tf}`;
         if (!emaSignalLog.length && !_emaPrevKeys.size) {
             document.getElementById('emaScanList').innerHTML = '<div class="div-scan-empty">Сканирование...</div>';
         }
         try {
             const url = isFinam
-                ? `${API_BASE}/finam/scan/ema?top=30`
-                : `${API_BASE}/scan/ema?top=30`;
+                ? `${API_BASE}/finam/scan/ema?timeframe=${tf}&top=30`
+                : `${API_BASE}/scan/ema?timeframe=${tf}&top=30`;
             const res = isFinam ? await _authFetch(url) : await fetch(url);
             const json = await res.json();
             if (myGen !== _emaGen) return;
             if (!res.ok) throw new Error(json.detail || 'Ошибка');
+            if (json.warming_up && !emaSignalLog.length) {
+                document.getElementById('emaScanList').innerHTML = '<div class="div-scan-empty">Считается в фоне, обновится в течение пары минут...</div>';
+                emaNextRefresh = Date.now() + 20 * 1000;
+                return;
+            }
             const pairs = (json.pairs ?? []).map(p => ({ ...p, _key: _emaSignalKey(p) }));
 
             const currentKeys = new Set(pairs.map(p => p._key));
@@ -4965,6 +4980,7 @@
         // Новые ключи
         showGrid: true, logScale: false, autoScale: true,
         divScanTimeframe: '1d',
+        emaScanTimeframe: '15m',
         rememberLastMarket: true, rememberLastTimeframe: true,
         rememberFxIndicators: false, confirmClearAll: true,
     };
@@ -4999,6 +5015,7 @@
             logScale:             document.getElementById('s_logScale').checked,
             autoScale:            document.getElementById('s_autoScale').checked,
             divScanTimeframe:     document.getElementById('s_divTimeframe').value,
+            emaScanTimeframe:     document.getElementById('s_emaTimeframe').value,
             rememberLastMarket:   document.getElementById('s_rememberMarket').checked,
             rememberLastTimeframe:document.getElementById('s_rememberTf').checked,
             rememberFxIndicators: document.getElementById('s_rememberFx').checked,
@@ -5042,7 +5059,17 @@
         } else if (!s.volAutoRefresh) {
             volNextRefresh = 0; emaNextRefresh = 0;
         }
+        // Смена таймфрейма EMA-сканера (сброс настроек/отмена/импорт — не только
+        // прямой переключатель, у которого есть свой _emaTimeframeChanged())
+        const emaTf = s.emaScanTimeframe || '15m';
+        if (_lastEmaTf !== null && _lastEmaTf !== emaTf) {
+            emaLogClear();
+            emaNextRefresh = 0;
+            fetchEmaScan();
+        }
+        _lastEmaTf = emaTf;
     }
+    let _lastEmaTf = null;
 
     function applySettingsLive() {
         if (document.getElementById('settingsModal').style.display === 'none') return;
@@ -5065,6 +5092,7 @@
         document.getElementById('s_volCrypto').value         = s.volScoreThresholdCrypto;
         document.getElementById('s_volAutoRefresh').checked  = s.volAutoRefresh;
         document.getElementById('s_divTimeframe').value      = s.divScanTimeframe || '1d';
+        document.getElementById('s_emaTimeframe').value      = s.emaScanTimeframe || '15m';
         document.getElementById('s_showGrid').checked        = s.showGrid;
         document.getElementById('s_logScale').checked        = s.logScale;
         document.getElementById('s_autoScale').checked       = s.autoScale;
@@ -5166,7 +5194,7 @@
     const SECTION_KEYS = {
         chart:      ['candleUp','candleDown','chartLimit','showGrid','logScale','autoScale'],
         ui:         [],
-        scanner:    ['volScoreThresholdCrypto','volAutoRefresh','divScanTimeframe'],
+        scanner:    ['volScoreThresholdCrypto','volAutoRefresh','divScanTimeframe','emaScanTimeframe'],
         indicators: ['showAlligator','jawColor','teethColor','lipsColor','showBB','bbColor','showAO','aoUp','aoDown'],
         behavior:   ['rememberLastMarket','rememberLastTimeframe','rememberFxIndicators','confirmClearAll'],
     };
@@ -6457,6 +6485,19 @@
                                     <option value="1h">1 час</option>
                                     <option value="4h">4 часа</option>
                                     <option value="1d" selected>1 день</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="sv2-group">
+                            <div class="sv2-group-title">Сканер MA/EMA</div>
+                            <div class="sv2-row" data-search="ema ma скальпинг таймфрейм">
+                                <div class="sv2-label">Таймфрейм</div>
+                                <select class="sv2-select" id="s_emaTimeframe" onchange="_emaTimeframeChanged()">
+                                    <option value="15m" selected>15 мин</option>
+                                    <option value="1h">1 час</option>
+                                    <option value="4h">4 часа</option>
+                                    <option value="1d">1 день</option>
+                                    <option value="1w">1 неделя</option>
                                 </select>
                             </div>
                         </div>

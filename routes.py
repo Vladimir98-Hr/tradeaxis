@@ -341,15 +341,22 @@ async def scan_volatile(threshold: float = 60.0, top: int = 20):
     return await get_or_compute(key, compute, ttl=45)
 
 
+_EMA_SCAN_TIMEFRAMES = ("15m", "1h", "4h", "1d", "1w")
+
+
 @router.get("/scan/ema")
-async def scan_ma_ema(top: int = 30):
+async def scan_ma_ema(timeframe: str = "15m", top: int = 30):
     """
-    Скальпинг-сканер по MA20/EMA20/50/100/200 на 15-минутных свечах:
+    Скальпинг-сканер по MA20/EMA20/50/100/200:
     - пересечение MA20 и EMA20 на последнем баре (краткосрочный сигнал смены импульса);
     - касание ценой последнего бара любой из EMA20/50/100/200 (отработка уровня).
-    См. indicators.detect_ma_ema_signal для точных правил.
+    См. indicators.detect_ma_ema_signal для точных правил. Крипто торгует 24/7, так что
+    limit здесь — это ровно число баров (в отличие от Finam, где для intraday ТФ лимит
+    на не-deep_history запрос определяет календарное окно, не гарантированный бар-каунт).
     """
-    key = get_cache_key("", "15m", top, "ma_ema_signal")
+    if timeframe not in _EMA_SCAN_TIMEFRAMES:
+        timeframe = "15m"
+    key = get_cache_key("", timeframe, top, "ma_ema_signal")
     sem = asyncio.Semaphore(6)
 
     async def scan_one(t_info):
@@ -357,7 +364,7 @@ async def scan_ma_ema(top: int = 30):
             try:
                 sym = t_info['symbol']
                 base = sym.replace('USDT', '')
-                df = await async_fetch_ohlcv_df(sym, '15m', 250)
+                df = await async_fetch_ohlcv_df(sym, timeframe, 250)
                 signal = detect_ma_ema_signal(df)
                 if not signal:
                     return None
@@ -382,7 +389,9 @@ async def scan_ma_ema(top: int = 30):
         pairs = [r for r in results if r]
         return {"count": len(pairs[:top]), "pairs": pairs[:top]}
 
-    return await get_or_compute(key, compute, ttl=45)
+    # Крупные ТФ меняются медленно — дольше держим кэш, меньше лишних проходов по 80 парам
+    ttl = {"15m": 45, "1h": 180, "4h": 600, "1d": 1800, "1w": 3600}.get(timeframe, 45)
+    return await get_or_compute(key, compute, ttl=ttl)
 
 
 @router.get("/chart-data")
