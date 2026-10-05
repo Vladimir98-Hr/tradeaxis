@@ -3355,25 +3355,10 @@
             : '<div class="div-scan-empty">Пока нет сигналов выше порога</div>';
     }
 
-    // Мосбиржа не торгует по выходным — отдельный "рынок закрыт" вместо ошибки/
-    // бесконечного "Сканирование...", и не дёргаем Finam зря, пока это так.
-    // Дата/время считаем по МСК (UTC+3, без перехода на летнее — так в РФ с 2014).
-    function isFinamMarketClosed() {
-        const mskDay = new Date(Date.now() + 3 * 3600 * 1000).getUTCDay(); // 0=вс, 6=сб
-        return mskDay === 0 || mskDay === 6;
-    }
-    const FINAM_CLOSED_HTML = '<div class="div-scan-empty">📅 Мосбиржа закрыта — выходные<br><small style="opacity:.7">Сканер возобновит работу в понедельник</small></div>';
-
     async function fetchVolScan() {
         const myGen = ++_volGen;
         const list = document.getElementById('volScanList');
         const isFinam = currentMarket === 'finam';
-        if (isFinam && isFinamMarketClosed()) {
-            list.innerHTML = FINAM_CLOSED_HTML;
-            document.getElementById('volScanInfo').textContent = '';
-            volNextRefresh = Date.now() + 30 * 60 * 1000; // раз в полчаса достаточно, рынок всё равно закрыт
-            return;
-        }
         if (!volSignalLog.length && !_volPrevSymbols.size) list.innerHTML = '<div class="div-scan-empty">Сканирование...</div>';
         try {
             const _vs = loadSettings();
@@ -3484,12 +3469,6 @@
         const isFinam = currentMarket === 'finam';
         const tf = loadSettings().emaScanTimeframe || '15m';
         document.getElementById('emaScanTitle').textContent = `Сканер MA/EMA · ${EMA_TF_LABELS[tf] || tf}`;
-        if (isFinam && isFinamMarketClosed()) {
-            document.getElementById('emaScanList').innerHTML = FINAM_CLOSED_HTML;
-            document.getElementById('emaScanInfo').textContent = '';
-            emaNextRefresh = Date.now() + 30 * 60 * 1000;
-            return;
-        }
         if (!emaSignalLog.length && !_emaPrevKeys.size) {
             document.getElementById('emaScanList').innerHTML = '<div class="div-scan-empty">Сканирование...</div>';
         }
