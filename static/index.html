@@ -1729,8 +1729,8 @@
                     </div>
                 </div>
                 <div>
-                    <div class="rc-label">Ваш капитал ($)
-                        <span class="rc-help">?<span class="rc-help-pop">Сумма денег на вашем торговом счёте прямо сейчас. От неё считается % риска на одну сделку и на всю сессию — чем больше капитал, тем больше в долларах можно рисковать при том же проценте. Поле обновляется автоматически, когда вы закрываете сделку через журнал («Открытые планы → Закрыть сделку»); если сделка была вне журнала — впишите актуальную сумму вручную.</span></span>
+                    <div class="rc-label">Ваш капитал (<span id="rcCapCcy">$</span>)
+                        <span class="rc-help">?<span class="rc-help-pop">Сумма денег на вашем торговом счёте прямо сейчас — в валюте вашего брокерского счёта (доллары на крипто-бирже, рубли на Finam). От неё считается % риска на одну сделку и на всю сессию — чем больше капитал, тем больше можно рисковать при том же проценте. Поле обновляется автоматически, когда вы закрываете сделку через журнал («Открытые планы → Закрыть сделку»); если сделка была вне журнала — впишите актуальную сумму вручную.</span></span>
                     </div>
                     <input class="rc-input" id="rcCapital" type="number" min="0" placeholder="10 000" onchange="if (_rcSessionStartCapital) _rcRecomputeTrailing()">
                 </div>
@@ -1788,7 +1788,7 @@
                         <div class="rc-section-sub">Введите вход и объём — получите цену стопа</div>
                     </div>
                 </div>
-                <div>
+                <div id="rcLevSection">
                     <div class="rc-label">Кредитное плечо: <span id="rcLevVal" style="color:var(--text-primary);font-weight:600">1×</span>
                         <span class="rc-help">?<span class="rc-help-pop">Плечо — это заём у биржи, который увеличивает размер вашей позиции сверх вложенной суммы. Плечо 1× — торговля только своими деньгами, без займа. Чем выше плечо, тем ближе цена ликвидации к цене входа: биржа принудительно закроет позицию раньше, если не хватит залога (маржи), даже если ваш стоп-лосс ещё не сработал. Более высокое плечо = более высокий риск потерять весь залог за меньшее движение цены.</span></span>
                     </div>
@@ -1796,6 +1796,9 @@
                         <input type="range" id="rcLevSlider" min="1" max="100" step="1" value="1" style="flex:1" oninput="setRcLeverage(this.value)">
                         <input type="number" id="rcLevInput" min="1" max="100" step="1" value="1" class="rc-input" style="width:64px" oninput="setRcLeverage(this.value)">
                     </div>
+                </div>
+                <div id="rcFinamLevNote" class="rc-section-sub" style="display:none;line-height:1.5;margin:2px 0 10px">
+                    На Finam плечо и цена ликвидации не показываются — маржинальная механика MOEX устроена иначе, чем на крипто-биржах. Уточняйте требования по марже у брокера.
                 </div>
                 <div>
                     <div class="rc-label">Направление
@@ -1813,11 +1816,37 @@
                         </div>
                         <input class="rc-input" id="rcEntry" type="number" min="0" placeholder="100">
                     </div>
-                    <div>
+                    <div id="rcPosAmountField">
                         <div class="rc-label" id="rcPosLabel">Объём позиции ($)
-                            <span class="rc-help">?<span class="rc-help-pop">При плече 1× — это полная сумма, на которую вы открываете позицию. При плече больше 1× это поле превращается в «Маржу / залог» — сумму, которую вы реально вносите своими деньгами; фактический размер позиции биржа увеличивает сама: маржа × плечо. Например, маржа $100 при плече 5× даёт позицию на $500.</span></span>
+                            <span class="rc-help">?<span class="rc-help-pop" id="rcPosLabelHelp">При плече 1× — это полная сумма, на которую вы открываете позицию. При плече больше 1× это поле превращается в «Маржу / залог» — сумму, которую вы реально вносите своими деньгами; фактический размер позиции биржа увеличивает сама: маржа × плечо. Например, маржа $100 при плече 5× даёт позицию на $500.</span></span>
                         </div>
                         <input class="rc-input" id="rcPosUsd" type="number" min="0" placeholder="500">
+                    </div>
+                </div>
+                <div id="rcPointFields" style="display:none">
+                    <div class="rc-2col">
+                        <div>
+                            <div class="rc-label">Количество контрактов
+                                <span class="rc-help">?<span class="rc-help-pop">Сколько контрактов (фьючерсов) вы планируете купить/продать. У точечных инструментов (фьючерсы, многие товарные контракты) цена указана в пунктах, а не в деньгах — поэтому размер позиции здесь задаётся напрямую числом контрактов, а не суммой в деньгах.</span></span>
+                            </div>
+                            <input class="rc-input" id="rcContracts" type="number" min="0" step="1" placeholder="1" oninput="document.getElementById('rcResB').style.display='none'">
+                        </div>
+                        <div>
+                            <div class="rc-label">Стоимость 1 пункта
+                                <span class="rc-help">?<span class="rc-help-pop">У срочных контрактов цена на графике — это пункты, а не деньги напрямую. «Стоимость пункта» — сколько денег стоит движение цены ровно на 1 пункт для ОДНОГО контракта. Это значение — часть спецификации конкретного контракта и различается от инструмента к инструменту; надёжных данных по спецификациям контрактов Finam в приложении нет, поэтому введите его вручную — посмотрите в спецификации контракта у брокера или на сайте биржи.</span></span>
+                            </div>
+                            <input class="rc-input" id="rcPointValue" type="number" min="0" step="0.01" placeholder="10" oninput="document.getElementById('rcResB').style.display='none'">
+                        </div>
+                    </div>
+                    <div style="margin-top:8px">
+                        <div class="rc-label">Валюта стоимости пункта
+                            <span class="rc-help">?<span class="rc-help-pop">В какой валюте указана «Стоимость 1 пункта» выше. Это валюта САМОГО КОНТРАКТА и может не совпадать с валютой вашего счёта (для Finam — всегда ₽): например, контракт на нефть или золото на зарубежной бирже оценивается в долларах, даже если торгуется через рублёвый счёт. Если валюты не совпадают, калькулятор не переводит суммы автоматически — он покажет предупреждение, а курс для сверки нужно учитывать самостоятельно.</span></span>
+                        </div>
+                        <div class="rc-dir-group">
+                            <button class="rc-dir-btn long active" id="rcPointCcyRub" onclick="setRcPointCcy('RUB')">₽ рубли</button>
+                            <button class="rc-dir-btn short" id="rcPointCcyUsd" onclick="setRcPointCcy('USD')">$ доллары</button>
+                        </div>
+                        <div class="rc-section-sub" id="rcPointCcyWarn" style="display:none;color:#e05252;margin-top:6px;line-height:1.5"></div>
                     </div>
                 </div>
                 <div>
@@ -1850,8 +1879,8 @@
                     </div>
                     <div class="rc-stop-result" style="margin-top:6px">
                         <div>
-                            <div class="rc-card-label">Объём в монетах
-                                <span class="rc-help">?<span class="rc-help-pop">Размер позиции, пересчитанный из долларов в количество монет актива по цене входа.</span></span>
+                            <div class="rc-card-label" id="rcB_unitLabel">Объём в монетах
+                                <span class="rc-help">?<span class="rc-help-pop" id="rcB_unitHelp">Размер позиции, пересчитанный из долларов в количество монет актива по цене входа.</span></span>
                             </div>
                             <div style="font-size:13px;font-weight:600" id="rcB_coins">—</div>
                             <div class="rc-card-sub" id="rcB_riskCheck">—</div>
@@ -1930,6 +1959,68 @@
                     </div>
                     <button class="rc-calc-btn" style="margin-top:8px" onclick="saveTradePlan()">&#128190; Сохранить как план</button>
                     <div id="rcPlanMsg" style="font-size:12px;margin-top:6px;min-height:16px"></div>
+                </div>
+
+                <hr class="rc-divider">
+
+                <!-- ═══ БЛОК Г: Усреднение позиции (пирамидинг) ═══ -->
+                <div class="rc-section">
+                    <div class="rc-section-num">Г</div>
+                    <div>
+                        <div class="rc-section-title">Усреднение позиции (пирамидинг)</div>
+                        <div class="rc-section-sub">Для докупок по частям на разных ценах — считает среднюю цену и новый стоп</div>
+                    </div>
+                </div>
+                <div class="rc-section-sub" style="line-height:1.6;margin:2px 0 10px">
+                    Для крупного капитала: если вы покупаете не всей суммой сразу, а по частям на разных ценах (например, купили на 100 000 по 50, затем ещё на 100 000 по 52) —
+                    впишите сюда каждую покупку отдельной строкой. Калькулятор сам посчитает средневзвешенную цену входа и новый стоп так, чтобы
+                    <b>суммарный риск по всей позиции остался в пределах лимита «Риск / 1 сделка» из блока А</b>, а не рос с каждым новым входом.
+                    <span class="rc-help">?<span class="rc-help-pop">Лимит риска из блока А не умножается на число входов. Для N входов калькулятор берёт среднюю цену и делит тот же самый лимит риска на итоговое количество акций/контрактов — поэтому чем больше вы докупаете, тем ближе к средней цене оказывается новый стоп. Плечо в этом блоке не учитывается — суммы считаются как внесённые деньги (или контракты) без займа у биржи, даже если вы торгуете крипто.</span></span>
+                </div>
+                <div id="rcAvgRows"></div>
+                <button type="button" class="rc-calc-btn" style="background:transparent;border:1px dashed var(--border-color);color:var(--text-secondary)" onclick="_rcAddAvgRow()">+ Добавить вход</button>
+                <div class="rc-error" id="rcErrorG"></div>
+                <button class="rc-calc-btn" style="margin-top:8px" onclick="calcAveraging()">Рассчитать усреднение</button>
+
+                <div id="rcResG" style="display:none;margin-top:10px">
+                    <div class="rc-stop-result">
+                        <div>
+                            <div class="rc-card-label">Средняя цена входа
+                                <span class="rc-help">?<span class="rc-help-pop">Средневзвешенная цена всех входов — чем больше вложено на конкретной цене, тем сильнее она "тянет" среднюю к себе.</span></span>
+                            </div>
+                            <div class="rc-stop-price" id="rcG_avgEntry">—</div>
+                            <div class="rc-card-sub" id="rcG_total">—</div>
+                        </div>
+                        <div style="text-align:right">
+                            <div class="rc-card-label">Новый стоп-лосс
+                                <span class="rc-help">?<span class="rc-help-pop">Стоп, пересчитанный от средней цены входа так, чтобы общий риск по всей усреднённой позиции не превышал лимит «Риск / 1 сделка» из блока А.</span></span>
+                            </div>
+                            <div style="font-size:18px;font-weight:700;color:#e05252" id="rcG_stopPrice">—</div>
+                            <div class="rc-card-sub" id="rcG_stopPct">—</div>
+                        </div>
+                    </div>
+                    <div class="rc-stop-result" style="margin-top:6px">
+                        <div>
+                            <div class="rc-card-label">Новый тейк-профит
+                                <span class="rc-help">?<span class="rc-help-pop">Тейк-профит от средней цены входа с тем же R:R, который указан в блоке Б.</span></span>
+                            </div>
+                            <div style="font-size:13px;font-weight:600;color:#4caf82" id="rcG_tpPrice">—</div>
+                            <div class="rc-card-sub" id="rcG_tpProfit">—</div>
+                        </div>
+                        <div style="text-align:right">
+                            <div class="rc-card-label">Риск на всю позицию
+                                <span class="rc-help">?<span class="rc-help-pop">Общая сумма, которую вы потеряете, если новый стоп сработает — не больше лимита риска из блока А, независимо от числа входов.</span></span>
+                            </div>
+                            <div style="font-size:13px;font-weight:600" id="rcG_riskTotal">—</div>
+                        </div>
+                    </div>
+                    <div style="margin-top:10px">
+                        <div class="rc-label">Оценка вероятности успеха сетапа, % (опционально)
+                            <span class="rc-help">?<span class="rc-help-pop">Это ВАША субъективная оценка, а не статистика по истории сделок — калькулятор её не вычисляет сам. Если вы её укажете, ниже появится математическое ожидание сделки в деньгах: p × потенциальная прибыль − (1 − p) × риск. Положительное значение означает, что сделка выгодна в среднем при таком win-rate; оставьте поле пустым, если не готовы оценить вероятность.</span></span>
+                        </div>
+                        <input class="rc-input" id="rcAvgPWin" type="number" min="0" max="100" step="1" placeholder="например, 55" oninput="_rcRenderAvgEV()">
+                        <div class="rc-section-sub" id="rcG_ev" style="margin-top:4px"></div>
+                    </div>
                 </div>
 
                 <hr class="rc-divider">
@@ -2080,6 +2171,7 @@
     let currentTimeframe = '1h';
     let currentMarket = 'crypto';        // 'crypto' | 'finam'
     let currentFinamCategory = 'stocks';  // 'stocks' | 'futures' | 'currencies' | 'commodities'
+    let _rcCurInstrument = null;          // {currency, point_based} выбранного Finam-инструмента для калькулятора риска
 
     // Ссылки на графики и серии
     let mainChart, candleSeries, jawSeries, teethSeries, lipsSeries;
@@ -2849,6 +2941,8 @@
         finamCard.style.display = market === 'finam' ? 'block' : 'none';
         finamCats.style.display = market === 'finam' ? 'flex' : 'none';
         if (market === 'finam') {
+            _rcCurInstrument = null;
+            _rcResetCalcOnInstrumentChange();
             if (tickerInterval) clearInterval(tickerInterval);
             if (visibleTickerInterval) clearInterval(visibleTickerInterval);
             document.getElementById('wsStatus').textContent = 'Finam: исторические данные';
@@ -2877,6 +2971,8 @@
             _volRenderLog(new Set());
             currentSymbol = 'BTCUSDT';
             document.getElementById('chartSymbolName').textContent = 'BTC/USDT';
+            _rcCurInstrument = null;
+            _rcResetCalcOnInstrumentChange();
             updateTimeframesForMarket('crypto');
             fetchSymbolsList().then(() => { fetchAll(); startTicker(); });
             fetchVolScan();
@@ -2895,6 +2991,10 @@
         if (!sym) return;
         currentSymbol = sym;
         document.getElementById('chartSymbolName').textContent = sym;
+        // Инструмент введён вручную — валюта/тип цены неизвестны, калькулятор риска
+        // попросит указать их явно (см. _rcInstrumentMeta)
+        _rcCurInstrument = { currency: null, point_based: null };
+        _rcResetCalcOnInstrumentChange();
         fetchAll();
     }
 
@@ -2905,6 +3005,8 @@
         if (el) el.classList.add('active');
         currentSymbol = sym.symbol;
         document.getElementById('chartSymbolName').textContent = sym.name;
+        _rcCurInstrument = { currency: sym.currency, point_based: !!sym.point_based };
+        _rcResetCalcOnInstrumentChange();
         fetchAll();
     }
 
@@ -3292,6 +3394,8 @@
         btn.classList.add('active');
         currentFinamCategory = btn.dataset.cat;
         fetchFinamSymbols(currentFinamCategory);
+        _rcCurInstrument = null;
+        _rcResetCalcOnInstrumentChange();
     });
 
 
@@ -4072,7 +4176,101 @@
     let _rcAppliedJournalPnl = {}; // {reviewId: resultUsd} — сегодняшние сделки из журнала, уже учтённые в поле "Ваш капитал" (для диффа при повторных рендерах)
     let _rcSessionLockNotified = false; // показывали ли уже блокирующее окно для текущей блокировки сессии
     let _rcSetup     = 'Дивербар';
-    let _rcLastCalc  = null; // последний расчёт блока Б — используется для "Сохранить как план"
+    let _rcLastCalc  = null; // последний расчёт блока Б (или Г, если считали усреднение) — используется для "Сохранить как план"
+    let _rcAvgEntries = [];  // блок Г: [{price, amount}] для спот-инструментов или [{price, contracts}] для точечных
+    let _rcPointCcy = 'RUB'; // валюта стоимости пункта для точечных инструментов — выбирается пользователем вручную
+
+    // ── Валюта/единицы текущего инструмента ──────────────────
+    // Единая точка правды: crypto всегда $/монеты; для Finam — акции и рублёвые
+    // спот-пары (валюты, GLDRUB/SLVRUB) считаются как крипто, но в ₽ и "единицах";
+    // фьючерсы и точечные товары требуют от пользователя ручного ввода стоимости
+    // пункта и её валюты — у нас нет надёжных данных по спецификациям контрактов Finam.
+    // Валюта капитала/лимитов риска (блок А) — валюта вашего брокерского счёта.
+    // Для Finam всегда ₽ (брокерский счёт в РФ), для crypto всегда $. Это НЕ то же
+    // самое, что валюта стоимости пункта у фьючерса (см. _rcInstrumentMeta) — она
+    // может отличаться, и тогда калькулятор явно предупреждает об этом.
+    function _rcAccountCcy() {
+        return currentMarket === 'crypto' ? '$' : '₽';
+    }
+
+    function _rcUpdateCurrencyLabels() {
+        const ccy = _rcAccountCcy();
+        const capCcyEl = document.getElementById('rcCapCcy');
+        if (capCcyEl) capCcyEl.textContent = ccy;
+    }
+
+    function _rcInstrumentMeta() {
+        if (currentMarket === 'crypto') {
+            return { currency: 'USD', ccySym: '$', unitLabel: 'монет', pointBased: false, unknown: false };
+        }
+        const m = _rcCurInstrument || {};
+        // У всех точечных инструментов Finam (фьючерсы, большинство товаров) и у
+        // тикеров, введённых вручную, валюта/стоимость пункта не известна бэкенду —
+        // пользователь выбирает валюту переключателем ₽/$ и вводит стоимость сам.
+        if (m.point_based !== false) {
+            return { currency: _rcPointCcy, ccySym: _rcPointCcy === 'USD' ? '$' : '₽', unitLabel: 'контрактов', pointBased: true, unknown: m.point_based === null };
+        }
+        const unitLabel = currentFinamCategory === 'stocks' ? 'акций' : 'единиц';
+        return { currency: 'RUB', ccySym: '₽', unitLabel, pointBased: false, unknown: false };
+    }
+
+    // Переключатель валюты стоимости пункта (блок Б/Г, точечные инструменты)
+    function setRcPointCcy(ccy) {
+        _rcPointCcy = ccy;
+        document.getElementById('rcPointCcyRub').classList.toggle('active', ccy === 'RUB');
+        document.getElementById('rcPointCcyUsd').classList.toggle('active', ccy === 'USD');
+        document.getElementById('rcResB').style.display = 'none';
+        _rcCheckPointCcyWarn();
+    }
+
+    // Валюта стоимости пункта контракта — своя, не обязана совпадать с валютой
+    // капитала (₽ для Finam). Калькулятор не переводит суммы автоматически.
+    function _rcCheckPointCcyWarn() {
+        const warnEl = document.getElementById('rcPointCcyWarn');
+        if (!warnEl) return;
+        if (currentMarket !== 'crypto' && _rcPointCcy !== 'RUB') {
+            warnEl.style.display = 'block';
+            warnEl.textContent = '⚠ Стоимость пункта указана в $, а капитал и риск на сделку считаются в ₽ — суммы напрямую не сопоставимы. Автоматического перевода валют нет: сверяйте по актуальному курсу самостоятельно.';
+        } else {
+            warnEl.style.display = 'none';
+        }
+    }
+
+    // Показывает нужные поля блока Б (деньги vs контракты+пункт) и скрывает
+    // плечо/ликвидацию для Finam — крипто-модель маржи там не применима.
+    function _rcUpdateBlockBFields() {
+        const meta = _rcInstrumentMeta();
+        const posField = document.getElementById('rcPosAmountField');
+        const pointFields = document.getElementById('rcPointFields');
+        if (posField) posField.style.display = meta.pointBased ? 'none' : 'block';
+        if (pointFields) pointFields.style.display = meta.pointBased ? 'block' : 'none';
+
+        const levSection = document.getElementById('rcLevSection');
+        const levNote = document.getElementById('rcFinamLevNote');
+        const isFinam = currentMarket === 'finam';
+        if (levSection) levSection.style.display = isFinam ? 'none' : 'block';
+        if (levNote) levNote.style.display = isFinam ? 'block' : 'none';
+
+        if (!meta.pointBased) {
+            const labelEl = document.getElementById('rcPosLabel');
+            if (labelEl) labelEl.textContent = (!isFinam && _rcLeverage > 1 ? 'Маржа / залог (' : 'Объём позиции (') + meta.ccySym + ')';
+        }
+        _rcCheckPointCcyWarn();
+    }
+
+    // Сбрасывает результаты блоков Б/Г при смене рынка/категории/инструмента —
+    // единицы и валюта могли измениться, старые цифры вводят в заблуждение.
+    function _rcResetCalcOnInstrumentChange() {
+        const resB = document.getElementById('rcResB');
+        if (resB) resB.style.display = 'none';
+        _rcAvgEntries = [];
+        const avgRows = document.getElementById('rcAvgRows');
+        if (avgRows) avgRows.innerHTML = '';
+        const avgRes = document.getElementById('rcResG');
+        if (avgRes) avgRes.style.display = 'none';
+        _rcUpdateCurrencyLabels();
+        _rcUpdateBlockBFields();
+    }
 
     // Подсказки (?) — открытие/закрытие по клику или тапу (наведение работает через CSS :hover)
     document.addEventListener('click', function(e) {
@@ -4088,6 +4286,9 @@
 
     function openRiskCalc() {
         document.getElementById('riskCalcModal').style.display = 'flex';
+        _rcUpdateCurrencyLabels();
+        _rcUpdateBlockBFields();
+        _rcRenderAvgRows();
         loadSessionState();
     }
     function closeRiskCalc() {
@@ -4125,7 +4326,7 @@
         document.getElementById('rcLevInput').value  = lev;
         document.getElementById('rcLevVal').textContent = lev + '×';
         // Менять лейбл поля объёма: без плеча — "Объём позиции", с плечом — "Маржа (залог)"
-        document.getElementById('rcPosLabel').textContent = _rcLeverage > 1 ? 'Маржа / залог ($)' : 'Объём позиции ($)';
+        _rcUpdateBlockBFields();
         // Сбросить результат при смене плеча
         document.getElementById('rcResB').style.display = 'none';
     }
@@ -4168,18 +4369,20 @@
         _rcSessLimit  = sessLimit;
         localStorage.setItem('rcCapitalPersist', capital);
 
-        document.getElementById('rcA_tradeUsd').textContent = '$' + tradeRisk.toFixed(2);
+        _rcUpdateCurrencyLabels();
+        const ccy = _rcAccountCcy();
+        document.getElementById('rcA_tradeUsd').textContent = ccy + tradeRisk.toFixed(2);
         document.getElementById('rcA_tradePct').textContent = riskPct.toFixed(2) + '% от капитала сессии';
-        document.getElementById('rcA_sessUsd').textContent  = '$' + sessLimit.toFixed(2);
+        document.getElementById('rcA_sessUsd').textContent  = ccy + sessLimit.toFixed(2);
         document.getElementById('rcA_sessPct').textContent  = sessPct.toFixed(2) + '% от капитала сессии';
         document.getElementById('rcResA').style.display     = 'block';
 
         const noteEl = document.getElementById('rcSessionAnchorNote');
         if (Math.abs(capital - anchorCapital) > 0.01) {
-            noteEl.innerHTML = `Сессия открыта сегодня с капиталом <b>$${anchorCapital.toFixed(2)}</b> — лимиты выше посчитаны от него, а не от введённых сейчас $${capital.toFixed(2)}. `
+            noteEl.innerHTML = `Сессия открыта сегодня с капиталом <b>${ccy}${anchorCapital.toFixed(2)}</b> — лимиты выше посчитаны от него, а не от введённых сейчас ${ccy}${capital.toFixed(2)}. `
                 + `Чтобы пересчитать от нового капитала — нажмите «Сбросить сессию».`;
         } else {
-            noteEl.innerHTML = `Капитал начала сессии на сегодня: <b>$${anchorCapital.toFixed(2)}</b>. Пока сессия открыта, лимиты не меняются, даже если капитал в поле выше — это и защищает от отдачи прибыли.`;
+            noteEl.innerHTML = `Капитал начала сессии на сегодня: <b>${ccy}${anchorCapital.toFixed(2)}</b>. Пока сессия открыта, лимиты не меняются, даже если капитал в поле выше — это и защищает от отдачи прибыли.`;
         }
 
         // Разблокировать блок Б
@@ -4290,33 +4493,63 @@
             return;
         }
 
-        const entry  = parseFloat(document.getElementById('rcEntry').value);
-        const posUsd = parseFloat(document.getElementById('rcPosUsd').value);
-        if (!entry || entry <= 0)   { errEl.textContent = 'Введите цену входа'; return; }
-        if (!posUsd || posUsd <= 0) { errEl.textContent = _rcLeverage > 1 ? 'Введите маржу в $' : 'Введите объём позиции в $'; return; }
+        const meta = _rcInstrumentMeta();
+        _rcUpdateBlockBFields();
+        const ccy = meta.ccySym;
+        const entry = parseFloat(document.getElementById('rcEntry').value);
+        if (!entry || entry <= 0) { errEl.textContent = 'Введите цену входа'; return; }
+        const rr = parseFloat(document.getElementById('rcRRInput').value) || 1.5;
 
-        const lev = _rcLeverage;
-        // При плече posUsd — это маржа; эффективная позиция = маржа × плечо
-        const effectivePosUsd = posUsd * lev;
-        // Сколько монет контролируем
-        const coins    = effectivePosUsd / entry;
-        // Допустимое расстояние до стопа на монету
-        const stopDist = _rcTradeRisk / coins;
-        // Цена стопа
-        const stopPrice = _rcDir === 'long' ? entry - stopDist : entry + stopDist;
-        const stopPct   = (stopDist / entry * 100).toFixed(2);
+        // Плечо имеет смысл только для крипто-перпетуалов; для Finam позиция всегда 1×
+        const lev = (currentMarket === 'crypto') ? _rcLeverage : 1;
 
+        let coins, stopDist, stopPrice, tpDist, tpPrice, tpProfit;
+        let posUsd = null, effectivePosUsd = null, contracts = null, pointValue = null;
+
+        if (meta.pointBased) {
+            contracts  = parseFloat(document.getElementById('rcContracts').value);
+            pointValue = parseFloat(document.getElementById('rcPointValue').value);
+            if (!contracts || contracts <= 0)   { errEl.textContent = 'Введите количество контрактов'; return; }
+            if (!pointValue || pointValue <= 0) { errEl.textContent = 'Введите стоимость 1 пункта'; return; }
+            coins = contracts;
+            // Риск делится на итоговую стоимость движения всей позиции на 1 пункт
+            stopDist  = _rcTradeRisk / (contracts * pointValue);
+            stopPrice = _rcDir === 'long' ? entry - stopDist : entry + stopDist;
+            tpDist    = stopDist * rr;
+            tpPrice   = _rcDir === 'long' ? entry + tpDist : entry - tpDist;
+            tpProfit  = tpDist * contracts * pointValue;
+        } else {
+            posUsd = parseFloat(document.getElementById('rcPosUsd').value);
+            if (!posUsd || posUsd <= 0) { errEl.textContent = (lev > 1 ? `Введите маржу в ${ccy}` : `Введите объём позиции в ${ccy}`); return; }
+            // При плече posUsd — это маржа; эффективная позиция = маржа × плечо
+            effectivePosUsd = posUsd * lev;
+            coins     = effectivePosUsd / entry;
+            stopDist  = _rcTradeRisk / coins;
+            stopPrice = _rcDir === 'long' ? entry - stopDist : entry + stopDist;
+            tpDist    = stopDist * rr;
+            tpPrice   = _rcDir === 'long' ? entry + tpDist : entry - tpDist;
+            tpProfit  = tpDist * coins;
+        }
+
+        const stopPct = (stopDist / entry * 100).toFixed(2);
         const stopEl = document.getElementById('rcB_stopPrice');
         stopEl.textContent = stopPrice < 0.01 ? stopPrice.toFixed(8) : stopPrice.toFixed(4);
         stopEl.className   = 'rc-stop-price ' + _rcDir;
+        stopEl.style.color = '';
 
-        document.getElementById('rcB_stopPct').textContent   = (_rcDir === 'long' ? '−' : '+') + stopPct + '% от входа';
-        document.getElementById('rcB_coins').textContent     = coins.toFixed(4) + ' монет';
-        document.getElementById('rcB_riskCheck').textContent = 'Риск: $' + _rcTradeRisk.toFixed(2);
+        document.getElementById('rcB_stopPct').textContent = (_rcDir === 'long' ? '−' : '+') + stopPct + '% от входа';
+        document.getElementById('rcB_unitLabel').textContent = meta.pointBased ? 'Количество контрактов' : ('Объём в ' + meta.unitLabel);
+        document.getElementById('rcB_unitHelp').textContent = meta.pointBased
+            ? 'Контракты, указанные выше, — на них распределён риск сделки из блока А через стоимость 1 пункта.'
+            : `Размер позиции, пересчитанный из ${ccy} в количество ${meta.unitLabel} актива по цене входа.`;
+        document.getElementById('rcB_coins').textContent = meta.pointBased
+            ? (coins.toFixed(0) + ' контр.')
+            : (coins.toFixed(4) + ' ' + meta.unitLabel);
+        document.getElementById('rcB_riskCheck').textContent = 'Риск: ' + ccy + _rcTradeRisk.toFixed(2);
 
-        // Инфо о плече
+        // Инфо о плече/ликвидации — только для крипто без плеча это тоже скрыто
         const levInfoEl = document.getElementById('rcB_levInfo');
-        if (lev > 1) {
+        if (currentMarket === 'crypto' && lev > 1 && !meta.pointBased) {
             // Цена ликвидации с учётом maintenance margin (~0.5%) — консервативная оценка
             // Реальная цена зависит от биржи и размера позиции
             const MMR = 0.005;
@@ -4328,18 +4561,18 @@
             // Реальный убыток при ликвидации
             const lossAtLiq = Math.abs(entry - liqPrice) * coins;
 
-            document.getElementById('rcB_effPos').textContent   = '$' + effectivePosUsd.toLocaleString('ru-RU', {maximumFractionDigits: 2});
-            document.getElementById('rcB_margin').textContent   = 'Маржа: $' + posUsd.toLocaleString('ru-RU', {maximumFractionDigits: 2}) + ' × ' + lev;
+            document.getElementById('rcB_effPos').textContent   = ccy + effectivePosUsd.toLocaleString('ru-RU', {maximumFractionDigits: 2});
+            document.getElementById('rcB_margin').textContent   = 'Маржа: ' + ccy + posUsd.toLocaleString('ru-RU', {maximumFractionDigits: 2}) + ' × ' + lev;
             document.getElementById('rcB_liqPrice').textContent = liqPrice < 0.01 ? liqPrice.toFixed(8) : liqPrice.toFixed(4);
             document.getElementById('rcB_liqPct').textContent   = (_rcDir === 'long' ? '−' : '+') + liqPct + '% от входа';
-            document.getElementById('rcB_liqLoss').textContent  = 'При ликвидации потеря: ~$' + lossAtLiq.toFixed(2);
+            document.getElementById('rcB_liqLoss').textContent  = 'При ликвидации потеря: ~' + ccy + lossAtLiq.toFixed(2);
 
             // Предупреждение: маржа меньше лимита риска
             const marginWarnEl = document.getElementById('rcB_marginWarn');
             if (posUsd < _rcTradeRisk) {
                 marginWarnEl.style.display = 'block';
-                marginWarnEl.innerHTML = '⚠ Маржа ($' + posUsd.toFixed(2) + ') меньше лимита риска ($' + _rcTradeRisk.toFixed(2) + ').<br>'
-                    + 'Максимальная потеря ограничена маржой. Для риска $' + _rcTradeRisk.toFixed(2) + ' нужна маржа ≥ $' + _rcTradeRisk.toFixed(2) + '.';
+                marginWarnEl.innerHTML = '⚠ Маржа (' + ccy + posUsd.toFixed(2) + ') меньше лимита риска (' + ccy + _rcTradeRisk.toFixed(2) + ').<br>'
+                    + 'Максимальная потеря ограничена маржой. Для риска ' + ccy + _rcTradeRisk.toFixed(2) + ' нужна маржа ≥ ' + ccy + _rcTradeRisk.toFixed(2) + '.';
             } else {
                 marginWarnEl.style.display = 'none';
             }
@@ -4349,8 +4582,6 @@
             if (stopBeyondLiq) {
                 document.getElementById('rcB_stopPct').textContent = '⚠ недостижим — биржа ликвидирует раньше';
                 stopEl.style.color = '#e05252';
-            } else {
-                stopEl.style.color = '';
             }
             document.getElementById('rcB_liqWarn').style.display = stopBeyondLiq ? 'block' : 'none';
 
@@ -4359,26 +4590,131 @@
             levInfoEl.style.display = 'none';
         }
 
-        // Тейк-профит по R:R из поля ввода
-        const rr = parseFloat(document.getElementById('rcRRInput').value) || 1.5;
-        const tpDist  = stopDist * rr;
-        const tpPrice = _rcDir === 'long' ? entry + tpDist : entry - tpDist;
-        const tpPct   = (tpDist / entry * 100).toFixed(2);
-        const tpProfit = tpDist * coins;
-
+        const tpPct = (tpDist / entry * 100).toFixed(2);
         const tpEl = document.getElementById('rcB_tpPrice');
         tpEl.textContent = tpPrice < 0.01 ? tpPrice.toFixed(8) : tpPrice.toFixed(4);
         document.getElementById('rcB_tpPct').textContent    = (_rcDir === 'long' ? '+' : '−') + tpPct + '% от входа';
-        document.getElementById('rcB_tpProfit').textContent = '+$' + tpProfit.toFixed(2);
+        document.getElementById('rcB_tpProfit').textContent = '+' + ccy + tpProfit.toFixed(2);
         document.getElementById('rcB_rrLabel').textContent  = 'R:R ' + rr + ':1';
 
         document.getElementById('rcResB').style.display = 'block';
 
         _rcLastCalc = {
             sym: currentSymbol, dir: _rcDir, entry, stop: stopPrice, tp: tpPrice,
-            riskUsd: _rcTradeRisk, rr, coins, ts: Date.now()
+            riskUsd: _rcTradeRisk, rr, coins, ts: Date.now(),
+            unit: meta.unitLabel, currency: meta.currency, pointBased: meta.pointBased,
+            pointValue: meta.pointBased ? pointValue : undefined,
         };
         document.getElementById('rcPlanMsg').textContent = '';
+    }
+
+    // ── БЛОК Г: усреднение позиции (пирамидинг) ──────────────
+    // _rcAvgEntries: [{price, amount}] для спот-инструментов, [{price, contracts}] для точечных
+    let _rcLastAvgResult = null; // {totalUnits, stopDist, rr, pointBased, pointValue} — для пересчёта EV без повторного нажатия "Рассчитать"
+
+    function _rcRenderAvgRows() {
+        const container = document.getElementById('rcAvgRows');
+        if (!container) return;
+        const meta = _rcInstrumentMeta();
+        container.innerHTML = _rcAvgEntries.map((row, i) => `
+            <div class="rc-2col" style="margin-bottom:6px" data-avg-row="${i}">
+                <div>
+                    <div class="rc-label" style="margin-bottom:4px">Цена входа ${i + 1}</div>
+                    <input class="rc-input" type="number" min="0" value="${row.price || ''}" placeholder="52" oninput="_rcAvgEntries[${i}].price = parseFloat(this.value) || 0">
+                </div>
+                <div>
+                    <div class="rc-label" style="margin-bottom:4px">${meta.pointBased ? 'Контракты' : ('Сумма, ' + (meta.ccySym || '₽'))}
+                        <button type="button" class="rc-mic-btn" style="float:right" onclick="_rcRemoveAvgRow(${i})" title="Удалить вход">&#x2715;</button>
+                    </div>
+                    <input class="rc-input" type="number" min="0" value="${(meta.pointBased ? row.contracts : row.amount) || ''}" placeholder="${meta.pointBased ? '1' : '100000'}"
+                        oninput="_rcAvgEntries[${i}].${meta.pointBased ? 'contracts' : 'amount'} = parseFloat(this.value) || 0">
+                </div>
+            </div>
+        `).join('');
+    }
+
+    function _rcAddAvgRow() {
+        _rcAvgEntries.push({ price: 0, amount: 0, contracts: 0 });
+        document.getElementById('rcResG').style.display = 'none';
+        _rcRenderAvgRows();
+    }
+
+    function _rcRemoveAvgRow(i) {
+        _rcAvgEntries.splice(i, 1);
+        document.getElementById('rcResG').style.display = 'none';
+        _rcRenderAvgRows();
+    }
+
+    function calcAveraging() {
+        const errEl = document.getElementById('rcErrorG');
+        errEl.textContent = '';
+        document.getElementById('rcResG').style.display = 'none';
+
+        if (_rcTradeRisk <= 0) { errEl.textContent = 'Сначала рассчитайте лимиты (блок А)'; return; }
+        const meta = _rcInstrumentMeta();
+        const ccy = meta.ccySym;
+        const rr = parseFloat(document.getElementById('rcRRInput').value) || 1.5;
+
+        const rows = _rcAvgEntries.filter(r => r.price > 0 && (meta.pointBased ? r.contracts > 0 : r.amount > 0));
+        if (rows.length < 2) { errEl.textContent = 'Добавьте минимум 2 входа с ценой и суммой/контрактами'; return; }
+
+        let avgEntry, totalUnits, stopDist, pointValue = null;
+        if (meta.pointBased) {
+            pointValue = parseFloat(document.getElementById('rcPointValue').value);
+            if (!pointValue || pointValue <= 0) { errEl.textContent = 'Укажите стоимость 1 пункта в блоке Б'; return; }
+            totalUnits = rows.reduce((s, r) => s + r.contracts, 0);
+            avgEntry   = rows.reduce((s, r) => s + r.price * r.contracts, 0) / totalUnits;
+            stopDist   = _rcTradeRisk / (totalUnits * pointValue);
+        } else {
+            const totalAmount = rows.reduce((s, r) => s + r.amount, 0);
+            totalUnits = rows.reduce((s, r) => s + r.amount / r.price, 0);
+            avgEntry    = totalAmount / totalUnits;
+            stopDist    = _rcTradeRisk / totalUnits;
+        }
+
+        const stopPrice = _rcDir === 'long' ? avgEntry - stopDist : avgEntry + stopDist;
+        const stopPct    = (stopDist / avgEntry * 100).toFixed(2);
+        const tpDist     = stopDist * rr;
+        const tpPrice    = _rcDir === 'long' ? avgEntry + tpDist : avgEntry - tpDist;
+        const tpProfit   = meta.pointBased ? tpDist * totalUnits * pointValue : tpDist * totalUnits;
+
+        document.getElementById('rcG_avgEntry').textContent = avgEntry < 0.01 ? avgEntry.toFixed(8) : avgEntry.toFixed(4);
+        document.getElementById('rcG_total').textContent = meta.pointBased
+            ? (totalUnits.toFixed(0) + ' контр. · ' + rows.length + ' вх.')
+            : (totalUnits.toFixed(4) + ' ' + meta.unitLabel + ' · ' + rows.length + ' вх.');
+        document.getElementById('rcG_stopPrice').textContent = stopPrice < 0.01 ? stopPrice.toFixed(8) : stopPrice.toFixed(4);
+        document.getElementById('rcG_stopPct').textContent = (_rcDir === 'long' ? '−' : '+') + stopPct + '% от средней';
+        document.getElementById('rcG_tpPrice').textContent = tpPrice < 0.01 ? tpPrice.toFixed(8) : tpPrice.toFixed(4);
+        document.getElementById('rcG_tpProfit').textContent = '+' + ccy + tpProfit.toFixed(2);
+        document.getElementById('rcG_riskTotal').textContent = ccy + _rcTradeRisk.toFixed(2) + ' (не растёт с числом входов)';
+
+        document.getElementById('rcResG').style.display = 'block';
+
+        _rcLastAvgResult = { totalUnits, stopDist, rr, pointBased: meta.pointBased, pointValue, tpProfit };
+        _rcRenderAvgEV();
+
+        _rcLastCalc = {
+            sym: currentSymbol, dir: _rcDir, entry: avgEntry, stop: stopPrice, tp: tpPrice,
+            riskUsd: _rcTradeRisk, rr, coins: totalUnits, ts: Date.now(),
+            unit: meta.unitLabel, currency: meta.currency, pointBased: meta.pointBased,
+            pointValue: meta.pointBased ? pointValue : undefined,
+            entries: rows.slice(),
+        };
+        document.getElementById('rcPlanMsg').textContent = '';
+    }
+
+    // Математическое ожидание сделки — только если пользователь явно указал
+    // свою оценку вероятности успеха; это не статистика по истории сделок.
+    function _rcRenderAvgEV() {
+        const evEl = document.getElementById('rcG_ev');
+        if (!evEl || !_rcLastAvgResult) return;
+        const pWinPct = parseFloat(document.getElementById('rcAvgPWin').value);
+        if (isNaN(pWinPct) || pWinPct < 0 || pWinPct > 100) { evEl.textContent = ''; return; }
+        const p = pWinPct / 100;
+        const ccy = _rcInstrumentMeta().ccySym;
+        const reward = _rcLastAvgResult.tpProfit;
+        const ev = p * reward - (1 - p) * _rcTradeRisk;
+        evEl.innerHTML = `Математическое ожидание при p = ${pWinPct}%: <b style="color:${ev >= 0 ? '#4caf82' : '#e05252'}">${ev >= 0 ? '+' : ''}${ccy}${ev.toFixed(2)}</b> за сделку`;
     }
 
     // ── Голосовой ввод (Web Speech API) ──────────────────────
@@ -4598,7 +4934,7 @@
             <div class="journal-item">
                 <div class="journal-item-left" style="cursor:pointer" onclick="openPlanConspect(${p.id})">
                     <span class="journal-badge ${p.dir === 'short' ? 'loss' : 'win'}">${p.dir === 'short' ? 'ШОРТ' : 'ЛОНГ'}</span>
-                    <span style="color:var(--text-primary);font-weight:500">${p.sym || '—'}</span>
+                    <span style="color:var(--text-primary);font-weight:500">${p.sym || '—'}${p.entries && p.entries.length > 1 ? ' · усреднено: ' + p.entries.length + ' вх.' : ''}</span>
                 </div>
                 <button class="div-scan-btn" style="padding:2px 8px;font-size:11px" onclick="event.stopPropagation();openPostReview(${p.id})">Закрыть сделку</button>
             </div>
@@ -4609,12 +4945,25 @@
         return ts ? new Date(ts).toLocaleString('ru-RU', { day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit' }) : '—';
     }
 
+    // Валюта плана из журнала — по рынку, на котором план был сохранён
+    // (crypto всегда $, Finam всегда ₽ — см. _rcAccountCcy)
+    function _jPlanCcy(plan) {
+        return (plan.market || 'crypto') === 'crypto' ? '$' : '₽';
+    }
+
     // ── Общий конспект плана (переиспользуется в разборе и в просмотре) ──
     function _planConspectHtml(plan) {
+        const ccy = _jPlanCcy(plan);
+        const unit = plan.unit || 'монет';
+        const entriesHtml = (plan.entries && plan.entries.length > 1)
+            ? `<div style="margin-top:6px"><b style="color:var(--text-primary)">Входы усреднения (${plan.entries.length}):</b> ` +
+              plan.entries.map(e => `${e.price}${plan.pointBased ? ' (' + e.contracts + ' контр.)' : ' (' + ccy + e.amount + ')'}`).join(', ') + `</div>`
+            : '';
         return `
             <div style="font-size:13px;color:var(--text-primary);font-weight:600;margin-bottom:4px">${plan.sym || '—'} · ${plan.dir === 'short' ? 'ШОРТ' : 'ЛОНГ'} · ${plan.setup || '—'}</div>
             <div>Открыта: ${_fmtJDate(plan.ts)}</div>
-            <div>Вход ${plan.entry ?? '—'} &nbsp; Стоп ${plan.stop ?? '—'} &nbsp; Тейк ${plan.tp ?? '—'} &nbsp; Риск $${plan.riskUsd ?? '—'}</div>
+            <div>Вход ${plan.entry ?? '—'} &nbsp; Стоп ${plan.stop ?? '—'} &nbsp; Тейк ${plan.tp ?? '—'} &nbsp; Риск ${ccy}${plan.riskUsd ?? '—'} &nbsp; Объём ${plan.coins ? plan.coins.toFixed ? plan.coins.toFixed(4) : plan.coins : '—'} ${unit}</div>
+            ${entriesHtml}
             <div style="margin-top:6px"><b style="color:var(--text-primary)">Причина входа:</b> ${plan.reason || '—'}</div>
             <div><b style="color:var(--text-primary)">Подтверждает:</b> ${plan.confirms || '—'}</div>
             <div><b style="color:var(--text-primary)">Отменяет:</b> ${plan.invalidates || '—'}</div>

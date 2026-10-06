@@ -23,11 +23,13 @@ def _curated_instruments(category: str) -> list:
     """Curated-список инструментов Finam из config.py по категории."""
     if category == "stocks":
         return [
-            {"symbol": f"{k}@MISX", "name": v["name"], "base": v["base"], "cat": "stocks"}
+            {"symbol": f"{k}@MISX", "name": v["name"], "base": v["base"], "cat": "stocks",
+             "currency": v.get("currency"), "point_based": v.get("point_based", False)}
             for k, v in FINAM_SYMBOLS.items()
         ]
     return [
-        {"symbol": k, "name": v["name"], "base": k.split("@")[0], "cat": v["cat"]}
+        {"symbol": k, "name": v["name"], "base": k.split("@")[0], "cat": v["cat"],
+         "currency": v.get("currency"), "point_based": v.get("point_based", False)}
         for k, v in FINAM_INSTRUMENTS.items()
         if v["cat"] == category
     ]
@@ -64,7 +66,15 @@ async def _category_instruments(category: str) -> list:
                     continue
                 if a.get("type") != wanted_type or a.get("mic") != wanted_mic:
                     continue
-                extra.append({"symbol": sym, "name": a.get("name") or sym, "base": a.get("ticker", sym), "cat": category})
+                # Живой каталог Finam не содержит валюту/тип цены — для акций MISX
+                # это всегда рублёвый спот, для фьючерсов RTSX — точечная цена без
+                # известной валюты/стоимости пункта (вводится вручную в калькуляторе).
+                if category == "stocks":
+                    currency, point_based = "RUB", False
+                else:
+                    currency, point_based = None, True
+                extra.append({"symbol": sym, "name": a.get("name") or sym, "base": a.get("ticker", sym), "cat": category,
+                               "currency": currency, "point_based": point_based})
     except HTTPException:
         pass
 
