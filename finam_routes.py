@@ -5,6 +5,7 @@
 """
 
 import asyncio
+import logging
 
 from fastapi import APIRouter, Depends, HTTPException
 
@@ -13,8 +14,10 @@ from database import User
 from config import FINAM_SYMBOLS, FINAM_INSTRUMENTS, FINAM_SECRET_TOKEN
 from cache import get_cache_key, get_cached_data, set_cached_data, get_or_compute
 from indicators import calculate_alligator, calculate_ao, calculate_bw_mfi, find_fractals, find_divergences, calculate_bollinger_bands, detect_ma_ema_signal
-from finam import fetch_ohlcv_finam, fetch_finam_assets
+from finam import fetch_ohlcv_finam, fetch_finam_assets, _accounts
 from routes import _check_last_bar_divergence
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/finam", tags=["finam"])
 
@@ -189,7 +192,10 @@ def _true_range(high, low, prev_close):
 
 
 _SCAN_REFRESH_INTERVAL = 180  # фоновый цикл волатильности+EMA(15m) Finam — раз в 3 минуты
-_scan_sem = asyncio.Semaphore(4)  # низкая параллельность — делим лимит Finam с остальными потребителями (чарты, живой хвост)
+# Параллельность масштабируется по числу токенов в пуле (у каждого свой rate-limiter,
+# см. finam.py: _FinamAccount) — с одним токеном остаётся консервативной (4), с
+# несколькими растёт пропорционально, но не выше 12 (делим лимит Finam с чартами/живым хвостом).
+_scan_sem = asyncio.Semaphore(min(4 * max(1, len(_accounts)), 12))
 _FINAM_VOL_RAW_KEY = get_cache_key("finam_vol_raw", "5m", 0, "finam_impulse_raw")
 
 
@@ -290,7 +296,8 @@ async def _scan_volatile_one(inst):
                 "score": round(score, 1),
                 "phase": phase,
             }
-        except Exception:
+        except Exception as e:
+            logger.debug("finam volatile scan failed for %s: %s", inst.get("symbol"), e)
             return None
 
 
@@ -356,7 +363,8 @@ async def _scan_ema_one(inst, timeframe: str = "15m", deep_history: bool = False
             "price": float(df["Close"].iloc[-1]),
             **signal,
         }
-    except Exception:
+    except Exception as e:
+        logger.debug("finam ema scan failed for %s (%s): %s", inst.get("symbol"), timeframe, e)
         return None
 
 
@@ -376,20 +384,20 @@ async def _compute_finam_ema_raw_15m() -> list:
 async def _compute_finam_ema_raw_heavy(timeframe: str) -> list:
     """
     Тяжёлый путь для 1h/4h/1d/1w: deep_history=True (постраничная история на
-    каждый инструмент). Строго последовательно по инструментам, без собственной
-    параллельности сверху — пагинация внутри fetch_ohlcv_finam уже параллелит окна
-    (до 6 одновременно на инструмент), а 65 инструментов разом поверх этого быстро
-    утыкаются в лимит Finam (тот самый инцидент с 429, который уже было чинили).
-    Тот же паттерн "один за другим с паузой", что и в _prewarm_finam_chart_cache.
+    каждый инструмент). Раньше был строго последовательным с ручной паузой —
+    теперь, когда у каждого токена в пуле свой независимый rate-limiter
+    (см. finam.py: _FinamAccount), пагинг инструментов можно вести параллельно
+    под тем же _scan_sem, что и остальные сканеры: реальную защиту от 429 даёт
+    per-account лимитер, а не искусственная сериализация здесь.
     """
     instruments = await _all_instruments()
-    results = []
-    for inst in instruments:
-        r = await _scan_ema_one(inst, timeframe, deep_history=True)
-        if r:
-            results.append(r)
-        await asyncio.sleep(0.3)
-    return results
+
+    async def one(inst):
+        async with _scan_sem:
+            return await _scan_ema_one(inst, timeframe, deep_history=True)
+
+    results = await asyncio.gather(*[one(inst) for inst in instruments])
+    return [r for r in results if r]
 
 
 @router.get("/scan/ema")
@@ -433,7 +441,8 @@ async def _scan_div_one(inst, timeframe: str):
                 "type": "bull" if is_bull else "bear",
                 "close": float(df["Close"].iloc[-1]),
             }
-        except Exception:
+        except Exception as e:
+            logger.debug("finam divergence scan failed for %s (%s): %s", inst.get("symbol"), timeframe, e)
             return None
 
 
@@ -549,10 +558,9 @@ async def run_finam_ema_heavy_refresher() -> None:
     """
     Фоновый цикл для EMA-сканера на 1h/4h/1d/1w — используют deep_history=True
     (постраничная история), заметно дороже быстрого 15m-пути. Считаем по одному
-    таймфрейму за проход, строго последовательно по инструментам (см.
-    _compute_finam_ema_raw_heavy), и по очереди обходим все 4 ТФ по кругу —
-    полный оборот занимает условно 15-25 минут, чего для дневных/недельных
-    сигналов более чем достаточно.
+    таймфрейму за проход, параллельно по инструментам под _scan_sem (см.
+    _compute_finam_ema_raw_heavy — защиту от 429 теперь даёт per-account
+    rate-limiter, а не ручная сериализация), и по очереди обходим все 4 ТФ по кругу.
     """
     if not FINAM_SECRET_TOKEN:
         return
@@ -564,7 +572,7 @@ async def run_finam_ema_heavy_refresher() -> None:
                 await set_cached_data(_finam_ema_raw_key(tf), raw, ttl=40 * 60)
             except Exception:
                 pass
-            await asyncio.sleep(30)  # пауза между таймфреймами
+            await asyncio.sleep(10)  # короткая пауза между таймфреймами
 
 
 async def run_finam_div_refresher() -> None:
@@ -588,5 +596,5 @@ async def run_finam_div_refresher() -> None:
                 await set_cached_data(_finam_div_raw_key(tf), raw, ttl=ttl)
             except Exception:
                 pass
-            await asyncio.sleep(15)  # пауза между таймфреймами
-        await asyncio.sleep(5 * 60)  # пауза перед новым полным кругом
+            await asyncio.sleep(5)  # короткая пауза между таймфреймами
+        await asyncio.sleep(3 * 60)  # пауза перед новым полным кругом

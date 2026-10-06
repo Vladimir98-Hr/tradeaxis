@@ -5,13 +5,14 @@
 """
 
 import asyncio
+import itertools
 import re
 import httpx
 import pandas as pd
 from datetime import datetime, timedelta, timezone
 from fastapi import HTTPException
 
-from config import FINAM_SECRET_TOKEN
+from config import FINAM_SECRET_TOKENS
 
 FINAM_BASE_URL = "https://api.finam.ru"
 
@@ -58,25 +59,24 @@ _HISTORY_DAYS = {
     '1d': 3650, '1w': 3650,  # ~10 лет
 }
 
-# JWT кешируется в памяти — живёт 15 минут на стороне Finam, обновляем с запасом
-_jwt_cache: dict = {"token": None, "expires_at": None}
-
 # Список инструментов меняется редко — кешируем на несколько часов
 _assets_cache: dict = {"data": None, "expires_at": None}
 
 
 class _RateLimiter:
     """
-    Глобальный троттлинг запросов к Finam API — не "сколько одновременно",
-    а "сколько в секунду" суммарно по всему приложению (фоновые сканеры,
-    прогрев кеша, живые запросы пользователей — все идут через одну точку,
-    _finam_get). Семафоры на конкурентность (asyncio.Semaphore в сканерах)
-    ограничивают только число ОДНОВРЕМЕННЫХ запросов, но не защищают от
-    превышения лимита, если разные задачи шлют запросы по очереди быстрее,
-    чем Finam готов их принимать — именно так сервис упал в понедельник
-    утром: несколько независимых фоновых циклов + реальные пользователи
-    в сумме превысили лимit, хотя каждый по отдельности был в рамках своих
-    локальных ограничений.
+    Троттлинг запросов к Finam API — не "сколько одновременно", а "сколько в
+    секунду". Раньше лимитер был один общий на всё приложение; теперь у
+    каждого _FinamAccount (см. ниже) свой собственный лимитер, т.к. лимит
+    Finam документирован как 200 запросов/мин на уровне API-доступа — в
+    отсутствие информации об обратном считаем его привязанным к токену, и
+    каждый токен получает свой независимый бюджет. Семафоры на конкурентность
+    (asyncio.Semaphore в сканерах) ограничивают только число ОДНОВРЕМЕННЫХ
+    запросов, но не защищают от превышения лимита, если разные задачи шлют
+    запросы по очереди быстрее, чем Finam готов их принимать — именно так
+    сервис упал в понедельник утром: несколько независимых фоновых циклов +
+    реальные пользователи в сумме превысили лимит, хотя каждый по отдельности
+    был в рамках своих локальных ограничений.
     """
     def __init__(self, min_interval: float):
         self._min_interval = min_interval
@@ -94,34 +94,48 @@ class _RateLimiter:
             self._next_allowed = now + self._min_interval
 
 
-# Не более ~2 запросов в секунду к Finam суммарно от всего приложения.
-_finam_rate_limiter = _RateLimiter(min_interval=0.5)
+class _FinamAccount:
+    """
+    Один secret-токен Finam со своим JWT-кешем и своим rate-limiter'ом.
+    Несколько аккаунтов (см. _accounts) дают независимые бюджеты запросов —
+    суммарная пропускная способность приложения растёт пропорционально
+    числу токенов вместо одного общего потолка на всех.
+    """
+    def __init__(self, token: str):
+        self.token = token
+        self.jwt: str | None = None
+        self.jwt_expires_at: datetime | None = None
+        # Официальный лимит Finam — 200 запросов/мин (~3.3/сек) на уровне API;
+        # берём с запасом ~10% на токен — 3 запроса/сек (min_interval ~0.333с).
+        self.rate_limiter = _RateLimiter(min_interval=1 / 3)
+
+
+_accounts: list[_FinamAccount] = [_FinamAccount(t) for t in FINAM_SECRET_TOKENS]
+_account_cycle = itertools.cycle(_accounts) if _accounts else None
 
 
 def _require_token():
-    if not FINAM_SECRET_TOKEN:
+    if not _accounts:
         raise HTTPException(
             status_code=400,
-            detail="Finam Trade API не настроен: отсутствует FINAM_SECRET_TOKEN на сервере",
+            detail="Finam Trade API не настроен: отсутствует FINAM_SECRET_TOKEN(S) на сервере",
         )
 
 
-async def get_jwt_token() -> str:
+async def _get_jwt_token_for(account: _FinamAccount) -> str:
     """
-    Возвращает действующий JWT-токен, обновляя его при необходимости.
+    Возвращает действующий JWT-токен аккаунта, обновляя его при необходимости.
     Finam выдаёт JWT на 15 минут по secret-токену через POST /v1/sessions.
     """
-    _require_token()
-
     now = datetime.now(timezone.utc)
-    if _jwt_cache["token"] and _jwt_cache["expires_at"] and now < _jwt_cache["expires_at"]:
-        return _jwt_cache["token"]
+    if account.jwt and account.jwt_expires_at and now < account.jwt_expires_at:
+        return account.jwt
 
     async with httpx.AsyncClient(timeout=10) as client:
         try:
             resp = await client.post(
                 f"{FINAM_BASE_URL}/v1/sessions",
-                json={"secret": FINAM_SECRET_TOKEN},
+                json={"secret": account.token},
             )
         except httpx.HTTPError as e:
             raise HTTPException(status_code=502, detail=f"Finam Trade API недоступен: {e}")
@@ -129,7 +143,7 @@ async def get_jwt_token() -> str:
     if resp.status_code == 401 or resp.status_code == 403:
         raise HTTPException(
             status_code=502,
-            detail="Finam Trade API отклонил secret-токен (401/403) — проверьте FINAM_SECRET_TOKEN",
+            detail="Finam Trade API отклонил secret-токен (401/403) — проверьте FINAM_SECRET_TOKEN(S)",
         )
     resp.raise_for_status()
 
@@ -138,10 +152,16 @@ async def get_jwt_token() -> str:
     if not token:
         raise HTTPException(status_code=502, detail="Finam Trade API не вернул JWT-токен")
 
-    _jwt_cache["token"] = token
+    account.jwt = token
     # Запас в 1 минуту до истечения реального 15-минутного срока действия
-    _jwt_cache["expires_at"] = now + timedelta(minutes=14)
+    account.jwt_expires_at = now + timedelta(minutes=14)
     return token
+
+
+async def get_jwt_token() -> str:
+    """Обратная совместимость: JWT первого аккаунта из пула."""
+    _require_token()
+    return await _get_jwt_token_for(_accounts[0])
 
 
 async def _finam_get(
@@ -155,16 +175,22 @@ async def _finam_get(
     (пагинация), чтобы не тратить время на TLS-хендшейк на каждый вызов.
     Без него открывается разовое соединение, как раньше.
 
+    Каждый вызов выбирает следующий аккаунт из пула по кругу (round-robin) —
+    распределяет нагрузку по всем доступным токенам вне зависимости от того,
+    как запросы сгруппированы по инструментам/окнам пагинации выше по стеку.
+
     429 обрабатывается отдельным retry-с-backoff прямо здесь: при загрузке
     глубокой истории уходит до ~11 параллельных запросов на один график, и
     без этого один-единственный 429 среди них ронял всю загрузку целиком —
     именно так возникала картина "шапка уже Сбер, а график всё ещё биткоин".
     """
-    token = await get_jwt_token()
+    _require_token()
+    account = next(_account_cycle)
+    token = await _get_jwt_token_for(account)
 
     async def _request(c: httpx.AsyncClient):
         for attempt in range(retries + 1):
-            await _finam_rate_limiter.wait()
+            await account.rate_limiter.wait()
             try:
                 resp = await c.get(
                     f"{FINAM_BASE_URL}{path}",
@@ -192,8 +218,8 @@ async def _finam_get(
             resp = await _request(c)
 
     if resp.status_code in (401, 403):
-        # Токен мог протухнуть раньше срока — сбрасываем кеш на следующий запрос
-        _jwt_cache["token"] = None
+        # Токен мог протухнуть раньше срока — сбрасываем кеш именно этого аккаунта
+        account.jwt = None
         raise HTTPException(status_code=502, detail="Finam Trade API отклонил запрос (401/403)")
     if resp.status_code == 429:
         raise HTTPException(status_code=429, detail="Finam Trade API: превышен лимит запросов, попробуйте через несколько секунд")
@@ -231,12 +257,14 @@ async def fetch_ohlcv_finam(symbol: str, timeframe: str = '1d', limit: int = 100
             windows.append((window_start, window_end))
             window_end = window_start
 
-        await get_jwt_token()  # прогреваем токен один раз до параллельных запросов
+        # Прогреваем JWT всех аккаунтов пула один раз до параллельных запросов —
+        # иначе первые несколько окон на каждый аккаунт долбят /v1/sessions разом.
+        await asyncio.gather(*[_get_jwt_token_for(a) for a in _accounts])
         # Полностью безлимитный параллелизм (по числу окон, до ~11) давал лишнюю
         # нагрузку по памяти/сокетам на тесном VPS (1.8GB) — фиксированный потолок
         # всё ещё покрывает большинство окон одним залпом, но не открывает больше
-        # 6 соединений разом.
-        sem = asyncio.Semaphore(6)
+        # 6 соединений на аккаунт разом (с несколькими токенами бюджет общий растёт).
+        sem = asyncio.Semaphore(min(6 * len(_accounts), 18))
 
         async def _fetch_window(ws: datetime, we: datetime, client: httpx.AsyncClient):
             async with sem:
@@ -364,7 +392,7 @@ async def _refresh_finam_assets_cache() -> None:
 
 async def run_finam_catalog_refresher() -> None:
     """Фоновый цикл: обновляет кеш каталога Finam при старте и затем каждые 6 часов."""
-    if not FINAM_SECRET_TOKEN:
+    if not _accounts:
         return
     while True:
         try:

@@ -57,9 +57,22 @@ RESET_TOKEN_EXPIRE_MINUTES = 60
 # База данных пользователей (SQLite)
 DATABASE_URL = os.getenv("DATABASE_URL", "sqlite+aiosqlite:///./users.db")
 
-# Finam Trade API — secret-токен из личного кабинета Финама, раздел «Токены».
+# Finam Trade API — secret-токен(ы) из личного кабинета Финама, раздел «Токены».
 # Пусто = раздел Finam в терминале недоступен. Доступен всем зарегистрированным пользователям.
-FINAM_SECRET_TOKEN = os.getenv("FINAM_SECRET_TOKEN", "")
+#
+# Можно указать несколько токенов (с разных счётов/кабинетов) через запятую в
+# FINAM_SECRET_TOKENS — тогда запросы сканеров распределяются между ними по
+# кругу (round-robin), и суммарный лимит запросов к Finam растёт пропорционально
+# числу токенов (см. finam.py: _FinamAccount, _accounts). FINAM_SECRET_TOKEN
+# оставлен для обратной совместимости — используется как единственный токен,
+# если FINAM_SECRET_TOKENS не задан.
+_finam_tokens_raw = os.getenv("FINAM_SECRET_TOKENS", "")
+if _finam_tokens_raw.strip():
+    FINAM_SECRET_TOKENS = [t.strip() for t in _finam_tokens_raw.split(",") if t.strip()]
+else:
+    FINAM_SECRET_TOKEN = os.getenv("FINAM_SECRET_TOKEN", "")
+    FINAM_SECRET_TOKENS = [FINAM_SECRET_TOKEN] if FINAM_SECRET_TOKEN else []
+FINAM_SECRET_TOKEN = FINAM_SECRET_TOKENS[0] if FINAM_SECRET_TOKENS else ""
 
 # Акции Finam (те же эмитенты MOEX, но тикеры в формате TICKER@MISX для Finam Trade API)
 # Все акции MOEX торгуются в рублях напрямую (цена = рубли за акцию) — спот,
