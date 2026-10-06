@@ -1511,6 +1511,7 @@
         <div class="card div-scan-card">
             <div class="div-scan-header">
                 <span id="emaScanTitle">Сканер MA/EMA</span>
+                <span class="rc-help">?<span class="rc-help-pop">Скальпинг-сигналы по пересечению MA20/EMA20 и касанию ценой EMA20/50/100/200. <b style="color:#26a69a">Зелёный</b> бейдж «MA20↑EMA20» / <b style="color:#ef5350">красный</b> «MA20↓EMA20» — пересечение средних на последнем баре, краткосрочная смена импульса вверх/вниз. <b style="color:#2196f3">Синий</b> бейдж «EMA50» и т.п. — цена последнего бара коснулась этой EMA (отработка уровня поддержки/сопротивления). Таймфрейм расчёта переключается выпадающим списком на самой карточке.</span></span>
                 <span style="display:flex;align-items:center;gap:6px">
                     <select class="div-scan-btn" id="emaScanTfSelect" onchange="_emaTimeframeChanged(this.value)" style="padding:4px 6px">
                         <option value="15m" selected>15м</option>
@@ -1654,6 +1655,7 @@
         <div class="card div-scan-card">
             <div class="div-scan-header">
                 <span id="divScanTitle">Дивергенции</span>
+                <span class="rc-help">?<span class="rc-help-pop">Ищет дивергентные бары — расхождение между движением цены и гистограммой осциллятора AO (Awesome Oscillator). <b style="color:#26a69a">Зелёный ▲</b> — бычья дивергенция: цена обновила минимум, а AO — нет, сигнал на разворот вверх. <b style="color:#ef5350">Красный ▼</b> — медвежья дивергенция: обратная ситуация, сигнал на разворот вниз. В отличие от двух других сканеров не обновляется автоматически — нажимайте «Сканировать» вручную.</span></span>
                 <button class="div-scan-btn" id="divScanBtn" onclick="fetchDivScan()">⟳ Сканировать</button>
             </div>
             <div class="div-scan-info" id="divScanInfo"></div>
@@ -1665,6 +1667,7 @@
         <div class="card div-scan-card">
             <div class="div-scan-header">
                 <span id="volScanTitle">Сканер волатильности</span>
+                <span class="rc-help">?<span class="rc-help-pop">Ищет монеты, которые прямо сейчас начинают резко двигаться (не «уже выросло», а «только начинает») — по ускорению цены, аномальному объёму (RVOL) и пробою локального диапазона. Число на бейдже — score от 0 до 100 (порог настраивается в настройках); цвет бейджа = фаза движения: <b style="color:#26a69a">зелёный</b> — пробой вверх при росте цены, <b style="color:#ef5350">красный</b> — пробой вниз при падении, <b style="color:#ff9800">оранжевый</b> — движение за 15 мин намного больше обычного (вероятный перегрев/разворот), <b style="color:#2196f3">синий</b> — высокая волатильность без чёткого направления. Строка «5m: +X% · RVOL Yx» — изменение цены за 5 минут и во сколько раз текущий объём выше обычного.</span></span>
                 <span style="display:flex;align-items:center;gap:6px">
                     <button class="div-scan-btn" id="volLogClearBtn" onclick="volLogClear()" title="Очистить журнал сигналов" style="padding:2px 8px;font-size:11px">🗑</button>
                     <span class="vol-timer" id="volScanTimer"></span>
