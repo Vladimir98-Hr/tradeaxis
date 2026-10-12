@@ -607,6 +607,15 @@
         }
         .vol-flash { animation: volFlash 2.5s ease-out; }
         .vol-log-time { opacity:.55; font-size:10px; margin-left:6px; }
+        /* Сканер MA/EMA — отдельная раскладка строки: имя+время сверху,
+           бейджи сигналов (переменной ширины, 0-3 штуки) обёртываемым рядом снизу,
+           чтобы не наезжать на 52px-колонку, рассчитанную под один числовой бейдж волатильности. */
+        .div-scan-item.ema-scan-item { grid-template-columns: 1fr; row-gap: 3px; }
+        .ema-scan-badges { display: flex; flex-wrap: wrap; gap: 4px; }
+        .ema-scan-badges .div-scan-badge {
+            font-size: 11px; font-weight: 600; padding: 1px 7px; border-radius: 10px;
+            background: rgba(255,255,255,0.07); white-space: nowrap;
+        }
         /* Журнал сделок */
         .journal-item { display:flex; justify-content:space-between; align-items:center; padding:5px 8px; border-radius:6px; font-size:12px; gap:8px; }
         .journal-item:hover { background:var(--hover-bg); }
@@ -3593,10 +3602,10 @@
                     : '';
                 const touchBadges = (p.touches || [])
                     .map(period => `<span class="div-scan-badge vol-info">EMA${period}</span>`)
-                    .join(' ');
-                return `<div class="div-scan-item${flash}" onclick="selectPair({symbol:'${p.symbol}',name:'${p.name}',base:'${p.base}'})">
-                    ${crossBadge}${crossBadge && touchBadges ? ' ' : ''}${touchBadges}
+                    .join('');
+                return `<div class="div-scan-item ema-scan-item${flash}" onclick="selectPair({symbol:'${p.symbol}',name:'${p.name}',base:'${p.base}'})">
                     <span class="div-scan-name">${p.name}<span class="vol-log-time">${t}</span></span>
+                    <div class="ema-scan-badges">${crossBadge}${touchBadges}</div>
                 </div>`;
             }).join('')
             : '<div class="div-scan-empty">Пока нет сигналов</div>';
