@@ -2177,13 +2177,14 @@
     let volumeChart, volumeSeries;
     let aoChart, aoSeries;
     let mfiSquatTimes = new Set();
+    let lastCandlesRaw = []; // [{time,open,high,low,close}] без цвета — для перекраски при переключении авторского индикатора
     let lastCandle = null;
     let fetchAllGen = 0;
     let fractalHighs = [];
     let fractalLows = [];
     let divergenceBearish = [];
     let divergenceBullish = [];
-    let authorIndicatorsVisible = true;
+    let authorIndicatorsVisible = false;
 
     // ============================================================
     // Drawing tools — состояние рисования
@@ -2415,6 +2416,22 @@
 
     function toggleAuthorIndicators() {
         authorIndicatorsVisible = !authorIndicatorsVisible;
+        _applyAuthorIndicatorsUI();
+    }
+
+    // Раскраска "приседающих баров" (Squat, Билл Уильямс) жёлтым — только когда
+    // авторский индикатор включён; raw-свечи без цвета хранятся в lastCandlesRaw,
+    // чтобы перекрашивать их по клику на кнопку без повторного запроса к серверу.
+    function _colorSquatCandles(raw, squatSet) {
+        return raw.map(c => (authorIndicatorsVisible && squatSet.has(c.time))
+            ? { ...c, color: '#FFD700', borderColor: '#FFD700', wickColor: '#FFD700' }
+            : c);
+    }
+
+    // Применяет текущее значение authorIndicatorsVisible к UI: кнопка, панели
+    // объёма/AO, видимость серий Аллигатора/BB, маркеры фракталов/дивергенций
+    // и жёлтая подсветка приседающих баров на уже загруженных свечах.
+    function _applyAuthorIndicatorsUI() {
         const vis = authorIndicatorsVisible;
         document.getElementById('authorIndBtn').classList.toggle('active', !vis);
         document.getElementById('volumeChart').style.display = vis ? '' : 'none';
@@ -2432,6 +2449,9 @@
         if (aoSeries)      aoSeries.applyOptions({ visible: vis && s.showAO });
         if (vis) applyAllMarkers();
         else if (candleSeries) candleSeries.setMarkers([]);
+        if (candleSeries && lastCandlesRaw.length) {
+            candleSeries.setData(_colorSquatCandles(lastCandlesRaw, mfiSquatTimes));
+        }
     }
 
     function applyAllMarkers() {
@@ -2485,15 +2505,11 @@
             );
 
             // OHLCV свечи + Volume
-            const candles = json.data.map(d => {
-                const t = toUnix(d.timestamp);
-                const isSquat = mfiSquatTimes.has(t);
-                return {
-                    time: t,
-                    open: d.Open, high: d.High, low: d.Low, close: d.Close,
-                    ...(isSquat ? { color: '#FFD700', borderColor: '#FFD700', wickColor: '#FFD700' } : {})
-                };
-            });
+            lastCandlesRaw = json.data.map(d => ({
+                time: toUnix(d.timestamp),
+                open: d.Open, high: d.High, low: d.Low, close: d.Close,
+            }));
+            const candles = _colorSquatCandles(lastCandlesRaw, mfiSquatTimes);
             candleSeries.setData(candles);
 
             const volData = json.data.map(d => ({
@@ -2631,7 +2647,7 @@
 
             const tailCandles = json.data.map(d => {
                 const t = toUnix(d.timestamp);
-                const isSquat = tailSquat.has(t);
+                const isSquat = authorIndicatorsVisible && tailSquat.has(t);
                 return {
                     time: t,
                     open: d.Open, high: d.High, low: d.Low, close: d.Close,
@@ -4117,6 +4133,7 @@
             await jRender();
             loadSessionState();
             initCharts();
+            _applyAuthorIndicatorsUI();
             initDrawingOverlay();
             setupResizeObserver();
             await fetchSymbolsList();
