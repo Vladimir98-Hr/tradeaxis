@@ -6,6 +6,7 @@
 
 import asyncio
 import logging
+from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, HTTPException
 
@@ -13,7 +14,7 @@ from auth import get_current_user
 from database import User
 from config import FINAM_SYMBOLS, FINAM_INSTRUMENTS, FINAM_SECRET_TOKEN
 from cache import get_cache_key, get_cached_data, set_cached_data, get_or_compute
-from indicators import calculate_alligator, calculate_ao, calculate_bw_mfi, find_fractals, find_divergences, calculate_bollinger_bands, detect_ma_ema_signal
+from indicators import calculate_alligator, calculate_ao, calculate_bw_mfi, find_fractals, find_divergences, calculate_bollinger_bands
 from finam import fetch_ohlcv_finam, fetch_finam_assets, _accounts
 from routes import _check_last_bar_divergence
 
@@ -178,280 +179,16 @@ async def _all_instruments() -> list:
     return instruments
 
 
-def _median(values):
-    s = sorted(values)
-    n = len(s)
-    if n == 0:
-        return 0.0
-    mid = n // 2
-    return s[mid] if n % 2 else (s[mid - 1] + s[mid]) / 2
-
-
-def _true_range(high, low, prev_close):
-    return max(high - low, abs(high - prev_close), abs(low - prev_close))
-
-
-_SCAN_REFRESH_INTERVAL = 180  # фоновый цикл волатильности+EMA(15m) Finam — раз в 3 минуты
-# Параллельность масштабируется по числу токенов в пуле (у каждого свой rate-limiter,
-# см. finam.py: _FinamAccount) — с одним токеном остаётся консервативной (4), с
-# несколькими растёт умеренно, но не выше 8. Finam чувствителен не только к
-# среднему темпу запросов, но и к коротким всплескам — слишком большой потолок
-# (пробовали 12) давал периодические 429 на живых графиках пользователей, даже
-# когда средняя нагрузка была в пределах лимита.
-_scan_sem = asyncio.Semaphore(min(3 * max(1, len(_accounts)), 8))
-
-_VOL_SCAN_TIMEFRAMES = ("5m", "4h", "1d")
-# 4h/1d — тот же "тяжёлый" путь, что и для EMA-сканера (deep_history=True,
-# отдельный медленный фоновый цикл) — не-deep_history запрос на эти ТФ не
-# набирает нужного числа реальных баров (см. _scan_ema_one/run_finam_ema_heavy_refresher).
-_VOL_HEAVY_TIMEFRAMES = ("4h", "1d")
-
-
-def _finam_vol_raw_key(timeframe: str) -> str:
-    return get_cache_key("finam_vol_raw", timeframe, 0, "finam_impulse_raw")
-
-
-async def _scan_volatile_one(inst, timeframe: str = "5m", deep_history: bool = False):
-    """Считает impulse-score одного инструмента без фильтра по threshold —
-    отсечение по порогу теперь делается на чтении из уже готового кэша
-    (см. finam_scan_volatile), а не на каждом фоновом пересчёте."""
-    async with _scan_sem:
-        try:
-            if deep_history:
-                # limit не используется (deep_history всегда отдаёт всю накопленную
-                # историю по _HISTORY_DAYS в finam.py) — передаём как есть.
-                df = await fetch_ohlcv_finam(inst["symbol"], timeframe, 900, deep_history=True)
-            else:
-                # 90 было мало: лимит для не-deep_history запроса задаёт КАЛЕНДАРНОЕ окно
-                # (end_time - 5м*(limit+5)), а не гарантированное число баров — а Мосбиржа
-                # не торгует по выходным/вечерам. 900 -> окно ~3.1 календарных дня, надёжно
-                # захватывает последнюю реальную торговую сессию даже после выходных
-                # (тот же фикс, что уже сделан для EMA-сканера — см. _scan_ema_one).
-                df = await fetch_ohlcv_finam(inst["symbol"], timeframe, 900, deep_history=False)
-            if len(df) < 65:
-                return None
-
-            closes = df["Close"].values
-            highs = df["High"].values
-            lows = df["Low"].values
-            volumes = df["Volume"].values
-            n = len(closes)
-
-            def ret(k):
-                prev = closes[n - 1 - k]
-                return (closes[-1] - prev) / prev * 100 if prev else 0.0
-
-            return_1m = ret(1)
-            return_5m = ret(3)
-            return_15m = ret(6)
-
-            prev_volumes = volumes[-61:-1]
-            median_vol = _median(prev_volumes)
-            rvol_1m = (volumes[-1] / median_vol) if median_vol > 0 else 0.0
-
-            trs = [
-                _true_range(highs[i], lows[i], closes[i - 1])
-                for i in range(n - 60, n)
-            ]
-            current_tr = trs[-1]
-            median_tr = _median(trs[:-1])
-            range_expansion = (current_tr / median_tr) if median_tr > 0 else 0.0
-
-            three_bar_rets = [
-                abs((closes[i] - closes[i - 3]) / closes[i - 3] * 100)
-                for i in range(n - 60, n) if closes[i - 3]
-            ]
-            mean_3b = sum(three_bar_rets) / len(three_bar_rets) if three_bar_rets else 0.0
-            var_3b = sum((x - mean_3b) ** 2 for x in three_bar_rets) / len(three_bar_rets) if three_bar_rets else 0.0
-            std_3b = var_3b ** 0.5
-            z_abs_5m = ((abs(return_5m) - mean_3b) / std_3b) if std_3b > 0 else 0.0
-
-            window_high = max(highs[-31:-1])
-            window_low = min(lows[-31:-1])
-            if closes[-1] > window_high:
-                breakout = "up"
-            elif closes[-1] < window_low:
-                breakout = "down"
-            else:
-                breakout = "none"
-
-            overheat = mean_3b > 0 and abs(return_15m) > mean_3b * 6
-
-            def clamp01(x):
-                return max(0.0, min(1.0, x))
-
-            s_price = clamp01(max(abs(return_1m) / 2, abs(return_5m) / 5, abs(return_15m) / 8))
-            s_z = clamp01(z_abs_5m / 4)
-            s_rvol = clamp01(rvol_1m / 5)
-            s_range = clamp01(range_expansion / 3)
-            s_breakout = 1.0 if breakout != "none" else 0.0
-
-            score = (
-                25 * s_price + 20 * s_z + 20 * s_rvol +
-                15 * s_range + 20 * s_breakout
-            )
-
-            if overheat:
-                phase = "POST-PUMP"
-            elif breakout == "up" and return_5m > 0:
-                phase = "UP-EXPANSION"
-            elif breakout == "down" and return_5m < 0:
-                phase = "DOWN-EXPANSION"
-            else:
-                phase = "HIGH-VOL-RANGE"
-
-            return {
-                "symbol": inst["symbol"], "name": inst["name"], "base": inst["base"],
-                "price": float(closes[-1]),
-                "return_1m": round(return_1m, 2),
-                "return_5m": round(return_5m, 2),
-                "return_15m": round(return_15m, 2),
-                "rvol_1m": round(rvol_1m, 2),
-                "range_expansion": round(range_expansion, 2),
-                "z_abs_5m": round(z_abs_5m, 2),
-                "breakout": breakout,
-                "score": round(score, 1),
-                "phase": phase,
-            }
-        except Exception as e:
-            logger.debug("finam volatile scan failed for %s: %s", inst.get("symbol"), e)
-            return None
-
-
-async def _compute_finam_volatile_raw(timeframe: str = "5m", deep_history: bool = False) -> list:
-    instruments = await _all_instruments()
-    results = await asyncio.gather(*[_scan_volatile_one(inst, timeframe, deep_history) for inst in instruments])
-    pairs = [r for r in results if r]
-    pairs.sort(key=lambda x: x["score"], reverse=True)
-    return pairs
-
-
-async def _compute_finam_volatile_raw_heavy(timeframe: str) -> list:
-    """Тяжёлый путь для 4h/1d — см. _compute_finam_ema_raw_heavy, тот же приём
-    (deep_history=True, под общим _scan_sem)."""
-    instruments = await _all_instruments()
-
-    async def one(inst):
-        return await _scan_volatile_one(inst, timeframe, deep_history=True)
-
-    results = await asyncio.gather(*[one(inst) for inst in instruments])
-    return [r for r in results if r]
-
-
-@router.get("/scan/volatile")
-async def finam_scan_volatile(threshold: float = 60.0, top: int = 20, timeframe: str = "5m", current_user: User = Depends(get_current_user)):
-    """
-    Сканер начала импульса для Finam (аналог крипто-сканера /scan/volatile).
-    Базовый ТФ — 5-минутные свечи (Finam не отдаёт минутные данные); 4h/1d — тот же
-    "тяжёлый" путь, что и у EMA-сканера. return_1m/5m/15m в ответе на самом деле
-    означают 1/3/6 баров ВЫБРАННОГО timeframe, названы так же, чтобы фронтенд мог
-    переиспользовать общий рендер журнала сигналов без спец-веток.
-
-    Сам эндпоинт только читает уже готовый результат фонового цикла
-    (run_finam_scanner_refresher) и фильтрует по threshold в памяти — никаких
-    обращений к Finam API на пользовательский запрос, поэтому открытие любого
-    числа вкладок с автообновлением не увеличивает нагрузку на Finam.
-    """
-    if timeframe not in _VOL_SCAN_TIMEFRAMES:
-        timeframe = "5m"
-    raw = await get_cached_data(_finam_vol_raw_key(timeframe))
-    if raw is None:
-        return {"threshold": threshold, "timeframe": timeframe, "count": 0, "pairs": [], "warming_up": True}
-    pairs = [p for p in raw if p["score"] >= threshold]
-    return {"threshold": threshold, "timeframe": timeframe, "count": len(pairs[:top]), "pairs": pairs[:top]}
-
-
-_EMA_SCAN_TIMEFRAMES = ("15m", "1h", "4h", "1d", "1w")
-# 1h/4h/1d/1w физически не набирают 210+ реальных баров (нужных EMA200) в пределах
-# одного не-deep_history запроса — Мосбиржа торгует не 24/7, а лимит там означает
-# календарное окно, которое для этих ТФ упирается в потолок Finam на один запрос
-# (_MAX_RANGE_DAYS). Поэтому для них используется deep_history=True (постраничная
-# история) в отдельном, более медленном фоновом цикле — см. run_finam_ema_heavy_refresher.
-_EMA_HEAVY_TIMEFRAMES = ("1h", "4h", "1d", "1w")
-
-
-def _finam_ema_raw_key(timeframe: str) -> str:
-    return get_cache_key("finam_ema_raw", timeframe, 0, "finam_ma_ema_raw")
-
-
-async def _scan_ema_one(inst, timeframe: str = "15m", deep_history: bool = False):
-    try:
-        if deep_history:
-            # limit здесь не используется (deep_history всегда отдаёт всю накопленную
-            # историю по _HISTORY_DAYS в finam.py) — передаём как есть, не важно.
-            df = await fetch_ohlcv_finam(inst["symbol"], timeframe, 200, deep_history=True)
-        else:
-            # limit здесь определяет и глубину окна запроса (end_time - 15м*(limit+5)),
-            # не только число возвращаемых баров — а Мосбиржа торгует не 24/7, в отличие
-            # от крипты. 900 -> окно ~9.5 календарных дней, с запасом на выходные даёт
-            # ~250-300 реальных 15м-баров — хватает detect_ma_ema_signal() для EMA200,
-            # не раздувая объём данных/вычислений на инструмент сильнее необходимого.
-            df = await fetch_ohlcv_finam(inst["symbol"], timeframe, 900, deep_history=False)
-        signal = detect_ma_ema_signal(df)
-        if not signal:
-            return None
-        return {
-            "symbol": inst["symbol"], "name": inst["name"], "base": inst["base"],
-            "price": float(df["Close"].iloc[-1]),
-            **signal,
-        }
-    except Exception as e:
-        logger.debug("finam ema scan failed for %s (%s): %s", inst.get("symbol"), timeframe, e)
-        return None
-
-
-async def _compute_finam_ema_raw_15m() -> list:
-    """Быстрый путь (15m, одиночный запрос на инструмент) — часть общего быстрого
-    цикла run_finam_scanner_refresher, та же логика, что и раньше."""
-    instruments = await _all_instruments()
-
-    async def one(inst):
-        async with _scan_sem:
-            return await _scan_ema_one(inst, "15m", deep_history=False)
-
-    results = await asyncio.gather(*[one(inst) for inst in instruments])
-    return [r for r in results if r]
-
-
-async def _compute_finam_ema_raw_heavy(timeframe: str) -> list:
-    """
-    Тяжёлый путь для 1h/4h/1d/1w: deep_history=True (постраничная история на
-    каждый инструмент). Раньше был строго последовательным с ручной паузой —
-    теперь, когда у каждого токена в пуле свой независимый rate-limiter
-    (см. finam.py: _FinamAccount), пагинг инструментов можно вести параллельно
-    под тем же _scan_sem, что и остальные сканеры: реальную защиту от 429 даёт
-    per-account лимитер, а не искусственная сериализация здесь.
-    """
-    instruments = await _all_instruments()
-
-    async def one(inst):
-        async with _scan_sem:
-            return await _scan_ema_one(inst, timeframe, deep_history=True)
-
-    results = await asyncio.gather(*[one(inst) for inst in instruments])
-    return [r for r in results if r]
-
-
-@router.get("/scan/ema")
-async def finam_scan_ma_ema(timeframe: str = "15m", top: int = 30, current_user: User = Depends(get_current_user)):
-    """
-    Скальпинг-сканер Finam по MA20/EMA20/50/100/200 (аналог крипто-сканера /scan/ema) —
-    пересечение MA20/EMA20 и касание ценой любой из EMA20/50/100/200.
-    См. indicators.detect_ma_ema_signal.
-
-    Как и /finam/scan/volatile — только читает готовый кэш фонового цикла
-    (run_finam_scanner_refresher для 15m, run_finam_ema_heavy_refresher для
-    1h/4h/1d/1w), без обращений к Finam на пользовательский запрос.
-    """
-    if timeframe not in _EMA_SCAN_TIMEFRAMES:
-        timeframe = "15m"
-    raw = await get_cached_data(_finam_ema_raw_key(timeframe))
-    if raw is None:
-        return {"count": 0, "pairs": [], "warming_up": True}
-    return {"count": len(raw[:top]), "pairs": raw[:top]}
-
-
 _DIV_SCAN_TIMEFRAMES = ("15m", "1h", "4h", "1d")
+# Сканеры волатильности и EMA для Finam убраны: несколько непрерывных фоновых
+# циклов одновременно с живыми графиками пользователей регулярно упирались в
+# лимиты Finam (401/429) независимо от того, как подкручивались токены и
+# параллельность — для Мосбиржи это оказалось системно хрупким. Остаётся
+# только сканер дивергенций, и тот теперь считается не круглосуточным циклом,
+# а один раз в сутки (см. run_finam_div_refresher) — см. контекст в плане.
+# Параллельность одного суточного прохода масштабируется по числу токенов в
+# пуле (у каждого свой rate-limiter, см. finam.py: _FinamAccount).
+_scan_sem = asyncio.Semaphore(min(3 * max(1, len(_accounts)), 8))
 
 
 def _finam_div_raw_key(timeframe: str) -> str:
@@ -555,97 +292,37 @@ async def run_finam_chart_prewarmer() -> None:
         await asyncio.sleep(2.5 * 3600)
 
 
-async def run_finam_scanner_refresher() -> None:
-    """
-    Фоновый цикл: считает волатильность и MA/EMA по ВСЕМ инструментам Finam раз
-    в _SCAN_REFRESH_INTERVAL и кладёт результат в кэш без фильтра по threshold/top
-    — сами эндпоинты /finam/scan/volatile и /finam/scan/ema только читают этот
-    кэш и фильтруют в памяти (см. выше).
-
-    Без этого несколько открытых вкладок с автообновлением сканеров раз в
-    минуту КАЖДАЯ быстро выедают лимит запросов Finam API сами на себя — именно
-    так случился инцидент с массовыми 429 и зависанием сканеров на 10+ минут.
-    Теперь нагрузка на Finam от этих двух сканеров фиксированная и не растёт
-    с числом открытых вкладок/пользователей.
-    """
-    if not FINAM_SECRET_TOKEN:
-        return
-    await asyncio.sleep(40)  # запускаемся после каталога и прогрева графиков
-    while True:
-        try:
-            vol_raw = await _compute_finam_volatile_raw("5m", deep_history=False)
-            await set_cached_data(_finam_vol_raw_key("5m"), vol_raw, ttl=_SCAN_REFRESH_INTERVAL * 2)
-        except Exception:
-            pass
-        await asyncio.sleep(5)  # пауза между сканерами — не бьём по Finam двумя полными обходами подряд
-        try:
-            ema_raw = await _compute_finam_ema_raw_15m()
-            await set_cached_data(_finam_ema_raw_key("15m"), ema_raw, ttl=_SCAN_REFRESH_INTERVAL * 2)
-        except Exception:
-            pass
-        await asyncio.sleep(_SCAN_REFRESH_INTERVAL)
+_MOSCOW_UTC_OFFSET = timedelta(hours=3)  # Россия не переводит часы — фиксированный оффсет безопасен
 
 
-async def run_finam_vol_heavy_refresher() -> None:
-    """
-    Фоновый цикл для сканера волатильности на 4h/1d — зеркалит
-    run_finam_ema_heavy_refresher: deep_history=True, раунд-робин по ТФ с
-    паузой между ними, отдельный сдвиг старта от остальных Finam-циклов.
-    """
-    if not FINAM_SECRET_TOKEN:
-        return
-    await asyncio.sleep(120)
-    while True:
-        for tf in _VOL_HEAVY_TIMEFRAMES:
-            try:
-                raw = await _compute_finam_volatile_raw_heavy(tf)
-                await set_cached_data(_finam_vol_raw_key(tf), raw, ttl=40 * 60)
-            except Exception:
-                pass
-            await asyncio.sleep(10)  # короткая пауза между таймфреймами
-
-
-async def run_finam_ema_heavy_refresher() -> None:
-    """
-    Фоновый цикл для EMA-сканера на 1h/4h/1d/1w — используют deep_history=True
-    (постраничная история), заметно дороже быстрого 15m-пути. Считаем по одному
-    таймфрейму за проход, параллельно по инструментам под _scan_sem (см.
-    _compute_finam_ema_raw_heavy — защиту от 429 теперь даёт per-account
-    rate-limiter, а не ручная сериализация), и по очереди обходим все 4 ТФ по кругу.
-    """
-    if not FINAM_SECRET_TOKEN:
-        return
-    await asyncio.sleep(90)  # даём быстрому циклу и прогреву графиков стартовать первыми
-    while True:
-        for tf in _EMA_HEAVY_TIMEFRAMES:
-            try:
-                raw = await _compute_finam_ema_raw_heavy(tf)
-                await set_cached_data(_finam_ema_raw_key(tf), raw, ttl=40 * 60)
-            except Exception:
-                pass
-            await asyncio.sleep(10)  # короткая пауза между таймфреймами
+def _seconds_until_next_run(hour: int = 6, minute: int = 30) -> float:
+    """Секунд до ближайшего hour:minute по московскому времени (сегодня или завтра)."""
+    now_msk = datetime.now(timezone.utc) + _MOSCOW_UTC_OFFSET
+    target = now_msk.replace(hour=hour, minute=minute, second=0, microsecond=0)
+    if target <= now_msk:
+        target += timedelta(days=1)
+    return (target - now_msk).total_seconds()
 
 
 async def run_finam_div_refresher() -> None:
     """
-    Фоновый цикл для сканера дивергенций Finam — по кругу считает все 4
-    поддерживаемых таймфрейма (15m/1h/4h/1d), каждый лёгким одиночным запросом
-    на инструмент (deep_history=False, 50 баров). Дивергенция — событие
-    закрытого бара, секундная свежесть не нужна, поэтому полный оборот на
-    ~8-10 минут более чем достаточен, а эндпоинт /finam/scan/divergences
-    всегда отвечает мгновенно из кэша, не деля ожидание ответа с остальным
-    Finam-трафиком на пользовательский запрос.
+    Фоновый цикл для сканера дивергенций Finam — считает все 4 поддерживаемых
+    таймфрейма (15m/1h/4h/1d) один раз в сутки, в 06:30 по Москве (до открытия
+    торгов), а не непрерывным циклом. Раньше несколько фоновых сканеров Finam
+    крутились круглосуточно параллельно с живыми графиками пользователей и
+    регулярно упирались в лимиты Finam (401/429) — волатильность и EMA убраны
+    совсем, а дивергенции сведены к одному короткому проходу в сутки, когда
+    нет конкуренции с живым трафиком. Эндпоинт /finam/scan/divergences всегда
+    отвечает мгновенно из кэша, не завися от текущего состояния этого цикла.
     """
     if not FINAM_SECRET_TOKEN:
         return
-    await asyncio.sleep(60)
     while True:
+        await asyncio.sleep(_seconds_until_next_run())
         for tf in _DIV_SCAN_TIMEFRAMES:
             try:
                 raw = await _compute_finam_div_raw(tf)
-                ttl = 3600 if tf == "1d" else 900
-                await set_cached_data(_finam_div_raw_key(tf), raw, ttl=ttl)
+                await set_cached_data(_finam_div_raw_key(tf), raw, ttl=25 * 3600)
             except Exception:
                 pass
             await asyncio.sleep(5)  # короткая пауза между таймфреймами
-        await asyncio.sleep(3 * 60)  # пауза перед новым полным кругом
