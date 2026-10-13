@@ -2580,7 +2580,7 @@
                 volume: d.Volume ?? d.volume ?? 0
             }));
             if (activeIndicators.length) renderAllActiveIndicators(lastChartData);
-            applyAllMarkers();
+            if (authorIndicatorsVisible) applyAllMarkers();
             mainChart.timeScale().fitContent();
             startCandleTimer();
             startLiveTail();
