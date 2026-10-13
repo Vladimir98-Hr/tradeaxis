@@ -1513,6 +1513,7 @@
                     <span class="rc-help">?<span class="rc-help-pop">Скальпинг-сигналы по пересечению MA20/EMA20 и касанию ценой EMA20/50/100/200. <b style="color:#26a69a">Зелёный</b> бейдж «MA20↑EMA20» / <b style="color:#ef5350">красный</b> «MA20↓EMA20» — пересечение средних на последнем баре, краткосрочная смена импульса вверх/вниз. <b style="color:#2196f3">Синий</b> бейдж «EMA50» и т.п. — цена последнего бара коснулась этой EMA (отработка уровня поддержки/сопротивления). Таймфрейм расчёта переключается выпадающим списком на самой карточке.</span></span>
                 </span>
                 <span style="display:flex;align-items:center;gap:6px">
+                    <button class="div-scan-btn" id="emaLogClearBtn" onclick="emaLogClear()" title="Очистить журнал сигналов" style="padding:2px 8px;font-size:11px">🗑</button>
                     <select class="div-scan-btn" id="emaScanTfSelect" onchange="_emaTimeframeChanged(this.value)" style="padding:4px 6px">
                         <option value="15m" selected>15м</option>
                         <option value="1h">1ч</option>
@@ -1655,7 +1656,7 @@
         <div class="card div-scan-card">
             <div class="div-scan-header">
                 <span style="display:flex;align-items:center;gap:6px;min-width:0">
-                    <span id="divScanTitle" class="div-scan-header-title">Дивергенции</span>
+                    <span id="divScanTitle" class="div-scan-header-title">Дивер</span>
                     <span class="rc-help">?<span class="rc-help-pop">Ищет дивергентные бары — расхождение между движением цены и гистограммой осциллятора AO (Awesome Oscillator). <b style="color:#26a69a">Зелёный ▲</b> — бычья дивергенция: цена обновила минимум, а AO — нет, сигнал на разворот вверх. <b style="color:#ef5350">Красный ▼</b> — медвежья дивергенция: обратная ситуация, сигнал на разворот вниз. В отличие от двух других сканеров не обновляется автоматически — нажимайте «Сканировать» вручную.</span></span>
                 </span>
                 <button class="div-scan-btn" id="divScanBtn" onclick="fetchDivScan()">⟳ Сканировать</button>
@@ -1672,9 +1673,12 @@
                     <span id="volScanTitle" class="div-scan-header-title">Волатильность</span>
                     <span class="rc-help">?<span class="rc-help-pop">Ищет монеты, которые прямо сейчас начинают резко двигаться (не «уже выросло», а «только начинает») — по ускорению цены, аномальному объёму (RVOL) и пробою локального диапазона. Число на бейдже — score от 0 до 100 (порог настраивается в настройках); цвет бейджа = фаза движения: <b style="color:#26a69a">зелёный</b> — пробой вверх при росте цены, <b style="color:#ef5350">красный</b> — пробой вниз при падении, <b style="color:#ff9800">оранжевый</b> — движение за 15 мин намного больше обычного (вероятный перегрев/разворот), <b style="color:#2196f3">синий</b> — высокая волатильность без чёткого направления. Строка «5m: +X% · RVOL Yx» — изменение цены за 5 минут и во сколько раз текущий объём выше обычного.</span></span>
                 </span>
-                <span style="display:flex;align-items:center;gap:6px">
-                    <button class="div-scan-btn" id="volLogClearBtn" onclick="volLogClear()" title="Очистить журнал сигналов" style="padding:2px 8px;font-size:11px">🗑</button>
-                    <span class="vol-timer" id="volScanTimer"></span>
+                <span style="display:flex;flex-direction:column;align-items:flex-end;gap:4px">
+                    <span style="display:flex;align-items:center;gap:6px">
+                        <button class="div-scan-btn" id="volLogClearBtn" onclick="volLogClear()" title="Очистить журнал сигналов" style="padding:2px 8px;font-size:11px">🗑</button>
+                        <span class="vol-timer" id="volScanTimer"></span>
+                    </span>
+                    <select class="div-scan-btn" id="volScanTfSelect" onchange="_volTimeframeChanged(this.value)" style="padding:4px 6px"></select>
                 </span>
             </div>
             <div class="div-scan-info" id="volScanInfo"></div>
@@ -2970,7 +2974,7 @@
             if (visibleTickerInterval) clearInterval(visibleTickerInterval);
             document.getElementById('wsStatus').textContent = 'Finam: исторические данные';
             document.getElementById('wsStatus').className = '';
-            document.getElementById('divScanTitle').textContent = 'Дивергенции';
+            document.getElementById('divScanTitle').textContent = 'Дивер';
             document.getElementById('divScanList').innerHTML = '<div class="div-scan-empty">Нажмите «Сканировать»</div>';
             document.getElementById('divScanInfo').textContent = '';
             volNextRefresh = 0;
@@ -2978,6 +2982,7 @@
             _volRenderLog(new Set());
             updateTimeframesForMarket('finam');
             fetchFinamSymbols(currentFinamCategory);
+            _volUpdateTfSelectOptions();
             fetchVolScan();
             emaNextRefresh = 0;
             _emaLoadLog();
@@ -2986,7 +2991,7 @@
             wlRender();
             jRender();
         } else {
-            document.getElementById('divScanTitle').textContent = 'Дивергенции';
+            document.getElementById('divScanTitle').textContent = 'Дивер';
             document.getElementById('divScanList').innerHTML = '<div class="div-scan-empty">Нажмите «Сканировать»</div>';
             document.getElementById('divScanInfo').textContent = '';
             volNextRefresh = 0;
@@ -2998,6 +3003,7 @@
             _rcResetCalcOnInstrumentChange();
             updateTimeframesForMarket('crypto');
             fetchSymbolsList().then(() => { fetchAll(); startTicker(); });
+            _volUpdateTfSelectOptions();
             fetchVolScan();
             emaNextRefresh = 0;
             _emaLoadLog();
@@ -3474,6 +3480,40 @@
         'POST-PUMP': 'vol-neutral',
         'HIGH-VOL-RANGE': 'vol-info',
     };
+
+    // Таймфреймы сканера волатильности: базовый зависит от рынка (крипто — 1м,
+    // Finam — 5м, т.к. у Finam нет готового 1м-потока для всех инструментов),
+    // плюс 4ч/1д — сам impulse-score алгоритм считает в номерах баров, а не
+    // в буквальных минутах, поэтому честно работает на любом ТФ.
+    let _volCurTf = '1m';
+    function _volBaseTf() {
+        return currentMarket === 'finam' ? '5m' : '1m';
+    }
+    function _volAllowedTfs() {
+        return [_volBaseTf(), '4h', '1d'];
+    }
+    const VOL_TF_LABELS = { '1m': '1м', '5m': '5м', '4h': '4ч', '1d': '1Д' };
+    function _volTfLabel(tf) {
+        return VOL_TF_LABELS[tf] || tf;
+    }
+    function _volUpdateTfSelectOptions() {
+        const sel = document.getElementById('volScanTfSelect');
+        if (!sel) return;
+        const allowed = _volAllowedTfs();
+        const stored = loadSettings().volScanTimeframe;
+        const tf = allowed.includes(stored) ? stored : _volBaseTf();
+        sel.innerHTML = allowed.map(t => `<option value="${t}">${_volTfLabel(t)}</option>`).join('');
+        sel.value = tf;
+    }
+    function _volTimeframeChanged(tf) {
+        const s = loadSettings();
+        s.volScanTimeframe = tf;
+        localStorage.setItem('cryptoSettings', JSON.stringify(s));
+        volLogClear();
+        volNextRefresh = 0;
+        fetchVolScan();
+    }
+
     function _volRenderLog(freshSymbols) {
         const list = document.getElementById('volScanList');
         const info = document.getElementById('volScanInfo');
@@ -3485,7 +3525,7 @@
                 const t = new Date(p.time).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
                 return `<div class="div-scan-item${flash}" onclick="selectPair({symbol:'${p.symbol}',name:'${p.name}',base:'${p.base}'})">
                     <span class="div-scan-badge ${cls}">${p.score}</span>
-                    <span class="div-scan-name">${p.name}<span class="vol-log-time">${t}</span><br><small style="opacity:.7">5m: ${p.return_5m > 0 ? '+' : ''}${p.return_5m}% · RVOL ${p.rvol_1m}x</small></span>
+                    <span class="div-scan-name">${p.name}<span class="vol-log-time">${t}</span><br><small style="opacity:.7">${_volTfLabel(_volCurTf)}: ${p.return_5m > 0 ? '+' : ''}${p.return_5m}% · RVOL ${p.rvol_1m}x</small></span>
                 </div>`;
             }).join('')
             : '<div class="div-scan-empty">Пока нет сигналов выше порога</div>';
@@ -3495,17 +3535,26 @@
         const myGen = ++_volGen;
         const list = document.getElementById('volScanList');
         const isFinam = currentMarket === 'finam';
+        const allowed = _volAllowedTfs();
+        const stored = loadSettings().volScanTimeframe;
+        const tf = allowed.includes(stored) ? stored : _volBaseTf();
+        _volCurTf = tf;
         if (!volSignalLog.length && !_volPrevSymbols.size) list.innerHTML = '<div class="div-scan-empty">Сканирование...</div>';
         try {
             const _vs = loadSettings();
             const url = isFinam
-                ? `${API_BASE}/finam/scan/volatile?threshold=${_vs.volScoreThresholdCrypto}&top=20`
-                : `${API_BASE}/scan/volatile?threshold=${_vs.volScoreThresholdCrypto}&top=20`;
+                ? `${API_BASE}/finam/scan/volatile?threshold=${_vs.volScoreThresholdCrypto}&top=20&timeframe=${tf}`
+                : `${API_BASE}/scan/volatile?threshold=${_vs.volScoreThresholdCrypto}&top=20&timeframe=${tf}`;
             const res = isFinam ? await _authFetch(url) : await fetch(url);
             const json = await res.json();
             // Если за время запроса пользователь сменил рынок — игнорируем ответ
             if (myGen !== _volGen) return;
             if (!res.ok) throw new Error(json.detail || 'Ошибка');
+            if (json.warming_up && !volSignalLog.length) {
+                list.innerHTML = '<div class="div-scan-empty">Считается в фоне, обновится в течение пары минут...</div>';
+                volNextRefresh = Date.now() + 20 * 1000;
+                return;
+            }
             const pairs = json.pairs ?? [];
 
             const currentSymbols = new Set(pairs.map(p => p.symbol));
@@ -3617,7 +3666,6 @@
         const myGen = ++_emaGen;
         const isFinam = currentMarket === 'finam';
         const tf = loadSettings().emaScanTimeframe || '15m';
-        document.getElementById('emaScanTitle').textContent = `MA/EMA · ${EMA_TF_LABELS[tf] || tf}`;
         if (!emaSignalLog.length && !_emaPrevKeys.size) {
             document.getElementById('emaScanList').innerHTML = '<div class="div-scan-empty">Сканирование...</div>';
         }
@@ -4149,6 +4197,7 @@
             fetchAll();
             startTicker();
             _volLoadLog();
+            _volUpdateTfSelectOptions();
             setTimeout(fetchVolScan, 5000);
             setInterval(tickVolTimer, 1000);
             _emaLoadLog();

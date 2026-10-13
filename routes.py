@@ -209,15 +209,26 @@ def _true_range(high, low, prev_close):
     return max(high - low, abs(high - prev_close), abs(low - prev_close))
 
 
+_VOL_SCAN_TIMEFRAMES = ("1m", "4h", "1d")
+
+
 @router.get("/scan/volatile")
-async def scan_volatile(threshold: float = 60.0, top: int = 20):
+async def scan_volatile(threshold: float = 60.0, top: int = 20, timeframe: str = "1m"):
     """
     Сканер начала импульса (не «уже выросло», а «только начинает резко двигаться»):
-    ускорение цены (return 1m/5m/15m) + аномальный относительный объём (RVOL) +
-    расширение диапазона (True Range к медиане) + пробой локального 30-минутного
+    ускорение цены (return 1/5/15 баров) + аномальный относительный объём (RVOL) +
+    расширение диапазона (True Range к медиане) + пробой локального 30-барного
     диапазона. threshold — минимальный score (0-100), не процент.
+
+    timeframe параметризует саму свечу расчёта (по умолчанию 1m — «только начинает
+    двигаться» в классическом скальперском смысле). Веса/окна (60 баров для RVOL,
+    30 баров для пробоя) считаются в номерах баров, а не в минутах, поэтому тот же
+    алгоритм честно работает и на 4h/1d — просто "недавний режим волатильности"
+    получается за 4h×60=10 дней или 1d×60=60 дней вместо 60 минут.
     """
-    key = get_cache_key("", "1m", top, f"impulse_{threshold}")
+    if timeframe not in _VOL_SCAN_TIMEFRAMES:
+        timeframe = "1m"
+    key = get_cache_key("", timeframe, top, f"impulse_{threshold}")
     sem = asyncio.Semaphore(6)
 
     async def scan_one(t_info):
@@ -225,7 +236,7 @@ async def scan_volatile(threshold: float = 60.0, top: int = 20):
             try:
                 sym = t_info['symbol']
                 base = sym.replace('USDT', '')
-                df = await async_fetch_ohlcv_df(sym, '1m', 90)
+                df = await async_fetch_ohlcv_df(sym, timeframe, 90)
                 if len(df) < 65:
                     return None
 
@@ -336,7 +347,7 @@ async def scan_volatile(threshold: float = 60.0, top: int = 20):
         results = await asyncio.gather(*[scan_one(t) for t in top_symbols])
         pairs = [r for r in results if r]
         pairs.sort(key=lambda x: x['score'], reverse=True)
-        return {"threshold": threshold, "count": len(pairs[:top]), "pairs": pairs[:top]}
+        return {"threshold": threshold, "timeframe": timeframe, "count": len(pairs[:top]), "pairs": pairs[:top]}
 
     return await get_or_compute(key, compute, ttl=45)
 
