@@ -270,17 +270,47 @@
             padding: 2px 4px; border-radius: 4px;
         }
         .mc-pair-btn:hover { background: var(--hover-bg); }
-        .mc-pair-input {
-            background: var(--bg-primary); border: 1px solid var(--accent-blue);
-            color: var(--text-primary); font-size: 13px; font-weight: 600;
-            padding: 2px 6px; border-radius: 4px; width: 100px; outline: none;
-            text-transform: uppercase;
-        }
         .mc-price { font-size: 13px; color: var(--text-primary); font-weight: 500; }
         .mc-change { font-size: 12px; }
         .mc-change.positive { color: var(--positive); }
         .mc-change.negative { color: var(--negative); }
         .mc-chart-wrap { flex: 1; position: relative; min-height: 0; }
+        .mc-remove-btn {
+            background: transparent; border: none; cursor: pointer;
+            color: var(--text-secondary); font-size: 15px; line-height: 1;
+            padding: 2px 4px; border-radius: 4px; margin-left: auto;
+        }
+        .mc-remove-btn:hover { background: var(--hover-bg); color: var(--negative); }
+        .mc-cell-add { align-items: center; justify-content: center; }
+        .mc-add-btn {
+            background: transparent; border: 1px dashed var(--border-color);
+            color: var(--text-secondary); cursor: pointer; font-size: 13px;
+            padding: 10px 18px; border-radius: 6px;
+        }
+        .mc-add-btn:hover { background: var(--hover-bg); color: var(--text-primary); border-color: var(--accent-blue); }
+
+        /* Окошко быстрого поиска пары в мультиграфике */
+        .mc-picker {
+            position: fixed; z-index: 600; width: 260px; max-height: 320px;
+            background: var(--bg-secondary); border: 1px solid var(--border-color);
+            border-radius: 8px; box-shadow: 0 8px 24px rgba(0,0,0,0.35);
+            flex-direction: column; overflow: hidden;
+        }
+        .mc-picker-input {
+            background: var(--bg-primary); border: none;
+            border-bottom: 1px solid var(--border-color);
+            color: var(--text-primary); font-size: 13px;
+            padding: 8px 10px; outline: none; flex-shrink: 0;
+        }
+        .mc-picker-list { overflow-y: auto; flex: 1; }
+        .mc-picker-item {
+            display: flex; align-items: center; justify-content: space-between;
+            gap: 8px; padding: 7px 10px; cursor: pointer; font-size: 13px;
+            color: var(--text-primary);
+        }
+        .mc-picker-item:hover { background: var(--hover-bg); }
+        .mc-picker-sub { font-size: 11px; color: var(--text-secondary); white-space: nowrap; }
+        .mc-picker-empty { padding: 14px 10px; font-size: 12px; color: var(--text-secondary); text-align: center; }
 
         /* Список пар */
         .pairs-card { padding: 8px; }
@@ -2219,10 +2249,6 @@
     let drawCtx = null;
     let drawIsDown = false;
     const FIB_LEVELS = [0, 0.236, 0.382, 0.5, 0.618, 0.786, 1.0];
-    // Мультиграфик — рисование
-    let mcDrawActive = false;
-    let mcActiveTool = 'cursor';
-
     // Динамический список символов (загружается с API)
     let allSymbols = []; // [{symbol: 'BTCUSDT', name: 'BTC/USDT', base: 'BTC'}, ...]
 
@@ -3056,6 +3082,7 @@
         _rcCurInstrument = { currency: sym.currency, point_based: !!sym.point_based };
         _rcResetCalcOnInstrumentChange();
         fetchAll();
+        redrawCanvas();
     }
 
     // Обновление тикера текущей пары (каждые 3 сек)
@@ -3125,6 +3152,13 @@
         const grid = document.getElementById('mcGrid');
         grid.innerHTML = '';
         mcInstances = [];
+        // Сетка подстраивается под фактическое число ячеек (1-6), чтобы одна
+        // пара не "терялась" на 1/6 экрана в сетке, рассчитанной на 6 ячеек.
+        const totalCells = mcSymbols.length + (mcSymbols.length < MC_GRID_SIZE ? 1 : 0);
+        const gridCols = totalCells <= 1 ? 1 : 2;
+        const gridRows = Math.max(1, Math.ceil(totalCells / gridCols));
+        grid.style.gridTemplateColumns = `repeat(${gridCols}, 1fr)`;
+        grid.style.gridTemplateRows = `repeat(${gridRows}, 1fr)`;
         for (let i = 0; i < mcSymbols.length; i++) {
             const cell = document.createElement('div');
             cell.className = 'mc-cell';
@@ -3222,6 +3256,7 @@
             inst.series.setMarkers(markers);
 
             document.getElementById(`mc-price-${i}`).textContent = '$' + formatPrice(last.close);
+            mcRedrawCell(i);
         } catch(e) {}
     }
 
@@ -3480,6 +3515,7 @@
         e.target.classList.add('active');
         currentTimeframe = e.target.dataset.tf;
         fetchAll();
+        redrawCanvas();
     });
 
     // Переключатель типа графика (Свечи / Бары)
@@ -4076,7 +4112,7 @@
 
             const up        = d.p2.price >= d.p1.price;
             const accent    = up ? '#26a69a' : '#ef5350';
-            const isHovered = drawings.indexOf(d) === hoveredRulerIdx;
+            const isHovered = _curDrawings().indexOf(d) === hoveredRulerIdx;
 
             // полупрозрачный треугольник
             ctx.globalAlpha = 0.10;
@@ -4183,38 +4219,16 @@
         return false;
     }
 
-    function undoDrawing() { drawings.pop(); redrawCanvas(); }
-    function clearDrawings() { drawings = []; redrawCanvas(); }
+    function undoDrawing() { _curDrawings().pop(); redrawCanvas(); }
+    function clearDrawings() { drawingsStore[_drawKey(currentSymbol, currentTimeframe)] = []; redrawCanvas(); }
 
     // ============================================================
     // Рисование в мультиграфике
     // ============================================================
 
-    function toggleMcDrawing() {
-        mcDrawActive = !mcDrawActive;
-        document.getElementById('mcDrawBtn').classList.toggle('active', mcDrawActive);
-        document.getElementById('mcDrawToolbar').classList.toggle('visible', mcDrawActive);
-        mcInstances.forEach(inst => {
-            if (!inst.canvas) return;
-            inst.canvas.classList.toggle('draw-active', mcDrawActive && mcActiveTool !== 'cursor');
-        });
-    }
-
-    function setMcDrawTool(tool) {
-        mcActiveTool = tool;
-        document.querySelectorAll('#mcDrawToolbar .dt-btn[data-mctool]').forEach(b =>
-            b.classList.toggle('active', b.dataset.mctool === tool));
-        mcInstances.forEach(inst => {
-            if (!inst.canvas) return;
-            inst.canvas.classList.toggle('draw-active', tool !== 'cursor');
-        });
-    }
-
-    function mcClearActiveDrawings() {
-        // определяем какой cell активен по последнему клику
-        mcInstances.forEach(inst => { inst.drawings = []; if (inst.ctx) { inst.ctx.clearRect(0, 0, inst.canvas.width, inst.canvas.height); } });
-    }
-
+    // Ячейки мультиграфика только ПОКАЗЫВАЮТ рисунки с главного графика
+    // (read-only, по ключу символ+таймфрейм этой ячейки) — своего инструмента
+    // рисования здесь больше нет.
     function mcInitCellCanvas(i) {
         const inst = mcInstances[i];
         if (!inst) return;
@@ -4222,15 +4236,13 @@
         if (!wrap) return;
         const canvas = document.createElement('canvas');
         canvas.className = 'drawing-canvas';
+        canvas.style.pointerEvents = 'none';
         canvas.width = wrap.offsetWidth;
         canvas.height = wrap.offsetHeight;
         wrap.appendChild(canvas);
         const ctx = canvas.getContext('2d');
         inst.canvas = canvas;
         inst.ctx = ctx;
-        inst.drawings = [];
-        inst.currentDraw = null;
-        inst.isDown = false;
 
         new ResizeObserver(() => {
             canvas.width = wrap.offsetWidth;
@@ -4239,52 +4251,14 @@
         }).observe(wrap);
 
         inst.chart.timeScale().subscribeVisibleLogicalRangeChange(() => mcRedrawCell(i));
-
-        canvas.addEventListener('mousedown', e => mcOnDown(e, i));
-        canvas.addEventListener('mousemove', e => mcOnMove(e, i));
-        canvas.addEventListener('mouseup', e => mcOnUp(e, i));
     }
 
     function mcRedrawCell(i) {
         const inst = mcInstances[i];
         if (!inst || !inst.ctx) return;
         inst.ctx.clearRect(0, 0, inst.canvas.width, inst.canvas.height);
-        const all = inst.currentDraw ? [...inst.drawings, inst.currentDraw] : inst.drawings;
-        for (const d of all) renderDrawing(inst.ctx, d, inst.canvas.width, inst.canvas.height, inst.series, inst.chart);
-    }
-
-    function mcOnDown(e, i) {
-        if (!mcDrawActive) return;
-        const inst = mcInstances[i];
-        const lx = e.offsetX, ly = e.offsetY;
-        const time = inst.chart.timeScale().coordinateToTime(lx);
-        const price = inst.series.coordinateToPrice(ly);
-        if (!time || price == null) return;
-        const color = document.getElementById('mcDrawColor').value;
-        if (mcActiveTool === 'eraser') { eraseAt(lx, ly, inst.drawings, inst.series, inst.chart); mcRedrawCell(i); return; }
-        if (mcActiveTool === 'hline') { inst.drawings.push({ type: 'hline', price, color }); mcRedrawCell(i); return; }
-        inst.isDown = true;
-        inst.currentDraw = { type: mcActiveTool, p1: { time, price }, p2: { time, price }, color };
-    }
-    function mcOnMove(e, i) {
-        const inst = mcInstances[i];
-        if (!inst.isDown || !inst.currentDraw) return;
-        const time = inst.chart.timeScale().coordinateToTime(e.offsetX);
-        const price = inst.series.coordinateToPrice(e.offsetY);
-        if (!time || price == null) return;
-        inst.currentDraw.p2 = { time, price };
-        mcRedrawCell(i);
-    }
-    function mcOnUp(e, i) {
-        const inst = mcInstances[i];
-        if (!inst.isDown || !inst.currentDraw) return;
-        inst.isDown = false;
-        const time = inst.chart.timeScale().coordinateToTime(e.offsetX);
-        const price = inst.series.coordinateToPrice(e.offsetY);
-        if (time && price != null) inst.currentDraw.p2 = { time, price };
-        inst.drawings.push({ ...inst.currentDraw });
-        inst.currentDraw = null;
-        mcRedrawCell(i);
+        const drawingsForCell = drawingsStore[_drawKey(mcSymbols[i], mcTf)] || [];
+        for (const d of drawingsForCell) renderDrawing(inst.ctx, d, inst.canvas.width, inst.canvas.height, inst.series, inst.chart);
     }
 
     // ============================================================
