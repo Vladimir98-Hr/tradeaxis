@@ -2755,12 +2755,19 @@
             } catch (e) { console.error('Live tail BB update error:', e); }
 
             lastCandle = tailCandles[tailCandles.length - 1];
-            lastChartData = json.data.map(d => ({
+            const tailBars = json.data.map(d => ({
                 timestamp: d.timestamp,
                 open: d.Open ?? d.open, high: d.High ?? d.high,
                 low: d.Low ?? d.low, close: d.Close ?? d.close,
                 volume: d.Volume ?? d.volume ?? 0
             }));
+            if (lastChartData && lastChartData.length) {
+                const byTime = new Map(lastChartData.map(d => [toUnix(d.timestamp), d]));
+                tailBars.forEach(d => byTime.set(toUnix(d.timestamp), d));
+                lastChartData = Array.from(byTime.values()).sort((a, b) => toUnix(a.timestamp) - toUnix(b.timestamp));
+            } else {
+                lastChartData = tailBars;
+            }
             if (activeIndicators.length) renderAllActiveIndicators(lastChartData);
 
             if (currentMarket === 'finam') {
@@ -5856,7 +5863,7 @@
         if (!d) return 0;
         const t = d.timestamp;
         if (typeof t === 'number') return t > 1e12 ? Math.floor(t / 1000) : t;
-        return Math.floor(new Date(t).getTime() / 1000);
+        return toUnix(t);
     };
 
     IND.calcSMA = function(data, p) {
