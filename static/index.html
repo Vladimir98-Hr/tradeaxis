@@ -2768,7 +2768,11 @@
             } else {
                 lastChartData = tailBars;
             }
-            if (activeIndicators.length) renderAllActiveIndicators(lastChartData);
+            if (activeIndicators.length) {
+                renderAllActiveIndicators(lastChartData);
+                const r = mainChart.timeScale().getVisibleLogicalRange();
+                if (r) indicatorPanes.forEach(p => { try { p.chart.timeScale().setVisibleLogicalRange(r); } catch(e){} });
+            }
 
             if (currentMarket === 'finam') {
                 const lastRaw = json.data[json.data.length - 1];
