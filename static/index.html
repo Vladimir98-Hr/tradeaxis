@@ -574,7 +574,12 @@
             display: flex; justify-content: space-between; align-items: center; gap: 10px;
             font-size: 13px; font-weight: 600; color: var(--text-accent); padding: 2px 4px;
         }
-        .div-scan-header-title { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .div-scan-header-title { white-space: nowrap; }
+        /* Заголовки сканеров (MA/EMA, дивергенции, волатильность) — название на своей
+           строке во всю ширину, элементы управления под ним прижаты вправо, чтобы
+           название никогда не обрезалось многоточием. */
+        .div-scan-header-wrap { flex-direction: column; align-items: stretch; gap: 4px; }
+        .div-scan-header-wrap > *:last-child { align-self: flex-end; }
         .div-scan-btn {
             background: var(--hover-bg); border: 1px solid var(--border-color);
             border-radius: 6px; color: var(--text-primary); font-size: 12px;
@@ -1507,7 +1512,7 @@
 
         <!-- Сканер MA/EMA (скальпинг: пересечение MA20/EMA20, касание EMA20/50/100/200) -->
         <div class="card div-scan-card">
-            <div class="div-scan-header">
+            <div class="div-scan-header div-scan-header-wrap">
                 <span style="display:flex;align-items:center;gap:6px;min-width:0">
                     <span id="emaScanTitle" class="div-scan-header-title">Сканер MA/EMA</span>
                     <span class="rc-help">?<span class="rc-help-pop">Скальпинг-сигналы по пересечению MA20/EMA20 и касанию ценой EMA20/50/100/200. <b style="color:#26a69a">Зелёный</b> бейдж «MA20↑EMA20» / <b style="color:#ef5350">красный</b> «MA20↓EMA20» — пересечение средних на последнем баре, краткосрочная смена импульса вверх/вниз. <b style="color:#2196f3">Синий</b> бейдж «EMA50» и т.п. — цена последнего бара коснулась этой EMA (отработка уровня поддержки/сопротивления). Таймфрейм расчёта переключается выпадающим списком на самой карточке.</span></span>
@@ -1653,7 +1658,7 @@
     <aside class="right-panel">
         <!-- Сканер дивергентных баров -->
         <div class="card div-scan-card">
-            <div class="div-scan-header">
+            <div class="div-scan-header div-scan-header-wrap">
                 <span style="display:flex;align-items:center;gap:6px;min-width:0">
                     <span id="divScanTitle" class="div-scan-header-title">Дивергенции</span>
                     <span class="rc-help">?<span class="rc-help-pop">Ищет дивергентные бары — расхождение между движением цены и гистограммой осциллятора AO (Awesome Oscillator). <b style="color:#26a69a">Зелёный ▲</b> — бычья дивергенция: цена обновила минимум, а AO — нет, сигнал на разворот вверх. <b style="color:#ef5350">Красный ▼</b> — медвежья дивергенция: обратная ситуация, сигнал на разворот вниз. В отличие от двух других сканеров не обновляется автоматически — нажимайте «Сканировать» вручную.</span></span>
@@ -1667,7 +1672,7 @@
         </div>
         <!-- Сканер волатильности -->
         <div class="card div-scan-card">
-            <div class="div-scan-header">
+            <div class="div-scan-header div-scan-header-wrap">
                 <span style="display:flex;align-items:center;gap:6px;min-width:0">
                     <span id="volScanTitle" class="div-scan-header-title">Сканер волатильности</span>
                     <span class="rc-help">?<span class="rc-help-pop">Ищет монеты, которые прямо сейчас начинают резко двигаться (не «уже выросло», а «только начинает») — по ускорению цены, аномальному объёму (RVOL) и пробою локального диапазона. Число на бейдже — score от 0 до 100 (порог настраивается в настройках); цвет бейджа = фаза движения: <b style="color:#26a69a">зелёный</b> — пробой вверх при росте цены, <b style="color:#ef5350">красный</b> — пробой вниз при падении, <b style="color:#ff9800">оранжевый</b> — движение за 15 мин намного больше обычного (вероятный перегрев/разворот), <b style="color:#2196f3">синий</b> — высокая волатильность без чёткого направления. Строка «5m: +X% · RVOL Yx» — изменение цены за 5 минут и во сколько раз текущий объём выше обычного.</span></span>
