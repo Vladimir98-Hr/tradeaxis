@@ -478,7 +478,7 @@
             width: 100%;
             overflow: hidden;
         }
-        .chart-container-main { flex: 6; min-height: 0; }
+        .chart-container-main { flex: 6; min-height: 0; position: relative; }
         .chart-container-volume { flex: 1.5; min-height: 0; }
         .chart-container-ao { flex: 2.5; min-height: 0; }
         #candleTimer {
@@ -1040,6 +1040,14 @@
         .osc-pane-hdr { position:absolute; top:0; left:0; right:0; z-index:3; display:flex; align-items:center; justify-content:space-between; padding:1px 8px; background:rgba(19,23,34,.75); font-size:11px; color:var(--text-secondary); pointer-events:none; }
         .osc-pane-hdr button { pointer-events:all; background:none; border:none; color:var(--text-secondary); font-size:11px; cursor:pointer; padding:0 4px; }
         .osc-pane-hdr button:hover { color:var(--text-primary); }
+        /* EMA Setup — легенда поверх главного графика */
+        .ema-setup-legend { position:absolute; top:6px; left:8px; z-index:4; display:flex; align-items:center; flex-wrap:wrap; gap:7px; padding:4px 8px; background:rgba(19,23,34,.75); border-radius:6px; font-size:11px; color:var(--text-secondary); }
+        .ema-setup-legend .esl-title { font-weight:700; color:var(--text-primary); margin-right:2px; }
+        .esl-chip { display:flex; align-items:center; gap:4px; }
+        .esl-dot { width:8px; height:2.5px; border-radius:2px; flex-shrink:0; }
+        .esl-val { color:var(--text-primary); font-variant-numeric:tabular-nums; }
+        .esl-close { background:none; border:none; color:var(--text-secondary); font-size:12px; cursor:pointer; padding:0 2px; margin-left:2px; }
+        .esl-close:hover { color:#ef5350; }
         /* ── Auth Modal ─────────────────────────────────────────── */
         .auth-overlay { position:fixed; inset:0; background:rgba(0,0,0,.65); z-index:3000; display:flex; align-items:center; justify-content:center; }
         .auth-box { background:var(--panel-bg); border:1px solid var(--border-color); border-radius:10px; width:360px; max-width:calc(100vw - 32px); padding:28px 28px 24px; }
@@ -1412,7 +1420,7 @@
                max-height:44px (commit 6919003) — на мобиле это выдвигаемый ящик
                #watchlistCard со своим overflow-y:auto, список должен расти свободно
                внутри него, а не скроллиться отдельным крошечным окном */
-            #watchlistItems { max-height: none; overflow-y: visible; }
+            #watchlistItems { max-height: none !important; overflow-y: visible !important; }
 
             /* Полноэкранный режим графика на телефоне: обычный сайдбар (в т.ч. кнопка
                "Инструменты рисования") скрыт под графиком (z-index:500 > z-index:200),
@@ -2505,19 +2513,22 @@
         if (bbUpperSeries) bbUpperSeries.applyOptions({ visible: vis && s.showBB });
         if (bbLowerSeries) bbLowerSeries.applyOptions({ visible: vis && s.showBB });
         if (aoSeries)      aoSeries.applyOptions({ visible: vis && s.showAO });
-        if (vis) applyAllMarkers();
-        else if (candleSeries) candleSeries.setMarkers([]);
+        applyAllMarkers();
         if (candleSeries && lastCandlesRaw.length) {
             candleSeries.setData(_colorSquatCandles(lastCandlesRaw, mfiSquatTimes));
         }
     }
 
+    // Маркеры фракталов/дивергенций показываются только при включённых
+    // «Авторских индикаторах», а стрелки EMA Setup (fx-индикатор) — всегда,
+    // независимо от этого переключателя — оба источника пишут в один и тот
+    // же candleSeries.setMarkers(), поэтому сливаются здесь в одном месте.
     function applyAllMarkers() {
         if (!candleSeries) return;
-        const markers = [
-            ...divergenceBearish, ...divergenceBullish,
-            ...fractalHighs, ...fractalLows,
-        ].sort((a, b) => a.time - b.time);
+        const authorMarkers = authorIndicatorsVisible
+            ? [...divergenceBearish, ...divergenceBullish, ...fractalHighs, ...fractalLows]
+            : [];
+        const markers = [...authorMarkers, ...emaSetupMarkers].sort((a, b) => a.time - b.time);
         candleSeries.setMarkers(markers);
     }
 
@@ -5844,6 +5855,7 @@
     let activeIndicators  = [];
     let indicatorPanes    = [];
     let lastChartData     = null;
+    let emaSetupMarkers   = [];
 
     // ── Вспомогательные вычисления ──────────────────────────────
     const IND = {};
@@ -5886,6 +5898,31 @@
         const src = data.map(d => d[p.source] ?? d.close);
         const v = IND._ema(src, p.length);
         return data.map((d, i) => v[i] == null ? null : { time: IND._ts(d), value: v[i] }).filter(Boolean);
+    };
+
+    // Авторский сетап: MA20 + EMA20/50/100/200, со стрелками на пересечении
+    // MA20/EMA20 по всей истории (портировано из detect_ma_ema_signal в
+    // indicators.py, который считает то же самое, но только для последнего бара).
+    IND.calcEmaSetup = function(data, p) {
+        const closes = data.map(d => d.close);
+        const ma20raw   = IND._sma(closes, 20);
+        const ema20raw  = IND._ema(closes, 20);
+        const ema50raw  = IND._ema(closes, 50);
+        const ema100raw = IND._ema(closes, 100);
+        const ema200raw = IND._ema(closes, 200);
+        const toSeries = raw => data.map((d, i) => raw[i] == null ? null : { time: IND._ts(d), value: raw[i] }).filter(Boolean);
+        const crosses = [];
+        for (let i = 1; i < data.length; i++) {
+            if (ma20raw[i - 1] == null || ema20raw[i - 1] == null || ma20raw[i] == null || ema20raw[i] == null) continue;
+            const prevDiff = ma20raw[i - 1] - ema20raw[i - 1];
+            const currDiff = ma20raw[i] - ema20raw[i];
+            if (prevDiff <= 0 && currDiff > 0) crosses.push({ time: IND._ts(data[i]), type: 'up' });
+            else if (prevDiff >= 0 && currDiff < 0) crosses.push({ time: IND._ts(data[i]), type: 'down' });
+        }
+        return {
+            ma20: toSeries(ma20raw), ema20: toSeries(ema20raw), ema50: toSeries(ema50raw),
+            ema100: toSeries(ema100raw), ema200: toSeries(ema200raw), crosses,
+        };
     };
 
     IND.calcVWMA = function(data, p) {
@@ -6090,6 +6127,41 @@
             },
             render(s, r) { s[0].setData(r.upper); s[1].setData(r.mid); s[2].setData(r.lower); }
         },
+        ema_setup: {
+            id: 'ema_setup', name: 'EMA Setup', category: 'Trend', overlay: true,
+            description: 'MA20 + EMA20/50/100/200 с подсветкой пересечения MA20/EMA20',
+            defaultParams: {},
+            calculate: (d, p) => IND.calcEmaSetup(d, p),
+            createSeries(chart, p) {
+                const ma20   = chart.addLineSeries({ color: '#42a5f5', lineWidth: 1.5, lineStyle: 2, title: 'MA20',   lastValueVisible: true, priceLineVisible: false });
+                const ema20  = chart.addLineSeries({ color: '#ff9800', lineWidth: 1.5, title: 'EMA20',  lastValueVisible: true, priceLineVisible: false });
+                const ema50  = chart.addLineSeries({ color: '#26a69a', lineWidth: 1.5, title: 'EMA50',  lastValueVisible: true, priceLineVisible: false });
+                const ema100 = chart.addLineSeries({ color: '#ab47bc', lineWidth: 1.5, title: 'EMA100', lastValueVisible: true, priceLineVisible: false });
+                const ema200 = chart.addLineSeries({ color: '#ef5350', lineWidth: 1.5, title: 'EMA200', lastValueVisible: true, priceLineVisible: false });
+                return [ma20, ema20, ema50, ema100, ema200];
+            },
+            render(s, r) {
+                s[0].setData(r.ma20); s[1].setData(r.ema20); s[2].setData(r.ema50);
+                s[3].setData(r.ema100); s[4].setData(r.ema200);
+            },
+            onAdd(inst) { _emaSetupLegendShow(inst); },
+            onRender(inst, r) {
+                emaSetupMarkers = r.crosses.map(c => ({
+                    time: c.time,
+                    position: c.type === 'up' ? 'belowBar' : 'aboveBar',
+                    color: c.type === 'up' ? '#26a69a' : '#ef5350',
+                    shape: c.type === 'up' ? 'arrowUp' : 'arrowDown',
+                    text: '',
+                }));
+                applyAllMarkers();
+                _emaSetupLegendUpdate(r);
+            },
+            onRemove() {
+                emaSetupMarkers = [];
+                applyAllMarkers();
+                _emaSetupLegendHide();
+            },
+        },
         atr: {
             id: 'atr', name: 'ATR', category: 'Volatility', overlay: false,
             description: '\u0421\u0440\u0435\u0434\u043d\u0438\u0439 \u0438\u0441\u0442\u0438\u043d\u043d\u044b\u0439 \u0434\u0438\u0430\u043f\u0430\u0437\u043e\u043d',
@@ -6194,6 +6266,7 @@
 
         const inst = { iid, id, def, params, series, pane };
         activeIndicators.push(inst);
+        if (def.onAdd) try { def.onAdd(inst); } catch(e) { console.warn('[IND] onAdd error', id, e); }
         if (lastChartData && lastChartData.length) renderIndicatorInstance(inst, lastChartData);
         ipAddToRecent(id);
         renderIPActiveList();
@@ -6206,6 +6279,7 @@
         const inst = activeIndicators[idx];
         inst.series.forEach(s => { try { (inst.pane ? inst.pane.chart : mainChart).removeSeries(s); } catch(e){} });
         if (inst.pane) removeOscillatorPane(iid);
+        if (inst.def.onRemove) try { inst.def.onRemove(inst); } catch(e) { console.warn('[IND] onRemove error', inst.id, e); }
         activeIndicators.splice(idx, 1);
         renderIPActiveList();
     }
@@ -6214,6 +6288,7 @@
         try {
             const result = inst.def.calculate(data, inst.params);
             if (result !== undefined && inst.series.length > 0) inst.def.render(inst.series, result);
+            if (result !== undefined && inst.def.onRender) inst.def.onRender(inst, result);
         } catch(e) { console.warn('[IND] render error', inst.id, e); }
     }
 
