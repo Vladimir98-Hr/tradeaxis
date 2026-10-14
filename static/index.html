@@ -2532,6 +2532,44 @@
         candleSeries.setMarkers(markers);
     }
 
+    // ── EMA Setup: легенда поверх главного графика ──────────────
+    const EMA_SETUP_ROWS = [
+        { key: 'ma20',   label: 'MA20',   color: '#42a5f5' },
+        { key: 'ema20',  label: 'EMA20',  color: '#ff9800' },
+        { key: 'ema50',  label: 'EMA50',  color: '#26a69a' },
+        { key: 'ema100', label: 'EMA100', color: '#ab47bc' },
+        { key: 'ema200', label: 'EMA200', color: '#ef5350' },
+    ];
+
+    function _emaSetupLegendShow(inst) {
+        _emaSetupLegendHide();
+        const body = document.querySelector('.chart-body');
+        if (!body) return;
+        const el = document.createElement('div');
+        el.id = 'emaSetupLegend';
+        el.className = 'ema-setup-legend';
+        el.innerHTML = '<span class="esl-title">EMA Setup</span>' +
+            EMA_SETUP_ROWS.map(r => `<span class="esl-chip"><span class="esl-dot" style="background:${r.color}"></span>${r.label} <span class="esl-val" data-k="${r.key}">—</span></span>`).join('') +
+            `<button class="esl-close" title="Удалить" onclick="removeIndicator('${inst.iid}')">✕</button>`;
+        document.getElementById('mainChart').appendChild(el);
+    }
+
+    function _emaSetupLegendUpdate(r) {
+        const el = document.getElementById('emaSetupLegend');
+        if (!el) return;
+        EMA_SETUP_ROWS.forEach(row => {
+            const arr = r[row.key];
+            const last = arr && arr.length ? arr[arr.length - 1].value : null;
+            const span = el.querySelector(`[data-k="${row.key}"]`);
+            if (span) span.textContent = last == null ? '—' : last.toFixed(4);
+        });
+    }
+
+    function _emaSetupLegendHide() {
+        const el = document.getElementById('emaSetupLegend');
+        if (el) el.remove();
+    }
+
     /** Один запрос к /chart-data (или /finam/chart-data) — все данные за раз */
     async function fetchAll() {
         // Гасим предыдущий график сразу — иначе при смене символа/рынка (особенно
