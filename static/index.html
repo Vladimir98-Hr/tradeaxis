@@ -4586,6 +4586,7 @@
 
     function openRiskCalc() {
         document.getElementById('riskCalcModal').style.display = 'flex';
+        _rcApplyPrefs(); // стиль/горизонт/плечо — до loadSessionState(), т.к. calcLimits() их использует
         _rcUpdateCurrencyLabels();
         _rcUpdateBlockBFields();
         _rcRenderAvgRows();
@@ -4607,6 +4608,7 @@
         _rcStyle = parseFloat(btn.dataset.val);
         document.querySelectorAll('#rcStyleGroup .rc-radio-btn').forEach(b => b.classList.remove('active'));
         btn.classList.add('active');
+        _rcSavePrefs();
     }
     function setRcCat(btn) {
         _rcCat = parseFloat(btn.dataset.val);
@@ -4616,6 +4618,7 @@
         document.getElementById('rcRRInput').value = _rcMinRR;
         document.getElementById('rcRRHint').textContent = `Мин. R:R для «${btn.textContent}»: ${_rcMinRR}:1`;
         document.getElementById('rcResB').style.display = 'none';
+        _rcSavePrefs();
     }
     function setRcLeverage(val) {
         let lev = Math.round(parseFloat(val));
@@ -4629,6 +4632,28 @@
         _rcUpdateBlockBFields();
         // Сбросить результат при смене плеча
         document.getElementById('rcResB').style.display = 'none';
+        _rcSavePrefs();
+    }
+
+    // ── Запоминаем стиль/горизонт/плечо между открытиями калькулятора ──
+    // (направление ЛОНГ/ШОРТ и R:R — не сохраняем, это каждый раз новое
+    // решение по конкретной сделке, а не привычка трейдера)
+    function _rcSavePrefs() {
+        localStorage.setItem('rcPrefs', JSON.stringify({ style: _rcStyle, cat: _rcCat, leverage: _rcLeverage }));
+    }
+    function _rcApplyPrefs() {
+        let prefs;
+        try { prefs = JSON.parse(localStorage.getItem('rcPrefs')); } catch { prefs = null; }
+        if (!prefs) return;
+        if (prefs.style != null) {
+            const btn = document.querySelector(`#rcStyleGroup .rc-radio-btn[data-val="${prefs.style}"]`);
+            if (btn) setRcStyle(btn);
+        }
+        if (prefs.cat != null) {
+            const btn = document.querySelector(`#rcCatGroup .rc-radio-btn[data-val="${prefs.cat}"]`);
+            if (btn) setRcCat(btn);
+        }
+        if (prefs.leverage != null) setRcLeverage(prefs.leverage);
     }
     function setRcRR(btn) {
         _rcRR = parseFloat(btn.dataset.val);
