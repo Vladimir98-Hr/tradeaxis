@@ -1699,18 +1699,17 @@
          Right Panel
          ============================================================ -->
     <aside class="right-panel">
-        <!-- Сканер дивергентных баров -->
-        <div class="card div-scan-card" id="divScanCard">
+        <!-- Капитал и сверка P&L -->
+        <div class="card div-scan-card" id="capitalCard">
             <div class="div-scan-header">
                 <span style="display:flex;align-items:center;gap:6px;min-width:0">
-                    <span id="divScanTitle" class="div-scan-header-title">Дивер</span>
-                    <span class="rc-help">?<span class="rc-help-pop">Ищет дивергентные бары — расхождение между движением цены и гистограммой осциллятора AO (Awesome Oscillator). <b style="color:#26a69a">Зелёный ▲</b> — бычья дивергенция: цена обновила минимум, а AO — нет, сигнал на разворот вверх. <b style="color:#ef5350">Красный ▼</b> — медвежья дивергенция: обратная ситуация, сигнал на разворот вниз. В отличие от двух других сканеров не обновляется автоматически — нажимайте «Сканировать» вручную.</span></span>
+                    <span class="div-scan-header-title">Капитал</span>
+                    <span class="rc-help">?<span class="rc-help-pop">Подключите read-only API-ключ биржи (без прав торговли/вывода — программа физически не может использовать его во вред) — тогда капитал и сверка P&amp;L за день считаются автоматически. Либо просто укажите капитал вручную без подключения ключа — расчёты риска будут работать, но без автосинхронизации.</span></span>
                 </span>
-                <button class="div-scan-btn" id="divScanBtn" onclick="fetchDivScan()">⟳ Сканировать</button>
+                <button class="div-scan-btn" id="capitalSettingsBtn" onclick="openCapitalModal()" title="Настроить">⚙</button>
             </div>
-            <div class="div-scan-info" id="divScanInfo"></div>
-            <div class="div-scan-list" id="divScanList">
-                <div class="div-scan-empty">Нажмите «Сканировать»</div>
+            <div class="div-scan-list" id="capitalCardBody" style="max-height:none">
+                <div class="div-scan-empty">Загрузка...</div>
             </div>
         </div>
         <!-- Сканер волатильности -->
@@ -1733,17 +1732,18 @@
                 <div class="div-scan-empty">Загрузка...</div>
             </div>
         </div>
-        <!-- Капитал и сверка P&L -->
-        <div class="card div-scan-card" id="capitalCard">
+        <!-- Сканер дивергентных баров -->
+        <div class="card div-scan-card" id="divScanCard">
             <div class="div-scan-header">
                 <span style="display:flex;align-items:center;gap:6px;min-width:0">
-                    <span class="div-scan-header-title">Капитал</span>
-                    <span class="rc-help">?<span class="rc-help-pop">Подключите read-only API-ключ биржи (без прав торговли/вывода — программа физически не может использовать его во вред) — тогда капитал и сверка P&amp;L за день считаются автоматически. Либо просто укажите капитал вручную без подключения ключа — расчёты риска будут работать, но без автосинхронизации.</span></span>
+                    <span id="divScanTitle" class="div-scan-header-title">Дивер</span>
+                    <span class="rc-help">?<span class="rc-help-pop">Ищет дивергентные бары — расхождение между движением цены и гистограммой осциллятора AO (Awesome Oscillator). <b style="color:#26a69a">Зелёный ▲</b> — бычья дивергенция: цена обновила минимум, а AO — нет, сигнал на разворот вверх. <b style="color:#ef5350">Красный ▼</b> — медвежья дивергенция: обратная ситуация, сигнал на разворот вниз. В отличие от двух других сканеров не обновляется автоматически — нажимайте «Сканировать» вручную.</span></span>
                 </span>
-                <button class="div-scan-btn" id="capitalSettingsBtn" onclick="openCapitalModal()" title="Настроить">⚙</button>
+                <button class="div-scan-btn" id="divScanBtn" onclick="fetchDivScan()">⟳ Сканировать</button>
             </div>
-            <div class="div-scan-list" id="capitalCardBody" style="max-height:none">
-                <div class="div-scan-empty">Загрузка...</div>
+            <div class="div-scan-info" id="divScanInfo"></div>
+            <div class="div-scan-list" id="divScanList">
+                <div class="div-scan-empty">Нажмите «Сканировать»</div>
             </div>
         </div>
         <!-- Открытые планы (ожидают пост-разбора) -->
@@ -6949,7 +6949,7 @@
         const form = document.getElementById('feedbackForm');
         const guestMsg = document.getElementById('feedbackGuestMsg');
         const loggedIn = !!(authToken && currentUser);
-        if (form) form.style.display = loggedIn ? 'flex' : 'none';
+        if (form) form.style.display = (loggedIn && !currentUser.is_admin) ? 'flex' : 'none';
         if (guestMsg) guestMsg.style.display = loggedIn ? 'none' : 'block';
         if (loggedIn && currentUser.is_admin) loadFeedbackAdmin();
         else document.getElementById('feedbackAdminList').innerHTML = '';
@@ -7788,8 +7788,13 @@
         воспользоваться таким ключом во вред вашему счёту.
       </div>
       <select class="auth-input" id="capExchangeSelect" onchange="_capExchangeChanged()">
-        <option value="okx">OKX</option>
-        <option value="bybit">Bybit</option>
+        <optgroup label="Крипто-биржи">
+          <option value="okx">OKX</option>
+          <option value="bybit">Bybit</option>
+        </optgroup>
+        <optgroup label="Мосбиржа (брокеры)">
+          <option value="finam" disabled>Finam — скоро</option>
+        </optgroup>
       </select>
       <input class="auth-input" id="capLabel" type="text" placeholder="Название (например, «Основной счёт»)">
       <input class="auth-input" id="capApiKey" type="text" placeholder="API Key" autocomplete="off">
