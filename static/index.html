@@ -5209,7 +5209,14 @@
         _rcSessionStartCapital = 0;
         _rcPeakCapital = 0;
         _rcAppliedJournalPnl = {};
+        localStorage.removeItem('rcSessionState'); // иначе следующий openRiskCalc() тут же восстановит старый якорь
         const capitalEl = document.getElementById('rcCapital');
+        // Подтягиваем самый свежий известный капитал (карточка "Капитал" держит
+        // rcCapitalPersist в актуальном состоянии) — реальный смысл "сброса" для
+        // пользователя это "начни заново от текущих денег", а не "от того, что
+        // случайно осталось в поле".
+        const live = localStorage.getItem('rcCapitalPersist');
+        if (live) capitalEl.value = live;
         if (capitalEl.value) {
             calcLimits();
         } else {
