@@ -5,6 +5,7 @@
 """
 
 import asyncio
+import logging
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
@@ -16,8 +17,12 @@ from auth_routes import router as auth_router
 from user_routes import router as user_router
 from chat import router as chat_router
 from news_routes import router as news_router
+from feedback_routes import router as feedback_router
 from finam_routes import router as finam_router
+from exchange_credentials_routes import router as exchange_credentials_router, pnl_router
 from database import init_db
+
+logging.basicConfig(level=logging.INFO)
 
 # Создание приложения
 app = FastAPI(title="Force of Momentum API")
@@ -39,7 +44,10 @@ app.include_router(ws_router)
 app.include_router(auth_router)
 app.include_router(user_router)
 app.include_router(news_router)
+app.include_router(feedback_router)
 app.include_router(finam_router)
+app.include_router(exchange_credentials_router)
+app.include_router(pnl_router)
 
 
 async def _warm_cache():
@@ -78,13 +86,13 @@ async def startup():
     """Инициализация БД при запуске приложения."""
     import os
     os.makedirs("uploads/news", exist_ok=True)
+    os.makedirs("uploads/feedback", exist_ok=True)
     await init_db()
     asyncio.create_task(_warm_cache())
     from finam import run_finam_catalog_refresher
     asyncio.create_task(run_finam_catalog_refresher())
-    from finam_routes import run_finam_chart_prewarmer, run_finam_div_refresher
+    from finam_routes import run_finam_chart_prewarmer
     asyncio.create_task(run_finam_chart_prewarmer())
-    asyncio.create_task(run_finam_div_refresher())
 
 # Создаём папку uploads заранее (StaticFiles требует существующую директорию)
 import os as _os

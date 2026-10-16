@@ -1466,6 +1466,9 @@
             <button class="sidebar-btn" id="chatBtn" title="Чат сообщества" onclick="openChat()">
                 <svg viewBox="0 0 24 24"><path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm0 14H5.17L4 17.17V4h16v12z"/></svg>
             </button>
+            <button class="sidebar-btn" id="feedbackBtn" title="Жалобы и предложения" onclick="openFeedback()">
+                <svg viewBox="0 0 24 24"><path d="M20 2H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h3v4l5.33-4H20c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm-9 9H9V7h2v4zm4 0h-2V7h2v4z"/></svg>
+            </button>
             <!-- Мобильные кнопки — видны только на телефоне -->
             <button class="sidebar-btn mob-only" title="Список символов" onclick="mobTogglePanel('left')">
                 <svg viewBox="0 0 24 24"><path d="M3 18h18v-2H3v2zm0-5h18v-2H3v2zm0-7v2h18V6H3z"/></svg>
@@ -1697,7 +1700,7 @@
          ============================================================ -->
     <aside class="right-panel">
         <!-- Сканер дивергентных баров -->
-        <div class="card div-scan-card">
+        <div class="card div-scan-card" id="divScanCard">
             <div class="div-scan-header">
                 <span style="display:flex;align-items:center;gap:6px;min-width:0">
                     <span id="divScanTitle" class="div-scan-header-title">Дивер</span>
@@ -2237,6 +2240,7 @@
     let lastCandlesRaw = []; // [{time,open,high,low,close}] без цвета — для перекраски при переключении авторского индикатора
     let lastCandle = null;
     let fetchAllGen = 0;
+    let fetchAllAbort = null;
     let fractalHighs = [];
     let fractalLows = [];
     let divergenceBearish = [];
@@ -2577,6 +2581,14 @@
         // под уже обновлённым заголовком продолжает висеть график ПРЕДЫДУЩЕГО
         // символа/рынка как будто это текущие данные — опасно для торгового инструмента.
         const myGen = ++fetchAllGen;
+        // Обрываем предыдущий ещё летящий запрос графика — иначе при быстром
+        // переключении таймфреймов/символов (особенно на Finam, где одна загрузка
+        // уходит в ~10 параллельных запросов к API) старые забытые запросы
+        // продолжают виснуть на сервере и съедают общий лимит запросов к Finam,
+        // из-за чего новые свежие запросы начинают получать 429.
+        if (fetchAllAbort) fetchAllAbort.abort();
+        fetchAllAbort = new AbortController();
+        const mySignal = fetchAllAbort.signal;
         lastCandle = null;
         candleSeries.setData([]);
         volumeSeries.setData([]);
@@ -2596,7 +2608,7 @@
             const url = isFinam
                 ? `${API_BASE}/finam/chart-data?symbol=${encodeURIComponent(currentSymbol)}&timeframe=${currentTimeframe}&limit=${chartLimit}`
                 : `${API_BASE}/chart-data?symbol=${currentSymbol}&timeframe=${currentTimeframe}&limit=${chartLimit}`;
-            const res = isFinam ? await _authFetch(url) : await fetch(url);
+            const res = isFinam ? await _authFetch(url, { signal: mySignal }) : await fetch(url, { signal: mySignal });
             const json = await res.json();
             if (myGen !== fetchAllGen) return; // пришёл ответ на уже неактуальный запрос — отброшен более новым fetchAll()
             if (!res.ok || !json.data) {
@@ -2713,6 +2725,7 @@
                 document.getElementById('liveVolume').textContent = vol;
             }
         } catch (e) {
+            if (e.name === 'AbortError') return; // запрос отменён более новым fetchAll() — не ошибка
             showError('mainChart', 'Сервер недоступен');
             console.error('Chart data error:', e);
         }
@@ -3076,6 +3089,11 @@
         // Для crypto обе карточки остаются видимыми как раньше.
         const volCard = document.getElementById('volScanCard');
         const emaCard = document.getElementById('emaScanCard');
+        // Сканер дивергенций для Finam тоже убран (см. finam_routes.py) — слишком
+        // хрупкий против лимитов Finam при отдельно взятой Мосбирже, та же
+        // причина, по которой тут уже нет волатильности/EMA. Для crypto виден как раньше.
+        const divCard = document.getElementById('divScanCard');
+        if (divCard) divCard.style.display = market === 'finam' ? 'none' : '';
         if (volCard) volCard.style.display = market === 'finam' ? 'none' : '';
         if (emaCard) emaCard.style.display = market === 'finam' ? 'none' : '';
         if (market === 'finam') {
@@ -3925,15 +3943,22 @@
     // ============================================================
     // Сканер дивергентных баров
     // ============================================================
-    async function fetchDivScan() {
+    async function fetchDivScan(_retriesLeft) {
         const btn = document.getElementById('divScanBtn');
         const list = document.getElementById('divScanList');
         const info = document.getElementById('divScanInfo');
+        const isFinam = currentMarket === 'finam';
+        // Для Finam кэш сканера дивергенций может быть "холодным" (см. backend:
+        // finam_scan_divergences запускает фоновый пересчёт по требованию) — даём
+        // ему пару попыток с паузой, прежде чем сдаться, вместо одного показа
+        // "считается в фоне" без дальнейшего опроса.
+        const retriesLeft = _retriesLeft ?? (isFinam ? 3 : 0);
         btn.disabled = true;
         btn.textContent = '...';
-        const isFinam = currentMarket === 'finam';
-        list.innerHTML = `<div class="div-scan-empty">${isFinam ? 'Загрузка...' : 'Сканирование всех пар...<br>Может занять 20–40 сек'}</div>`;
-        info.textContent = '';
+        if (_retriesLeft === undefined) {
+            list.innerHTML = `<div class="div-scan-empty">${isFinam ? 'Загрузка...' : 'Сканирование всех пар...<br>Может занять 20–40 сек'}</div>`;
+            info.textContent = '';
+        }
         try {
             const divTf = loadSettings().divScanTimeframe || '1d';
             const url = isFinam
@@ -3943,6 +3968,11 @@
             const json = await res.json();
             if (!res.ok) throw new Error(json.detail || 'Ошибка');
             if (json.warming_up) {
+                if (retriesLeft > 0) {
+                    list.innerHTML = '<div class="div-scan-empty">Считается в фоне, обновится через несколько секунд...</div>';
+                    setTimeout(() => fetchDivScan(retriesLeft - 1), 5000);
+                    return;
+                }
                 list.innerHTML = '<div class="div-scan-empty">Считается в фоне, обновится в течение пары минут...</div>';
                 btn.disabled = false;
                 btn.textContent = '⟳ Сканировать';
@@ -6896,6 +6926,76 @@
         } catch { alert('Ошибка соединения'); }
     }
 
+    // ── Жалобы и предложения ─────────────────────────────────────
+    function openFeedback() {
+        document.getElementById('feedbackPanel').classList.add('open');
+        const form = document.getElementById('feedbackForm');
+        const guestMsg = document.getElementById('feedbackGuestMsg');
+        const loggedIn = !!(authToken && currentUser);
+        if (form) form.style.display = loggedIn ? 'flex' : 'none';
+        if (guestMsg) guestMsg.style.display = loggedIn ? 'none' : 'block';
+        if (loggedIn && currentUser.is_admin) loadFeedbackAdmin();
+        else document.getElementById('feedbackAdminList').innerHTML = '';
+    }
+    function closeFeedback() { document.getElementById('feedbackPanel').classList.remove('open'); }
+
+    function feedbackFileChanged(input) {
+        const el = document.getElementById('feedbackFileName');
+        if (el) el.textContent = input.files.length ? input.files[0].name : '';
+    }
+
+    async function submitFeedback() {
+        if (!authToken || !currentUser) return;
+        const text = document.getElementById('feedbackText').value.trim();
+        const fileInput = document.getElementById('feedbackScreenshot');
+        const msgEl = document.getElementById('feedbackMsg');
+        if (!text) { msgEl.style.color = 'var(--red)'; msgEl.textContent = 'Введите текст обращения'; return; }
+        const fd = new FormData();
+        fd.append('message', text);
+        if (fileInput.files.length) fd.append('screenshot', fileInput.files[0]);
+        try {
+            const r = await fetch('/feedback', { method: 'POST', headers: { 'Authorization': 'Bearer ' + authToken }, body: fd });
+            if (!r.ok) { const j = await r.json().catch(() => ({})); msgEl.style.color = 'var(--red)'; msgEl.textContent = j.detail || 'Ошибка отправки'; return; }
+            document.getElementById('feedbackText').value = '';
+            fileInput.value = '';
+            document.getElementById('feedbackFileName').textContent = '';
+            msgEl.style.color = '#26a69a';
+            msgEl.textContent = 'Отправлено, спасибо!';
+        } catch { msgEl.style.color = 'var(--red)'; msgEl.textContent = 'Ошибка соединения'; }
+    }
+
+    async function loadFeedbackAdmin() {
+        const list = document.getElementById('feedbackAdminList');
+        list.innerHTML = '<div style="text-align:center;color:var(--text-secondary);font-size:12px;margin-top:20px">Загрузка...</div>';
+        try {
+            const r = await _authFetch('/feedback');
+            const data = await r.json();
+            const items = data.items || [];
+            if (!items.length) { list.innerHTML = '<div style="text-align:center;color:var(--text-secondary);font-size:12px;margin-top:20px">Обращений пока нет</div>'; return; }
+            list.innerHTML = items.map(_renderFeedbackItem).join('');
+        } catch { list.innerHTML = '<div style="color:#e91e63;font-size:12px;text-align:center">Ошибка загрузки</div>'; }
+    }
+
+    function _renderFeedbackItem(f) {
+        const date = new Date(f.created_at).toLocaleString('ru-RU', {day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'});
+        const shot = f.screenshot_url ? `<div class="news-media-grid"><img src="${f.screenshot_url}" onclick="window.open('${f.screenshot_url}','_blank')" alt="screenshot"></div>` : '';
+        const resolveBtn = f.status === 'resolved'
+            ? `<span style="font-size:11px;color:#26a69a">✓ Обработано</span>`
+            : `<button class="news-delete-btn" onclick="resolveFeedback(${f.id})">✓ Обработано</button>`;
+        return `<div class="news-post" id="feedback-${f.id}">
+            <div class="news-post-meta">${_esc(f.username)} · ${date}</div>
+            <div class="news-post-text">${_esc(f.message)}</div>
+            ${shot}
+            ${resolveBtn}
+        </div>`;
+    }
+
+    async function resolveFeedback(id) {
+        if (!currentUser || !currentUser.is_admin) return;
+        await _authFetch('/feedback/' + id + '/resolve', { method: 'POST' });
+        loadFeedbackAdmin();
+    }
+
     async function deleteNewsPost(id) {
         if (!currentUser || !currentUser.is_admin || !confirm('Удалить запись?')) return;
         await fetch('/news/' + id, { method: 'DELETE', headers: { 'Authorization': 'Bearer ' + authToken } });
@@ -7456,6 +7556,33 @@
   <div class="news-feed" id="newsFeed">
     <div style="text-align:center;color:var(--text-secondary);font-size:12px;margin-top:20px">Загрузка...</div>
   </div>
+</div>
+
+<!-- Жалобы и предложения — панель -->
+<div class="news-panel" id="feedbackPanel">
+  <div class="chat-header">
+    <div>
+      <div class="chat-header-title">Жалобы и предложения</div>
+    </div>
+    <button class="chat-close" onclick="closeFeedback()">&#10005;</button>
+  </div>
+  <!-- Форма отправки — видна всем залогиненным -->
+  <div class="news-admin-form" id="feedbackForm" style="display:none">
+    <textarea class="news-admin-textarea" id="feedbackText" placeholder="Опишите проблему или предложение..." rows="3"></textarea>
+    <div class="news-admin-row">
+      <label style="cursor:pointer;font-size:12px;color:#2196f3;display:flex;align-items:center;gap:4px">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="#2196f3"><path d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z"/></svg>
+        Приложить скриншот
+        <input type="file" id="feedbackScreenshot" accept="image/*" style="display:none" onchange="feedbackFileChanged(this)">
+      </label>
+      <span id="feedbackFileName" style="font-size:11px;color:var(--text-secondary)"></span>
+      <button class="chat-send-btn" style="margin-left:auto" onclick="submitFeedback()">&#10148;</button>
+    </div>
+    <div id="feedbackMsg" style="font-size:12px;margin-top:4px"></div>
+  </div>
+  <div class="chat-guest-msg" id="feedbackGuestMsg" style="display:none">Войдите, чтобы отправить жалобу или предложение</div>
+  <!-- Список обращений — только для admin -->
+  <div class="news-feed" id="feedbackAdminList"></div>
 </div>
 
 <!-- Затемнение для мобильных выдвигаемых панелей -->

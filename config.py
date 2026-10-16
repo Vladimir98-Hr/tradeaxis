@@ -41,6 +41,11 @@ JWT_SECRET = os.getenv("JWT_SECRET", "change-me-in-production-please")
 JWT_ALGORITHM = "HS256"
 JWT_EXPIRE_DAYS = 30
 
+# Ключ шифрования (Fernet) для чужих секретов at-rest — API-ключи бирж
+# пользователей (ExchangeCredential). Пусто = хранение API-ключей недоступно.
+# Сгенерировать: python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+CREDENTIALS_ENCRYPTION_KEY = os.getenv("CREDENTIALS_ENCRYPTION_KEY", "")
+
 # Настройки почты (для восстановления пароля). Пусто = письма не отправляются, только логируются.
 SMTP_HOST = os.getenv("SMTP_HOST", "")
 SMTP_PORT = int(os.getenv("SMTP_PORT", "587"))

@@ -119,6 +119,18 @@ class _FinamAccount:
 _accounts: list[_FinamAccount] = [_FinamAccount(t) for t in FINAM_SECRET_TOKENS]
 _account_cycle = itertools.cycle(_accounts) if _accounts else None
 
+# Внешний семафор на весь fetch_ohlcv_finam(deep_history=True) — в отличие от
+# "sem" внутри самой функции (который создаётся заново на каждый вызов и
+# ограничивает параллелизм только окон ОДНОЙ загрузки), этот общий на всё
+# приложение: если несколько загрузок графика (быстрые клики по таймфреймам/
+# символам до того, как фронтенд успеет отменить предыдущий запрос, или
+# несколько пользователей одновременно) накладываются друг на друга, каждая
+# новая не плюсует свою пачку из ~10 параллельных запросов поверх уже идущих,
+# а ждёт своей очереди — иначе суммарная нагрузка от нескольких одновременных
+# загрузок на один и тот же бюджет rate-limiter'а (_FinamAccount.rate_limiter)
+# предсказуемо выжирает retries и превращается в 429 у пользователя.
+_chart_load_sem = asyncio.Semaphore(max(1, 2 * max(1, len(_accounts))))
+
 
 def _require_token():
     if not _accounts:
@@ -263,34 +275,35 @@ async def fetch_ohlcv_finam(symbol: str, timeframe: str = '1d', limit: int = 100
             windows.append((window_start, window_end))
             window_end = window_start
 
-        # Прогреваем JWT всех аккаунтов пула один раз до параллельных запросов —
-        # иначе первые несколько окон на каждый аккаунт долбят /v1/sessions разом.
-        await asyncio.gather(*[_get_jwt_token_for(a) for a in _accounts])
-        # Полностью безлимитный параллелизм (по числу окон, до ~11) давал лишнюю
-        # нагрузку по памяти/сокетам на тесном VPS (1.8GB) — фиксированный потолок
-        # всё ещё покрывает большинство окон одним залпом. Растёт с числом
-        # аккаунтов, но умеренно: слишком большой залп одновременных запросов
-        # (даже распределённых по разным токенам) всё равно может натолкнуться
-        # на чувствительность Finam к коротким всплескам, а не только к
-        # среднему темпу — см. комментарий у _scan_sem в finam_routes.py.
-        sem = asyncio.Semaphore(min(4 * len(_accounts), 10))
+        async with _chart_load_sem:
+            # Прогреваем JWT всех аккаунтов пула один раз до параллельных запросов —
+            # иначе первые несколько окон на каждый аккаунт долбят /v1/sessions разом.
+            await asyncio.gather(*[_get_jwt_token_for(a) for a in _accounts])
+            # Полностью безлимитный параллелизм (по числу окон, до ~11) давал лишнюю
+            # нагрузку по памяти/сокетам на тесном VPS (1.8GB) — фиксированный потолок
+            # всё ещё покрывает большинство окон одним залпом. Растёт с числом
+            # аккаунтов, но умеренно: слишком большой залп одновременных запросов
+            # (даже распределённых по разным токенам) всё равно может натолкнуться
+            # на чувствительность Finam к коротким всплескам, а не только к
+            # среднему темпу — см. комментарий у _scan_sem в finam_routes.py.
+            sem = asyncio.Semaphore(min(4 * len(_accounts), 10))
 
-        async def _fetch_window(ws: datetime, we: datetime, client: httpx.AsyncClient):
-            async with sem:
-                data = await _finam_get(
-                    f"/v1/instruments/{symbol}/bars",
-                    params={
-                        "timeframe": tf,
-                        "interval.start_time": ws.strftime('%Y-%m-%dT%H:%M:%SZ'),
-                        "interval.end_time": we.strftime('%Y-%m-%dT%H:%M:%SZ'),
-                    },
-                    retries=3,
-                    client=client,
-                )
-                return data.get("bars", [])
+            async def _fetch_window(ws: datetime, we: datetime, client: httpx.AsyncClient):
+                async with sem:
+                    data = await _finam_get(
+                        f"/v1/instruments/{symbol}/bars",
+                        params={
+                            "timeframe": tf,
+                            "interval.start_time": ws.strftime('%Y-%m-%dT%H:%M:%SZ'),
+                            "interval.end_time": we.strftime('%Y-%m-%dT%H:%M:%SZ'),
+                        },
+                        retries=3,
+                        client=client,
+                    )
+                    return data.get("bars", [])
 
-        async with httpx.AsyncClient(timeout=20) as shared_client:
-            pages = await asyncio.gather(*[_fetch_window(ws, we, shared_client) for ws, we in windows])
+            async with httpx.AsyncClient(timeout=20) as shared_client:
+                pages = await asyncio.gather(*[_fetch_window(ws, we, shared_client) for ws, we in windows])
 
         bars = []
         for page in reversed(pages):  # windows идут от новых к старым — собираем в хронологическом порядке
