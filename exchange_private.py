@@ -80,6 +80,19 @@ async def fetch_daily_summary(
 
     trades, funding, ledger = [], [], []
     errors = []
+    capital = None
+
+    try:
+        balance = await asyncio.to_thread(client.fetch_balance)
+        # Берём суммарный капитал в стейблкоине счёта (USDT — основная расчётная
+        # валюта на спот/фьючерсных счетах поддерживаемых бирж). Это приближение:
+        # если на счету есть и другие активы, их стоимость здесь не учтена —
+        # для калькулятора риска важен именно доступный торговый капитал, а не
+        # весь портфель, поэтому такое упрощение осознанно, не случайный баг.
+        total = balance.get("total") or {}
+        capital = float(total.get("USDT") or total.get("USD") or 0) or None
+    except ccxt.BaseError as e:
+        errors.append(f"баланс: {e}")
 
     try:
         if client.has.get("fetchMyTrades"):
@@ -124,6 +137,7 @@ async def fetch_daily_summary(
     return {
         "date": date,
         "exchange_id": exchange_id,
+        "capital": round(capital, 2) if capital is not None else None,
         "trades_count": len(trades),
         "realized_pnl": round(realized_pnl, 8),
         "fees": round(fees, 8),
