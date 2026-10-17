@@ -4740,13 +4740,20 @@
         let state;
         try { state = JSON.parse(localStorage.getItem('rcSessionState_' + _capMarketBucket())); } catch { state = null; }
         const capitalEl = document.getElementById('rcCapital');
+        // Поле капитала в DOM одно на оба рынка (крипто/Finam) — само оно никогда
+        // не пустеет само по себе между переключениями рынка/открытиями калькулятора.
+        // Без явной очистки здесь оставшееся с другого рынка число (например, $
+        // с крипто) молча используется как будто это ₽ на Finam — тот самый баг.
+        // Поэтому на каждое открытие калькулятора начинаем строго с чистого листа
+        // и заполняем заново только данными ТЕКУЩЕГО рынка.
+        capitalEl.value = '';
         if (state && state.date === _rcToday()) {
             // Сессия за сегодня уже была открыта — восстанавливаем якорь, пик и текущий
             // капитал (с учётом уже применённого P&L из журнала), а не пересчитываем заново.
             if (state.sessionStartCapital) _rcSessionStartCapital = state.sessionStartCapital;
             if (state.peakCapital) _rcPeakCapital = state.peakCapital;
             if (state.appliedJournalPnl) _rcAppliedJournalPnl = state.appliedJournalPnl;
-            if (state.capital && !capitalEl.value) capitalEl.value = state.capital;
+            if (state.capital) capitalEl.value = state.capital;
         } else {
             _rcSessionStartCapital = 0; // новый день — якорь, пик и снимок журнала сбрасываются
             _rcPeakCapital = 0;
@@ -5219,7 +5226,7 @@
         // реальный смысл "сброса" для пользователя это "начни заново от текущих
         // денег", а не "от того, что случайно осталось в поле".
         const live = localStorage.getItem('rcCapitalPersist_' + _capMarketBucket());
-        if (live) capitalEl.value = live;
+        capitalEl.value = live || ''; // полная перезапись, не "если есть" — иначе останется число другого рынка
         if (capitalEl.value) {
             calcLimits();
         } else {
