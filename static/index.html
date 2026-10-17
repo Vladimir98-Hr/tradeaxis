@@ -3109,6 +3109,9 @@
         if (divCard) divCard.style.display = market === 'finam' ? 'none' : '';
         if (volCard) volCard.style.display = market === 'finam' ? 'none' : '';
         if (emaCard) emaCard.style.display = market === 'finam' ? 'none' : '';
+        // Капитал/валюта привязаны к рынку (крипто = $, Finam = ₽) — перерисовываем
+        // карточку под новый рынок, чтобы не показывать капитал в чужой валюте.
+        if (typeof loadCapitalCard === 'function') loadCapitalCard();
         if (market === 'finam') {
             _rcCurInstrument = null;
             _rcResetCalcOnInstrumentChange();
@@ -4692,7 +4695,7 @@
 
         _rcTradeRisk  = tradeRisk;
         _rcSessLimit  = sessLimit;
-        localStorage.setItem('rcCapitalPersist', capital);
+        localStorage.setItem('rcCapitalPersist_' + _capMarketBucket(), capital);
 
         _rcUpdateCurrencyLabels();
         const ccy = _rcAccountCcy();
@@ -4722,7 +4725,7 @@
     }
 
     function saveSessionState() {
-        localStorage.setItem('rcSessionState', JSON.stringify({
+        localStorage.setItem('rcSessionState_' + _capMarketBucket(), JSON.stringify({
             date: _rcToday(),
             capital: document.getElementById('rcCapital').value,
             sessionStartCapital: _rcSessionStartCapital,
@@ -4735,7 +4738,7 @@
 
     function loadSessionState() {
         let state;
-        try { state = JSON.parse(localStorage.getItem('rcSessionState')); } catch { state = null; }
+        try { state = JSON.parse(localStorage.getItem('rcSessionState_' + _capMarketBucket())); } catch { state = null; }
         const capitalEl = document.getElementById('rcCapital');
         if (state && state.date === _rcToday()) {
             // Сессия за сегодня уже была открыта — восстанавливаем якорь, пик и текущий
@@ -4751,7 +4754,7 @@
         }
         // Капитал переиспользуется изо дня в день, если сессии на сегодня ещё не было.
         if (!capitalEl.value) {
-            const persisted = localStorage.getItem('rcCapitalPersist');
+            const persisted = localStorage.getItem('rcCapitalPersist_' + _capMarketBucket());
             if (persisted) capitalEl.value = persisted;
         }
         if (capitalEl.value) {
@@ -5209,13 +5212,13 @@
         _rcSessionStartCapital = 0;
         _rcPeakCapital = 0;
         _rcAppliedJournalPnl = {};
-        localStorage.removeItem('rcSessionState'); // иначе следующий openRiskCalc() тут же восстановит старый якорь
+        localStorage.removeItem('rcSessionState_' + _capMarketBucket()); // иначе следующий openRiskCalc() тут же восстановит старый якорь
         const capitalEl = document.getElementById('rcCapital');
-        // Подтягиваем самый свежий известный капитал (карточка "Капитал" держит
-        // rcCapitalPersist в актуальном состоянии) — реальный смысл "сброса" для
-        // пользователя это "начни заново от текущих денег", а не "от того, что
-        // случайно осталось в поле".
-        const live = localStorage.getItem('rcCapitalPersist');
+        // Подтягиваем самый свежий известный капитал ЭТОГО рынка (карточка
+        // "Капитал" держит rcCapitalPersist_<рынок> в актуальном состоянии) —
+        // реальный смысл "сброса" для пользователя это "начни заново от текущих
+        // денег", а не "от того, что случайно осталось в поле".
+        const live = localStorage.getItem('rcCapitalPersist_' + _capMarketBucket());
         if (live) capitalEl.value = live;
         if (capitalEl.value) {
             calcLimits();
@@ -7054,6 +7057,14 @@
         document.getElementById('capitalModal').style.display = 'flex';
         document.getElementById('capApiError').textContent = '';
         document.getElementById('capManualError').textContent = '';
+        const bucket = _capMarketBucket();
+        document.getElementById('capManualAmount').placeholder = bucket === 'finam' ? 'Капитал, ₽' : 'Капитал, $';
+        document.getElementById('capManualHint').textContent = bucket === 'finam'
+            ? 'Сейчас выбран рынок Finam — капитал в рублях.'
+            : 'Сейчас выбран крипто-рынок — капитал в долларах.';
+        // Подключение API-ключа пока доступно только для крипто-бирж (Finam — см. план)
+        document.getElementById('capTabApi').style.display = bucket === 'finam' ? 'none' : '';
+        if (bucket === 'finam') switchCapitalTab('manual'); else switchCapitalTab('api');
         _capExchangeChanged();
         _capRenderExchangeList();
     }
@@ -7065,8 +7076,8 @@
         document.getElementById('capFormApi').style.display = tab === 'api' ? 'flex' : 'none';
         document.getElementById('capFormManual').style.display = tab === 'manual' ? 'flex' : 'none';
         if (tab === 'manual') {
-            const cur = localStorage.getItem('manualCapital');
-            if (cur) document.getElementById('capManualAmount').value = cur;
+            const cur = localStorage.getItem('manualCapital_' + _capMarketBucket());
+            document.getElementById('capManualAmount').value = cur || '';
         }
     }
 
@@ -7130,11 +7141,22 @@
         loadCapitalCard();
     }
 
+    // Капитал (ручной ввод, кеш калькулятора, сессия калькулятора) хранится
+    // отдельно по рынкам — крипто-биржи торгуются в $, Finam в ₽, нельзя мешать
+    // одно число между ними (иначе рубли с Finam утекают как доллары в крипто
+    // и наоборот — именно так выглядел баг, который мы ловили).
+    function _capMarketBucket() {
+        return currentMarket === 'finam' ? 'finam' : 'crypto';
+    }
+    function _capCcySymbol() {
+        return _capMarketBucket() === 'finam' ? '₽' : '$';
+    }
+
     function submitManualCapital() {
         const errEl = document.getElementById('capManualError');
         const val = parseFloat(document.getElementById('capManualAmount').value);
         if (!val || val <= 0) { errEl.textContent = 'Введите сумму больше 0'; return; }
-        localStorage.setItem('manualCapital', String(val));
+        localStorage.setItem('manualCapital_' + _capMarketBucket(), String(val));
         closeCapitalModal();
         loadCapitalCard();
     }
@@ -7146,16 +7168,23 @@
 
     async function loadCapitalCard() {
         const body = document.getElementById('capitalCardBody');
+        const bucket = _capMarketBucket();
+        const ccy = _capCcySymbol();
         if (!currentUser) {
             body.innerHTML = '<div class="div-scan-empty">Войдите, чтобы подключить биржу или указать капитал</div>';
             return;
         }
+
+        // API-ключи сейчас только для крипто-бирж (OKX/Bybit) — на Finam их пока
+        // нет (см. план), поэтому на Finam сразу смотрим только ручной капитал.
         let credentials = [];
-        try {
-            const r = await _authFetch(`${API_BASE}/user/exchange-credentials`);
-            const data = await r.json();
-            credentials = data.credentials || [];
-        } catch {}
+        if (bucket === 'crypto') {
+            try {
+                const r = await _authFetch(`${API_BASE}/user/exchange-credentials`);
+                const data = await r.json();
+                credentials = data.credentials || [];
+            } catch {}
+        }
 
         if (credentials.length) {
             const cred = credentials[0];
@@ -7174,15 +7203,15 @@
             return;
         }
 
-        const manual = localStorage.getItem('manualCapital');
+        const manual = localStorage.getItem('manualCapital_' + bucket);
         if (manual) {
-            _capSyncToCalculator(manual);
+            _capSyncToCalculator(manual, bucket);
             body.innerHTML = `
                 <div style="padding:6px 4px;font-size:13px">
-                    <div style="color:var(--text-secondary);font-size:11px;margin-bottom:4px">Капитал (вручную)</div>
-                    <div style="font-size:18px;font-weight:600">${_esc(manual)}</div>
+                    <div style="color:var(--text-secondary);font-size:11px;margin-bottom:4px">Капитал (вручную, ${bucket === 'finam' ? 'Finam' : 'крипто'})</div>
+                    <div style="font-size:18px;font-weight:600">${ccy}${_esc(manual)}</div>
                     <div style="font-size:11px;color:var(--text-secondary);margin-top:8px">
-                        Точнее и без ручных обновлений — <a href="#" onclick="openCapitalModal();return false">подключите API-ключ</a>
+                        ${bucket === 'crypto' ? `Точнее и без ручных обновлений — <a href="#" onclick="openCapitalModal();return false">подключите API-ключ</a>` : ''}
                     </div>
                 </div>`;
             return;
@@ -7190,28 +7219,29 @@
 
         body.innerHTML = `
             <div style="padding:6px 4px;font-size:12px;color:var(--text-secondary)">
-                Капитал не задан. <a href="#" onclick="openCapitalModal();return false">Подключить биржу</a>
+                Капитал (${bucket === 'finam' ? '₽' : '$'}) не задан.
+                <a href="#" onclick="openCapitalModal();return false">Подключить биржу</a>
                 или <a href="#" onclick="openCapitalModal();switchCapitalTab('manual');return false">ввести вручную</a>.
             </div>`;
     }
 
-    // Пишем живой капитал в тот же localStorage-ключ, который уже читает
-    // калькулятор риска как запасной вариант (см. loadSessionState) — поэтому
-    // калькулятор подхватывает его сам, без переписывания его собственной
-    // логики и без риска перезаписать уже открытую сегодняшнюю сессию
-    // (loadSessionState трогает поле только если оно ещё пустое).
-    function _capSyncToCalculator(capitalValue) {
+    // Пишем живой капитал в localStorage-ключ калькулятора риска, отдельный
+    // на каждый рынок (см. _capMarketBucket) — калькулятор читает его сам как
+    // запасной вариант (см. loadSessionState), без риска перезаписать уже
+    // открытую сегодняшнюю сессию (loadSessionState трогает поле только если
+    // оно ещё пустое) и без риска смешать $ крипто-биржи с ₽ Finam.
+    function _capSyncToCalculator(capitalValue, bucket) {
         if (capitalValue == null || capitalValue === '') return;
-        localStorage.setItem('rcCapitalPersist', String(capitalValue));
+        localStorage.setItem('rcCapitalPersist_' + (bucket || _capMarketBucket()), String(capitalValue));
     }
 
     function _renderPnlSummary(body, cred, data) {
-        _capSyncToCalculator(data.capital);
+        _capSyncToCalculator(data.capital, 'crypto'); // API-ключи сейчас только крипто-биржи
         const sign = v => v > 0 ? '+' : '';
         const color = v => v > 0 ? '#26a69a' : (v < 0 ? '#ef5350' : 'var(--text-primary)');
         const syncedAt = data.synced_at ? new Date(data.synced_at).toLocaleTimeString('ru-RU', {hour:'2-digit',minute:'2-digit'}) : '—';
         const capitalRow = data.capital != null
-            ? `<div style="display:flex;justify-content:space-between;font-weight:600;font-size:14px;margin-bottom:2px"><span>Капитал</span><span>${data.capital}</span></div>`
+            ? `<div style="display:flex;justify-content:space-between;font-weight:600;font-size:14px;margin-bottom:2px"><span>Капитал</span><span>$${data.capital}</span></div>`
             : `<div style="color:var(--text-secondary);font-size:11px">Баланс не удалось прочитать (права ключа?)</div>`;
         body.innerHTML = `
             <div style="padding:6px 4px;font-size:12px;display:flex;flex-direction:column;gap:4px">
@@ -7854,11 +7884,11 @@
 
     <!-- Вкладка: вручную -->
     <div id="capFormManual" class="auth-form" style="display:none">
-      <div style="font-size:11px;color:var(--text-secondary);line-height:1.5">
+      <div style="font-size:11px;color:var(--text-secondary);line-height:1.5" id="capManualHint">
         Без подключения ключа — просто укажите капитал, расчёты риска будут
         работать от этого числа. Обновлять нужно будет вручную.
       </div>
-      <input class="auth-input" id="capManualAmount" type="number" placeholder="Капитал, $ или ₽" min="0" step="0.01">
+      <input class="auth-input" id="capManualAmount" type="number" placeholder="Капитал" min="0" step="0.01">
       <div class="auth-error" id="capManualError"></div>
       <button class="auth-btn" onclick="submitManualCapital()">Сохранить</button>
     </div>
