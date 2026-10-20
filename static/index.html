@@ -1469,6 +1469,9 @@
             <button class="sidebar-btn" id="feedbackBtn" title="Жалобы и предложения" onclick="openFeedback()">
                 <svg viewBox="0 0 24 24"><path d="M20 2H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h3v4l5.33-4H20c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm-9 9H9V7h2v4zm4 0h-2V7h2v4z"/></svg>
             </button>
+            <button class="sidebar-btn" id="draftsBtn" title="Черновики статей" onclick="openDrafts()" style="display:none">
+                <svg viewBox="0 0 24 24"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>
+            </button>
             <!-- Мобильные кнопки — видны только на телефоне -->
             <button class="sidebar-btn mob-only" title="Список символов" onclick="mobTogglePanel('left')">
                 <svg viewBox="0 0 24 24"><path d="M3 18h18v-2H3v2zm0-5h18v-2H3v2zm0-7v2h18V6H3z"/></svg>
@@ -1975,6 +1978,7 @@
                             &#9888; Стоп ниже цены ликвидации — позиция будет принудительно закрыта раньше стопа
                         </div>
                     </div>
+                    <div id="rcB_aggWarn" style="display:none;background:rgba(224,82,82,0.1);border:1px solid #e05252;border-radius:4px;padding:6px 8px;margin-top:8px;font-size:11px;color:#e05252;line-height:1.5"></div>
 
                     <hr class="rc-divider">
 
@@ -2123,6 +2127,26 @@
                         </div>
                         <div class="rc-card-val" id="rcRemain">—</div>
                     </div>
+                    <div class="rc-card">
+                        <div class="rc-card-label">Риск в открытых сделках
+                            <span class="rc-help">?<span class="rc-help-pop">Суммарный риск по всем ещё не закрытым планам из «Открытых планов». Если все они одновременно дойдут до стопа — именно столько вы потеряете, сверх уже зафиксированного в капитале.</span></span>
+                        </div>
+                        <div class="rc-card-val" id="rcOpenRiskVal">—</div>
+                        <div class="rc-card-sub" id="rcOpenRiskSub">—</div>
+                    </div>
+                    <div class="rc-card danger">
+                        <div class="rc-card-label">Доступно с учётом открытых
+                            <span class="rc-help">?<span class="rc-help-pop">«Остаток бюджета на потери» минус риск уже открытых сделок — сколько реально остаётся на НОВУЮ сделку, чтобы не выйти за лимит сессии, если все открытые позиции одновременно уйдут в минус.</span></span>
+                        </div>
+                        <div class="rc-card-val" id="rcAvailWithOpenVal">—</div>
+                    </div>
+                </div>
+                <div style="margin-top:10px">
+                    <div class="rc-label">Сценарий: сколько сделок планирую открыть одновременно
+                        <span class="rc-help">?<span class="rc-help-pop">Прикидка заранее: сколько вы потеряете, если открытые сейчас позиции плюс ещё N новых (у каждой риск — «Риск / 1 сделку» из блока А) одновременно дойдут до стопа, и хватит ли на это бюджета сессии.</span></span>
+                    </div>
+                    <input class="rc-input" id="rcScenarioN" type="number" min="1" step="1" placeholder="3" style="max-width:120px" oninput="_rcRenderScenario()">
+                    <div class="rc-section-sub" id="rcScenarioResult" style="margin-top:6px;line-height:1.5"></div>
                 </div>
                 <div id="rcSessionLockBanner" style="display:none;background:rgba(224,82,82,0.12);border:1px solid #e05252;border-radius:8px;padding:8px 10px;margin:8px 0;font-size:12px;color:#e05252;line-height:1.5">
                     🛑 Лимит на сегодня исчерпан. Новые сделки заблокированы до сброса или следующего дня.
@@ -4425,6 +4449,7 @@
     let _rcPeakCapital = 0; // максимум, которого достигал капитал за сегодняшнюю сессию — трейлинг-уровень стоп-аута считается от него
     let _rcAppliedJournalPnl = {}; // {reviewId: resultUsd} — сегодняшние сделки из журнала, уже учтённые в поле "Ваш капитал" (для диффа при повторных рендерах)
     let _rcSessionLockNotified = false; // показывали ли уже блокирующее окно для текущей блокировки сессии
+    let _rcRemainBudget = 0; // остаток бюджета на потери (текущий капитал - уровень стоп-аута), без учёта открытых позиций — считается в _rcRecomputeTrailing
     let _rcSetup     = 'Дивербар';
     let _rcLastCalc  = null; // последний расчёт блока Б (или Г, если считали усреднение) — используется для "Сохранить как план"
     let _rcAvgEntries = [];  // блок Г: [{price, amount}] для спот-инструментов или [{price, contracts}] для точечных
@@ -4577,6 +4602,7 @@
         _rcUpdateBlockBFields();
         _rcRenderAvgRows();
         loadSessionState();
+        jRender(); // свежие "Открытые планы" — от них считается агрегированный риск
     }
     function closeRiskCalc() {
         document.getElementById('riskCalcModal').style.display = 'none';
@@ -4893,6 +4919,31 @@
             pointValue: meta.pointBased ? pointValue : undefined,
         };
         document.getElementById('rcPlanMsg').textContent = '';
+        _rcRenderAggWarn();
+    }
+
+    // Предупреждает (не блокирует — решение остаётся за пользователем), если риск
+    // уже открытых сделок + риск этой новой одновременно превысят остаток бюджета
+    // сессии. Отдельно от _rcSessionLocked(): тот бьёт тревогу по уже случившейся
+    // просадке, это — по риску, который ещё только МОЖЕТ реализоваться. Бюджет и
+    // риск на сделку всегда в валюте СЧЁТА (_rcAccountCcy), не в валюте пункта/
+    // контракта — для Finam-фьючерсов это может отличаться, см. rcPointCcyWarn.
+    function _rcRenderAggWarn() {
+        const ccy = _rcAccountCcy();
+        const warnEl = document.getElementById('rcB_aggWarn');
+        if (!warnEl) return;
+        if (_rcSessLimit <= 0) { warnEl.style.display = 'none'; return; }
+        const openInfo = _rcOpenRiskInfo();
+        const committed = openInfo.sum + _rcTradeRisk;
+        const budget = _rcSessionStartCapital ? _rcRemainBudget : _rcSessLimit;
+        if (committed > budget) {
+            warnEl.style.display = 'block';
+            warnEl.innerHTML = `⚠ Эта сделка (${ccy}${_rcTradeRisk.toFixed(2)}) + ${openInfo.count} уже открытых (${ccy}${openInfo.sum.toFixed(2)}) = `
+                + `<b>${ccy}${committed.toFixed(2)}</b>, если все одновременно уйдут в стоп — это больше остатка бюджета сессии (${ccy}${budget.toFixed(2)}). `
+                + `Решение за вами: уменьшить объём этой сделки или не открывать её.`;
+        } else {
+            warnEl.style.display = 'none';
+        }
     }
 
     // ── БЛОК Г: усреднение позиции (пирамидинг) ──────────────
@@ -5125,6 +5176,9 @@
             remEl.className = 'rc-card-val';
             lockBanner.style.display = 'none';
             _rcSessionLockNotified = false;
+            _rcRemainBudget = 0;
+            _rcRenderOpenRiskCard();
+            _rcRenderScenario();
             return;
         }
 
@@ -5134,6 +5188,7 @@
 
         const stopOut = _rcPeakCapital - _rcSessLimit;
         const remain  = (isNaN(current) ? _rcSessionStartCapital : current) - stopOut;
+        _rcRemainBudget = remain;
 
         peakEl.textContent = '$' + _rcPeakCapital.toFixed(2);
         curEl.textContent  = '$' + (isNaN(current) ? _rcSessionStartCapital : current).toFixed(2);
@@ -5150,6 +5205,57 @@
             _rcSessionLockNotified = false;
         }
         saveSessionState();
+        _rcRenderOpenRiskCard();
+        _rcRenderScenario();
+    }
+
+    // Суммарный риск всех ещё не закрытых планов текущего рынка — то, что
+    // реализуется, если ВСЕ открытые сейчас позиции одновременно дойдут до стопа.
+    function _rcOpenRiskInfo() {
+        const all = _journalCache || [];
+        const plans = all.filter(t => t.type === 'plan' && (t.market || 'crypto') === currentMarket);
+        const reviewedIds = new Set(all.filter(t => t.type === 'review').map(t => t.planId));
+        const open = plans.filter(p => !reviewedIds.has(p.id));
+        return { count: open.length, sum: open.reduce((s, p) => s + (p.riskUsd || 0), 0) };
+    }
+
+    // Обновляет карточки "Риск в открытых сделках" / "Доступно с учётом открытых"
+    function _rcRenderOpenRiskCard() {
+        const valEl = document.getElementById('rcOpenRiskVal');
+        const subEl = document.getElementById('rcOpenRiskSub');
+        const availEl = document.getElementById('rcAvailWithOpenVal');
+        if (!valEl || !availEl) return;
+        const ccy = _rcAccountCcy();
+        const openInfo = _rcOpenRiskInfo();
+        valEl.textContent = ccy + openInfo.sum.toFixed(2);
+        subEl.textContent = openInfo.count + (openInfo.count === 1 ? ' сделка' : ' сделок');
+        if (!_rcSessionStartCapital || _rcSessLimit <= 0) {
+            availEl.textContent = '—';
+            return;
+        }
+        const avail = _rcRemainBudget - openInfo.sum;
+        availEl.textContent = (avail >= 0 ? ccy : '−' + ccy) + Math.abs(avail).toFixed(2);
+        availEl.className = 'rc-card-val ' + (avail >= 0 ? 'ok' : 'over');
+    }
+
+    // Сценарный расчёт: "если открою ещё N сделок одновременно поверх уже открытых"
+    function _rcRenderScenario() {
+        const el = document.getElementById('rcScenarioResult');
+        if (!el) return;
+        const n = parseInt(document.getElementById('rcScenarioN').value);
+        if (!n || n <= 0) { el.textContent = ''; return; }
+        if (_rcTradeRisk <= 0) { el.textContent = 'Сначала рассчитайте лимиты (блок А)'; return; }
+        const ccy = _rcAccountCcy();
+        const openInfo = _rcOpenRiskInfo();
+        const newRisk = n * _rcTradeRisk;
+        const total = openInfo.sum + newRisk;
+        const budget = _rcSessionStartCapital ? _rcRemainBudget : _rcSessLimit;
+        const over = total - budget;
+        el.innerHTML = `Уже в риске: ${ccy}${openInfo.sum.toFixed(2)} (${openInfo.count} сд.) + ${n} нов. × ${ccy}${_rcTradeRisk.toFixed(2)} = `
+            + `<b>${ccy}${total.toFixed(2)}</b>, если все одновременно дойдут до стопа.<br>`
+            + (over > 0
+                ? `<span style="color:#e05252">Превышение бюджета сессии на ${ccy}${over.toFixed(2)}.</span>`
+                : `<span style="color:#4caf82">В пределах бюджета сессии, запас ${ccy}${Math.abs(over).toFixed(2)}.</span>`);
     }
 
     function showSessionLimitModal() {
@@ -5222,17 +5328,20 @@
         const list = document.getElementById('openPlansList');
         if (!open.length) {
             list.innerHTML = '<div class="div-scan-empty">Нет открытых планов</div>';
-            return;
-        }
-        list.innerHTML = open.map(p => `
-            <div class="journal-item">
-                <div class="journal-item-left" style="cursor:pointer" onclick="openPlanConspect(${p.id})">
-                    <span class="journal-badge ${p.dir === 'short' ? 'loss' : 'win'}">${p.dir === 'short' ? 'ШОРТ' : 'ЛОНГ'}</span>
-                    <span style="color:var(--text-primary);font-weight:500">${p.sym || '—'}${p.entries && p.entries.length > 1 ? ' · усреднено: ' + p.entries.length + ' вх.' : ''}</span>
+        } else {
+            list.innerHTML = open.map(p => `
+                <div class="journal-item">
+                    <div class="journal-item-left" style="cursor:pointer" onclick="openPlanConspect(${p.id})">
+                        <span class="journal-badge ${p.dir === 'short' ? 'loss' : 'win'}">${p.dir === 'short' ? 'ШОРТ' : 'ЛОНГ'}</span>
+                        <span style="color:var(--text-primary);font-weight:500">${p.sym || '—'}${p.entries && p.entries.length > 1 ? ' · усреднено: ' + p.entries.length + ' вх.' : ''}</span>
+                    </div>
+                    <button class="div-scan-btn" style="padding:2px 8px;font-size:11px" onclick="event.stopPropagation();openPostReview(${p.id})">Закрыть сделку</button>
                 </div>
-                <button class="div-scan-btn" style="padding:2px 8px;font-size:11px" onclick="event.stopPropagation();openPostReview(${p.id})">Закрыть сделку</button>
-            </div>
-        `).join('');
+            `).join('');
+        }
+        // Открытые планы изменились — обновить агрегированный риск и сценарный расчёт
+        _rcRenderOpenRiskCard();
+        _rcRenderScenario();
     }
 
     function _fmtJDate(ts) {
@@ -6582,6 +6691,8 @@
         if (riskBtn) riskBtn.style.display = currentUser ? '' : 'none';
         const finamTab = document.getElementById('finamTab');
         if (finamTab) finamTab.style.display = currentUser ? '' : 'none';
+        const draftsBtn = document.getElementById('draftsBtn');
+        if (draftsBtn) draftsBtn.style.display = (currentUser && currentUser.is_admin) ? '' : 'none';
     }
 
     function openAuthModal(tab) {
@@ -7001,6 +7112,64 @@
         if (!currentUser || !currentUser.is_admin) return;
         await _authFetch('/feedback/' + id + '/resolve', { method: 'POST' });
         loadFeedbackAdmin();
+    }
+
+    // ── Черновики статей (агент) ──────────────────────────────────
+    function openDrafts() {
+        if (!currentUser || !currentUser.is_admin) return;
+        document.getElementById('draftsPanel').classList.add('open');
+        loadDrafts();
+    }
+    function closeDrafts() { document.getElementById('draftsPanel').classList.remove('open'); }
+
+    async function loadDrafts() {
+        const list = document.getElementById('draftsList');
+        list.innerHTML = '<div style="text-align:center;color:var(--text-secondary);font-size:12px;margin-top:20px">Загрузка...</div>';
+        try {
+            const r = await _authFetch('/drafts');
+            const data = await r.json();
+            const items = data.items || [];
+            const cnt = document.getElementById('draftsCount');
+            if (cnt) cnt.textContent = items.length ? items.length + ' черновик(ов)' : '';
+            if (!items.length) { list.innerHTML = '<div style="text-align:center;color:var(--text-secondary);font-size:12px;margin-top:20px">Черновиков пока нет</div>'; return; }
+            list.innerHTML = items.map(_renderDraftItem).join('');
+        } catch { list.innerHTML = '<div style="color:#e91e63;font-size:12px;text-align:center">Ошибка загрузки</div>'; }
+    }
+
+    function _renderDraftItem(d) {
+        const date = new Date(d.created_at).toLocaleString('ru-RU', {day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'});
+        return `<div class="news-post" id="draft-${d.id}">
+            <div class="news-post-meta">${_esc(d.topic)} · ${date}</div>
+            <div class="news-post-text" style="white-space:pre-wrap">${_esc(d.content)}</div>
+            <button class="chat-send-btn" onclick="copyDraft(${d.id})">Скопировать</button>
+            <button class="news-delete-btn" onclick="archiveDraft(${d.id})">Архивировать</button>
+        </div>`;
+    }
+
+    function copyDraft(id) {
+        const el = document.getElementById('draft-' + id);
+        if (!el) return;
+        const text = el.querySelector('.news-post-text').textContent;
+        navigator.clipboard?.writeText(text);
+    }
+
+    async function archiveDraft(id) {
+        if (!currentUser || !currentUser.is_admin) return;
+        await _authFetch('/drafts/' + id + '/archive', { method: 'POST' });
+        loadDrafts();
+    }
+
+    async function generateDraftNow() {
+        const btn = document.getElementById('generateDraftBtn');
+        btn.disabled = true;
+        btn.textContent = 'Генерирую...';
+        try {
+            const r = await _authFetch('/drafts/generate', { method: 'POST' });
+            if (!r.ok) { const j = await r.json().catch(() => ({})); alert(j.detail || 'Ошибка генерации'); }
+            else loadDrafts();
+        } catch { alert('Ошибка соединения'); }
+        btn.disabled = false;
+        btn.textContent = 'Сгенерировать сейчас';
     }
 
     async function deleteNewsPost(id) {
@@ -7590,6 +7759,21 @@
   <div class="chat-guest-msg" id="feedbackGuestMsg" style="display:none">Войдите, чтобы отправить жалобу или предложение</div>
   <!-- Список обращений — только для admin -->
   <div class="news-feed" id="feedbackAdminList"></div>
+</div>
+
+<!-- Черновики статей от агента — панель (только admin) -->
+<div class="news-panel" id="draftsPanel">
+  <div class="chat-header">
+    <div>
+      <div class="chat-header-title">Черновики статей</div>
+      <div class="chat-online" id="draftsCount"></div>
+    </div>
+    <button class="chat-close" onclick="closeDrafts()">&#10005;</button>
+  </div>
+  <div class="news-admin-row" style="padding:8px 12px">
+    <button class="chat-send-btn" onclick="generateDraftNow()" id="generateDraftBtn">Сгенерировать сейчас</button>
+  </div>
+  <div class="news-feed" id="draftsList"></div>
 </div>
 
 <!-- Затемнение для мобильных выдвигаемых панелей -->
