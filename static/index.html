@@ -5166,17 +5166,24 @@
     }
 
     function resetSession() {
-        // Сброс якоря капитала, пика и снимка журнала — следующий "Рассчитать лимиты"
-        // откроет новую сессию от текущего значения в поле "Капитал".
+        // Полный сброс до нуля: якорь капитала, пик, снимок журнала, лимиты и само
+        // поле "Капитал" — иначе старое значение тут же пересчитывалось в новую
+        // сессию и казалось, что кнопка ничего не делает. После сброса пользователь
+        // вводит капитал заново и жмёт "Рассчитать лимиты" сам.
         _rcSessionStartCapital = 0;
         _rcPeakCapital = 0;
         _rcAppliedJournalPnl = {};
-        const capitalEl = document.getElementById('rcCapital');
-        if (capitalEl.value) {
-            calcLimits();
-        } else {
-            _rcRecomputeTrailing();
-        }
+        _rcTradeRisk = 0;
+        _rcSessLimit = 0;
+        document.getElementById('rcCapital').value = '';
+        document.getElementById('rcErrorA').textContent = '';
+        document.getElementById('rcSessionAnchorNote').innerHTML = '';
+        document.getElementById('rcResA').style.display = 'none';
+        document.getElementById('rcResB').style.display = 'none';
+        document.getElementById('rcCalcBBtn').disabled = true;
+        localStorage.removeItem('rcSessionState');
+        localStorage.removeItem('rcCapitalPersist');
+        _rcRecomputeTrailing();
     }
 
     // ── Журнал сделок ──────────────────────────────────────────
