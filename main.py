@@ -19,7 +19,6 @@ from chat import router as chat_router
 from news_routes import router as news_router
 from feedback_routes import router as feedback_router
 from finam_routes import router as finam_router
-from exchange_credentials_routes import router as exchange_credentials_router, pnl_router
 from database import init_db
 
 logging.basicConfig(level=logging.INFO)
@@ -46,8 +45,6 @@ app.include_router(user_router)
 app.include_router(news_router)
 app.include_router(feedback_router)
 app.include_router(finam_router)
-app.include_router(exchange_credentials_router)
-app.include_router(pnl_router)
 
 
 async def _warm_cache():

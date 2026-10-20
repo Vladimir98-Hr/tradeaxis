@@ -41,7 +41,6 @@ class User(Base):
     watchlist: Mapped[list["WatchlistItem"]] = relationship("WatchlistItem", back_populates="user")
     journal: Mapped[list["TradeJournal"]] = relationship("TradeJournal", back_populates="user")
     chat_messages: Mapped[list["ChatMessage"]] = relationship("ChatMessage", back_populates="user")
-    exchange_credentials: Mapped[list["ExchangeCredential"]] = relationship("ExchangeCredential", back_populates="user")
 
 
 class UserSettings(Base):
@@ -76,29 +75,6 @@ class TradeJournal(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
     user: Mapped["User"] = relationship("User", back_populates="journal")
-
-
-class ExchangeCredential(Base):
-    """
-    Read-only API-ключ пользователя к бирже (сверка P&L, см. exchange_private.py).
-    Секреты (api_key/secret/passphrase) хранятся только в зашифрованном виде
-    (crypto_utils.encrypt) — колонки *_enc, никогда не plaintext.
-    """
-    __tablename__ = "exchange_credentials"
-
-    id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    user_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.id"), nullable=False)
-    exchange_id: Mapped[str] = mapped_column(String(30), nullable=False)  # "okx", "bybit", ...
-    label: Mapped[str] = mapped_column(String(100), nullable=False)
-    api_key_enc: Mapped[str] = mapped_column(Text, nullable=False)
-    api_secret_enc: Mapped[str] = mapped_column(Text, nullable=False)
-    api_passphrase_enc: Mapped[str | None] = mapped_column(Text, nullable=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
-    last_synced_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
-    last_sync_status: Mapped[str | None] = mapped_column(String(20), nullable=True)  # "ok" | "error"
-    last_sync_error: Mapped[str | None] = mapped_column(String(500), nullable=True)
-
-    user: Mapped["User"] = relationship("User", back_populates="exchange_credentials")
 
 
 class ChatMessage(Base):
