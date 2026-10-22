@@ -1878,7 +1878,7 @@
                         <input class="rc-input" id="rcEntry" type="number" min="0" placeholder="100">
                     </div>
                     <div id="rcPosAmountField">
-                        <div class="rc-label" id="rcPosLabel">Объём позиции ($)
+                        <div class="rc-label" id="rcPosLabel"><span id="rcPosLabelText">Объём позиции ($)</span>
                             <span class="rc-help">?<span class="rc-help-pop" id="rcPosLabelHelp">При плече 1× — это полная сумма, на которую вы открываете позицию. При плече больше 1× это поле превращается в «Маржу / залог» — сумму, которую вы реально вносите своими деньгами; фактический размер позиции биржа увеличивает сама: маржа × плечо. Например, маржа $100 при плече 5× даёт позицию на $500.</span></span>
                         </div>
                         <input class="rc-input" id="rcPosUsd" type="number" min="0" placeholder="500">
@@ -1940,7 +1940,7 @@
                     </div>
                     <div class="rc-stop-result" style="margin-top:6px">
                         <div>
-                            <div class="rc-card-label" id="rcB_unitLabel">Объём в монетах
+                            <div class="rc-card-label" id="rcB_unitLabel"><span id="rcB_unitLabelText">Объём в монетах</span>
                                 <span class="rc-help">?<span class="rc-help-pop" id="rcB_unitHelp">Размер позиции, пересчитанный из долларов в количество монет актива по цене входа.</span></span>
                             </div>
                             <div style="font-size:13px;font-weight:600" id="rcB_coins">—</div>
@@ -4527,7 +4527,7 @@
         if (levNote) levNote.style.display = isFinam ? 'block' : 'none';
 
         if (!meta.pointBased) {
-            const labelEl = document.getElementById('rcPosLabel');
+            const labelEl = document.getElementById('rcPosLabelText');
             if (labelEl) labelEl.textContent = (!isFinam && _rcLeverage > 1 ? 'Маржа / залог (' : 'Объём позиции (') + meta.ccySym + ')';
         }
         _rcCheckPointCcyWarn();
@@ -4851,7 +4851,7 @@
         stopEl.style.color = '';
 
         document.getElementById('rcB_stopPct').textContent = (_rcDir === 'long' ? '−' : '+') + stopPct + '% от входа';
-        document.getElementById('rcB_unitLabel').textContent = meta.pointBased ? 'Количество контрактов' : ('Объём в ' + meta.unitLabel);
+        document.getElementById('rcB_unitLabelText').textContent = meta.pointBased ? 'Количество контрактов' : ('Объём в ' + meta.unitLabel);
         document.getElementById('rcB_unitHelp').textContent = meta.pointBased
             ? 'Контракты, указанные выше, — на них распределён риск сделки из блока А через стоимость 1 пункта.'
             : `Размер позиции, пересчитанный из ${ccy} в количество ${meta.unitLabel} актива по цене входа.`;
