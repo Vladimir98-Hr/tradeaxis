@@ -3098,9 +3098,26 @@
         }
     }
 
+    /** Запоминает выбранный таймфрейм этого рынка и подсвечивает его кнопку,
+     *  если включена настройка "Открывать последний таймфрейм" (behavior.js). */
+    function _rememberTimeframe(market, tf) {
+        if (!loadSettings().rememberLastTimeframe) return;
+        localStorage.setItem('lastTimeframe_' + market, tf);
+    }
+    function _restoreTimeframe(market) {
+        if (!loadSettings().rememberLastTimeframe) return;
+        const saved = localStorage.getItem('lastTimeframe_' + market);
+        const tfList = market === 'finam' ? TF_LIST_FINAM : TF_LIST_CRYPTO;
+        if (!saved || !tfList.includes(saved)) return;
+        currentTimeframe = saved;
+        document.querySelectorAll('#timeframes button').forEach(b =>
+            b.classList.toggle('active', b.dataset.tf === saved));
+    }
+
     /** Переключает рынок: crypto или finam */
     function switchMarket(market) {
         currentMarket = market;
+        if (loadSettings().rememberLastMarket) localStorage.setItem('lastMarket', market);
         document.querySelectorAll('#marketTabs .topbar-tab').forEach(b =>
             b.classList.toggle('active', b.dataset.market === market));
         const finamCats = document.getElementById('finamCategories');
@@ -3134,6 +3151,7 @@
             _volLoadLog();
             _volRenderLog(new Set());
             updateTimeframesForMarket('finam');
+            _restoreTimeframe('finam');
             fetchFinamSymbols(currentFinamCategory);
             _volUpdateTfSelectOptions();
             fetchVolScan();
@@ -3155,6 +3173,7 @@
             _rcCurInstrument = null;
             _rcResetCalcOnInstrumentChange();
             updateTimeframesForMarket('crypto');
+            _restoreTimeframe('crypto');
             fetchSymbolsList().then(() => { fetchAll(); startTicker(); });
             _volUpdateTfSelectOptions();
             fetchVolScan();
@@ -3622,6 +3641,7 @@
         document.querySelectorAll('#timeframes button').forEach(b => b.classList.remove('active'));
         e.target.classList.add('active');
         currentTimeframe = e.target.dataset.tf;
+        _rememberTimeframe(currentMarket, currentTimeframe);
         fetchAll();
         redrawCanvas();
     });
@@ -4340,7 +4360,11 @@
     }
 
     function undoDrawing() { _curDrawings().pop(); redrawCanvas(); }
-    function clearDrawings() { drawingsStore[_drawKey(currentSymbol, currentTimeframe)] = []; redrawCanvas(); }
+    function clearDrawings() {
+        if (loadSettings().confirmClearAll && !confirm('Удалить все рисунки на этом графике (текущий символ и таймфрейм)? Это нельзя отменить.')) return;
+        drawingsStore[_drawKey(currentSymbol, currentTimeframe)] = [];
+        redrawCanvas();
+    }
 
     // ============================================================
     // Рисование в мультиграфике
@@ -4394,9 +4418,18 @@
             _applyAuthorIndicatorsUI();
             initDrawingOverlay();
             setupResizeObserver();
-            await fetchSymbolsList();
-            fetchAll();
-            startTicker();
+            _fxRestoreActive();
+            // "Открывать последний рынок" (настройки → Модули) — если включено и в
+            // прошлый раз открывали Finam, стартуем сразу с него вместо Крипто.
+            const _initSettings = loadSettings();
+            if (_initSettings.rememberLastMarket && localStorage.getItem('lastMarket') === 'finam' && currentUser) {
+                switchMarket('finam');
+            } else {
+                _restoreTimeframe('crypto');
+                await fetchSymbolsList();
+                fetchAll();
+                startTicker();
+            }
             _volLoadLog();
             _volUpdateTfSelectOptions();
             setTimeout(fetchVolScan, 5000);
@@ -5918,6 +5951,7 @@
         const s = collectSettingsFromForm();
         localStorage.setItem('cryptoSettings', JSON.stringify(s));
         applySettings(s);
+        _fxSaveActive(); // если "Сохранять индикаторы fx" только что включили — зафиксировать текущий набор сразу, не дожидаясь следующего добавления/удаления
         closeSettings();
         pushSettingsToServer();
     }
@@ -6455,6 +6489,7 @@
         ipAddToRecent(id);
         renderIPActiveList();
         closeIndicatorPanel();
+        _fxSaveActive();
     }
 
     function removeIndicator(iid) {
@@ -6466,6 +6501,23 @@
         if (inst.def.onRemove) try { inst.def.onRemove(inst); } catch(e) { console.warn('[IND] onRemove error', inst.id, e); }
         activeIndicators.splice(idx, 1);
         renderIPActiveList();
+        _fxSaveActive();
+    }
+
+    // Настройка "Сохранять индикаторы fx" (настройки → Модули): пользовательские
+    // индикаторы из панели fx (не базовые Alligator/AO/BB) по умолчанию живут
+    // только в памяти страницы — при включении настройки переживают перезагрузку.
+    function _fxSaveActive() {
+        if (!loadSettings().rememberFxIndicators) return;
+        const list = activeIndicators.map(inst => ({ id: inst.id, params: inst.params }));
+        localStorage.setItem('fxActiveIndicators', JSON.stringify(list));
+    }
+
+    function _fxRestoreActive() {
+        if (!loadSettings().rememberFxIndicators) return;
+        let list;
+        try { list = JSON.parse(localStorage.getItem('fxActiveIndicators') || '[]'); } catch { list = []; }
+        list.forEach(item => { if (INDICATOR_REGISTRY[item.id]) addIndicator(item.id, item.params || {}); });
     }
 
     function renderIndicatorInstance(inst, data) {
@@ -7388,7 +7440,9 @@
                         <div class="sv2-group">
                             <div class="sv2-group-title">Данные</div>
                             <div class="sv2-row" data-search="количество свечей баров история лимит">
-                                <div><div class="sv2-label">Количество баров</div><div class="sv2-sub">История за один запрос</div></div>
+                                <div><div class="sv2-label">Количество баров
+                                    <span class="rc-help">?<span class="rc-help-pop">Сколько свечей запрашивать за один раз при открытии графика. Для Finam влияет напрямую — чем больше, тем глубже история. Для крипто (биржа OKX) верхний предел задаёт сама биржа: если выставить здесь больше, чем отдаёт OKX за один запрос, график всё равно покажет максимум, который реально пришёл — больше бар от этого не появится.</span></span>
+                                </div><div class="sv2-sub">История за один запрос</div></div>
                                 <select class="sv2-select" id="s_chartLimit" onchange="applySettingsLive()">
                                     <option value="50">50</option>
                                     <option value="100">100</option>
@@ -7439,7 +7493,9 @@
                         <div class="sv2-group">
                             <div class="sv2-group-title">Сканер волатильности</div>
                             <div class="sv2-row" data-search="порог волатильность крипто score импульс">
-                                <div class="sv2-label">Порог крипто (score начала импульса)</div>
+                                <div class="sv2-label">Порог крипто (score начала импульса)
+                                    <span class="rc-help">?<span class="rc-help-pop">Сканер волатильности считает каждой монете «score» от 0 до 100 — по ускорению цены, аномальному объёму (RVOL) и пробою локального диапазона. Это число — порог отсечения: монеты со score ниже порога в список сигналов не попадают. Ниже порог — больше сигналов, но больше и ложных; выше — сигналов меньше, но каждый увереннее. По умолчанию 60.</span></span>
+                                </div>
                                 <input type="number" class="sv2-num" id="s_volCrypto" value="60" min="0" max="100" step="5">
                             </div>
                         </div>
@@ -7525,22 +7581,30 @@
                         <div class="sv2-group">
                             <div class="sv2-group-title">Стартовое состояние</div>
                             <div class="sv2-row" data-search="запомнить рынок крипто finam старт">
-                                <div><div class="sv2-label">Открывать последний рынок</div><div class="sv2-sub">Крипто или Finam при запуске</div></div>
+                                <div><div class="sv2-label">Открывать последний рынок
+                                    <span class="rc-help">?<span class="rc-help-pop">При следующем заходе на сайт платформа сама откроется на том рынке (Крипто или Finam), на котором вы были в прошлый раз, вместо того чтобы всегда начинать с Крипто.</span></span>
+                                </div><div class="sv2-sub">Крипто или Finam при запуске</div></div>
                                 <label class="sv2-toggle"><input type="checkbox" id="s_rememberMarket" checked><span class="sv2-toggle-slider"></span></label>
                             </div>
                             <div class="sv2-row" data-search="запомнить таймфрейм тф период">
-                                <div><div class="sv2-label">Открывать последний таймфрейм</div></div>
+                                <div><div class="sv2-label">Открывать последний таймфрейм
+                                    <span class="rc-help">?<span class="rc-help-pop">Запоминает последний выбранный таймфрейм отдельно для Крипто и для Finam и подставляет его при следующем открытии этого рынка, вместо того чтобы всегда сбрасывать на 1 час.</span></span>
+                                </div></div>
                                 <label class="sv2-toggle"><input type="checkbox" id="s_rememberTf" checked><span class="sv2-toggle-slider"></span></label>
                             </div>
                             <div class="sv2-row" data-search="запомнить fx индикаторы пользовательские">
-                                <div><div class="sv2-label">Сохранять индикаторы fx</div><div class="sv2-sub">SMA, EMA, RSI и др. из панели fx</div></div>
+                                <div><div class="sv2-label">Сохранять индикаторы fx
+                                    <span class="rc-help">?<span class="rc-help-pop">Индикаторы, которые вы вручную добавляете через панель fx (SMA, EMA, RSI и др. — не базовые Alligator/AO/BB), по умолчанию не переживают перезагрузку страницы. Включите, чтобы они автоматически восстанавливались при следующем открытии платформы с теми же параметрами, с которыми были добавлены.</span></span>
+                                </div><div class="sv2-sub">SMA, EMA, RSI и др. из панели fx</div></div>
                                 <label class="sv2-toggle"><input type="checkbox" id="s_rememberFx"><span class="sv2-toggle-slider"></span></label>
                             </div>
                         </div>
                         <div class="sv2-group">
                             <div class="sv2-group-title">Подтверждения</div>
                             <div class="sv2-row" data-search="подтвердить очистить удалить">
-                                <div><div class="sv2-label">Спрашивать при «Очистить всё»</div><div class="sv2-sub">Инструменты рисования</div></div>
+                                <div><div class="sv2-label">Спрашивать при «Очистить всё»
+                                    <span class="rc-help">?<span class="rc-help-pop">Кнопка «Очистить всё» на панели рисования удаляет сразу все линии/разметку на текущем графике (символ + таймфрейм) без возможности отменить. Включите, чтобы перед удалением платформа каждый раз спрашивала подтверждение.</span></span>
+                                </div><div class="sv2-sub">Инструменты рисования</div></div>
                                 <label class="sv2-toggle"><input type="checkbox" id="s_confirmClear" checked><span class="sv2-toggle-slider"></span></label>
                             </div>
                         </div>
@@ -7552,7 +7616,9 @@
                         <div class="sv2-section-title">Данные и сохранение</div>
                         <div class="sv2-section-desc">Управление сохранёнными настройками</div>
                         <div class="sv2-group">
-                            <div class="sv2-group-title">Экспорт / Импорт</div>
+                            <div class="sv2-group-title">Экспорт / Импорт
+                                <span class="rc-help">?<span class="rc-help-pop">Все настройки этой страницы (цвета графика, пороги сканеров, цвета индикаторов и т.д.) хранятся локально в этом браузере — на другом устройстве или после очистки браузера их не будет. Экспорт сохраняет их в файл JSON, чтобы сделать резервную копию или перенести на другой компьютер/браузер; импорт загружает их обратно из такого файла.</span></span>
+                            </div>
                             <button class="sv2-data-btn" onclick="exportSettings()">
                                 <svg viewBox="0 0 24 24" style="width:16px;height:16px"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg>
                                 Экспорт настроек в JSON
