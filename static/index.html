@@ -2278,8 +2278,13 @@
     let activeTool = 'cursor';
     // Рисунки главного графика хранятся с ключом рынок+символ+таймфрейм, чтобы
     // мультиграфик мог показать (read-only) именно те, что относятся к его
-    // паре+таймфрейму, а не всё подряд без разбора.
-    let drawingsStore = {};
+    // паре+таймфрейму, а не всё подряд без разбора. Раньше это была чисто
+    // оперативная память — рисунки пропадали даже при простом обновлении страницы,
+    // не говоря уже о другом устройстве. Теперь восстанавливаются из localStorage
+    // (и из аккаунта на сервере, см. syncDeviceStateFromServer).
+    let drawingsStore = (() => {
+        try { return JSON.parse(localStorage.getItem('drawingsStore') || '{}'); } catch { return {}; }
+    })();
     function _drawKey(symbol, tf) { return `${currentMarket}_${symbol}_${tf}`; }
     function _curDrawings() {
         const k = _drawKey(currentSymbol, currentTimeframe);
@@ -2311,6 +2316,7 @@
         localStorage.setItem('theme', newTheme);
         updateThemeIcon();
         applyThemeToCharts();
+        scheduleDeviceStateSync();
     }
 
     function updateThemeIcon() {
@@ -3103,6 +3109,7 @@
     function _rememberTimeframe(market, tf) {
         if (!loadSettings().rememberLastTimeframe) return;
         localStorage.setItem('lastTimeframe_' + market, tf);
+        scheduleDeviceStateSync();
     }
     function _restoreTimeframe(market) {
         if (!loadSettings().rememberLastTimeframe) return;
@@ -3117,7 +3124,7 @@
     /** Переключает рынок: crypto или finam */
     function switchMarket(market) {
         currentMarket = market;
-        if (loadSettings().rememberLastMarket) localStorage.setItem('lastMarket', market);
+        if (loadSettings().rememberLastMarket) { localStorage.setItem('lastMarket', market); scheduleDeviceStateSync(); }
         document.querySelectorAll('#marketTabs .topbar-tab').forEach(b =>
             b.classList.toggle('active', b.dataset.market === market));
         const finamCats = document.getElementById('finamCategories');
@@ -3248,6 +3255,7 @@
 
     function mcSaveSymbols() {
         localStorage.setItem(`mc_syms_${currentMarket}`, JSON.stringify(mcSymbols));
+        scheduleDeviceStateSync();
     }
 
     function openMultiChart() {
@@ -4174,11 +4182,28 @@
     }
 
     function redrawCanvas() {
+        // Персист планируем ДО проверки drawCtx — иначе при ранних вызовах (до того
+        // как канвас рисования готов) данные рисунков молча не сохранялись бы.
+        _scheduleDrawingsPersist();
         if (!drawCtx) return;
         drawCtx.clearRect(0, 0, drawCanvas.width, drawCanvas.height);
         const cur = _curDrawings();
         const all = currentDraw ? [...cur, currentDraw] : cur;
         for (const d of all) renderDrawing(drawCtx, d, drawCanvas.width, drawCanvas.height, candleSeries, mainChart);
+    }
+
+    // Единая точка: любое изменение рисунков (добавление/удаление/перенос/отмена)
+    // в итоге вызывает redrawCanvas() — поэтому сохранение вешаем сюда одним местом,
+    // а не на каждый отдельный обработчик мыши/клавиши. Локальный дебаунс короткий
+    // (чтобы не писать в localStorage на каждый кадр во время перетаскивания мышью),
+    // затем планируется (более медленная) отправка на сервер.
+    let _drawingsPersistTimer = null;
+    function _scheduleDrawingsPersist() {
+        clearTimeout(_drawingsPersistTimer);
+        _drawingsPersistTimer = setTimeout(() => {
+            localStorage.setItem('drawingsStore', JSON.stringify(drawingsStore));
+            scheduleDeviceStateSync();
+        }, 400);
     }
 
     function formatTimeDiff(ms) {
@@ -4714,6 +4739,7 @@
         _rcTradeRisk  = tradeRisk;
         _rcSessLimit  = sessLimit;
         localStorage.setItem('rcCapitalPersist', capital);
+        scheduleDeviceStateSync();
 
         _rcUpdateCurrencyLabels();
         const ccy = _rcAccountCcy();
@@ -4752,6 +4778,7 @@
             tradeRisk: _rcTradeRisk,
             sessLimit: _rcSessLimit,
         }));
+        scheduleDeviceStateSync();
     }
 
     function loadSessionState() {
@@ -5322,6 +5349,7 @@
         document.getElementById('rcCalcBBtn').disabled = true;
         localStorage.removeItem('rcSessionState');
         localStorage.removeItem('rcCapitalPersist');
+        scheduleDeviceStateSync();
         _rcRecomputeTrailing();
     }
 
@@ -5975,6 +6003,7 @@
         localStorage.setItem('theme', theme);
         updateThemeIcon();
         applyThemeToCharts();
+        scheduleDeviceStateSync();
     }
 
     function settingsSearchFn(q) {
@@ -6511,13 +6540,21 @@
         if (!loadSettings().rememberFxIndicators) return;
         const list = activeIndicators.map(inst => ({ id: inst.id, params: inst.params }));
         localStorage.setItem('fxActiveIndicators', JSON.stringify(list));
+        scheduleDeviceStateSync();
     }
 
     function _fxRestoreActive() {
         if (!loadSettings().rememberFxIndicators) return;
         let list;
         try { list = JSON.parse(localStorage.getItem('fxActiveIndicators') || '[]'); } catch { list = []; }
-        list.forEach(item => { if (INDICATOR_REGISTRY[item.id]) addIndicator(item.id, item.params || {}); });
+        // Безопасно звать повторно (например, и из syncDeviceStateFromServer после
+        // логина, и отдельно при старте страницы) — не плодит дубликаты индикаторов,
+        // если что-то из списка уже добавлено.
+        list.forEach(item => {
+            if (!INDICATOR_REGISTRY[item.id]) return;
+            if (activeIndicators.some(inst => inst.id === item.id)) return;
+            addIndicator(item.id, item.params || {});
+        });
     }
 
     function renderIndicatorInstance(inst, data) {
@@ -6543,10 +6580,12 @@
         if (ipFavorites.has(id)) ipFavorites.delete(id); else ipFavorites.add(id);
         localStorage.setItem('ipFavorites', JSON.stringify([...ipFavorites]));
         ipFilter(document.getElementById('ipSearch')?.value || '');
+        scheduleDeviceStateSync();
     }
     function ipAddToRecent(id) {
         ipRecent = [id, ...ipRecent.filter(x => x !== id)].slice(0, 8);
         localStorage.setItem('ipRecent', JSON.stringify(ipRecent));
+        scheduleDeviceStateSync();
     }
 
     // ── UI панели ────────────────────────────────────────────────
@@ -6654,6 +6693,7 @@
                 _updateAuthUI();
                 await syncSettingsFromServer();
                 await syncWatchlistFromServer();
+                await syncDeviceStateFromServer();
             } else {
                 authToken = null;
                 localStorage.removeItem('auth_token');
@@ -6683,6 +6723,7 @@
             _updateAuthUI();
             await syncSettingsFromServer();
             await syncWatchlistFromServer();
+            await syncDeviceStateFromServer();
         } catch { err.textContent = 'Ошибка соединения'; }
     }
 
@@ -6826,6 +6867,7 @@
             _updateAuthUI();
             await syncSettingsFromServer();
             await syncWatchlistFromServer();
+            await syncDeviceStateFromServer();
         } catch { err.textContent = 'Ошибка соединения'; }
     }
 
@@ -6885,6 +6927,91 @@
             const settings = JSON.parse(localStorage.getItem('cryptoSettings') || '{}');
             await _authFetch('/user/settings', { method: 'PUT', body: { settings } });
         } catch {}
+    }
+
+    // ── Синхронизация состояния устройства между компьютером/телефоном ──
+    // Отдельно от /user/settings (та форма — только явные "Настройки", сохраняются
+    // по кнопке «Сохранить»). Здесь — всё остальное, что раньше жило только в
+    // localStorage этого браузера и терялось при заходе с другого устройства: тема,
+    // рисунки на графике, раскладка мультиграфика, последний рынок/таймфрейм,
+    // избранные/недавние индикаторы, пользовательские fx-индикаторы, капитал/сессия
+    // риск-калькулятора. Пушится автоматически (с дебаунсом) при каждом изменении,
+    // а не по кнопке — пользователь не должен думать о "сохранении".
+    const DEVICE_STATE_KEYS = [
+        'theme', 'lastMarket', 'lastTimeframe_crypto', 'lastTimeframe_finam',
+        'rcCapitalPersist', 'rcSessionState', 'fxActiveIndicators',
+        'mc_syms_crypto', 'mc_syms_finam', 'ipFavorites', 'ipRecent', 'drawingsStore',
+    ];
+
+    function _collectDeviceState() {
+        // PUT полностью заменяет сохранённое состояние на сервере (не мерджит) —
+        // поэтому ключ, которого сейчас нет локально (например, после resetSession()
+        // удалил rcSessionState), явно отправляется как null, а не просто
+        // пропускается. Иначе на другом устройстве просто не обновили бы значение
+        // и остался бы устаревший локальный кусок вместо реального "удалено".
+        const state = {};
+        DEVICE_STATE_KEYS.forEach(k => { state[k] = localStorage.getItem(k); });
+        return state;
+    }
+
+    let _deviceStatePushTimer = null;
+    function scheduleDeviceStateSync() {
+        if (!authToken) return;
+        clearTimeout(_deviceStatePushTimer);
+        _deviceStatePushTimer = setTimeout(pushDeviceState, 1500);
+    }
+
+    async function pushDeviceState() {
+        if (!authToken) return;
+        try {
+            await _authFetch('/user/device-state', { method: 'PUT', body: { state: _collectDeviceState() } });
+        } catch {}
+    }
+
+    async function syncDeviceStateFromServer() {
+        if (!authToken) return;
+        try {
+            const r = await _authFetch('/user/device-state');
+            if (!r.ok) return;
+            const { state } = await r.json();
+            if (!state || !Object.keys(state).length) return;
+            DEVICE_STATE_KEYS.forEach(k => {
+                if (typeof state[k] === 'string') localStorage.setItem(k, state[k]);
+                else if (k in state) localStorage.removeItem(k); // null = явно удалено на другом устройстве
+            });
+            _applyRestoredDeviceState();
+        } catch {}
+    }
+
+    // После того как localStorage обновлён значениями с сервера, часть состояния
+    // уже загружена в переменные при старте скрипта (drawingsStore, ipFavorites,
+    // ipRecent) — localStorage сам их не обновит, нужно перенести руками. Мутируем
+    // ТЕ ЖЕ объекты/коллекции (не переприсваиваем), чтобы остальной код, который уже
+    // держит на них ссылку, увидел изменения.
+    function _applyRestoredDeviceState() {
+        try {
+            const restoredDrawings = JSON.parse(localStorage.getItem('drawingsStore') || '{}');
+            for (const k in drawingsStore) delete drawingsStore[k];
+            Object.assign(drawingsStore, restoredDrawings);
+            redrawCanvas();
+        } catch {}
+        const savedTheme = localStorage.getItem('theme');
+        if (savedTheme && savedTheme !== document.body.dataset.theme) {
+            document.body.dataset.theme = savedTheme;
+            updateThemeIcon();
+            applyThemeToCharts();
+        }
+        try {
+            const favs = JSON.parse(localStorage.getItem('ipFavorites') || '[]');
+            ipFavorites.clear();
+            favs.forEach(f => ipFavorites.add(f));
+        } catch {}
+        try {
+            const rec = JSON.parse(localStorage.getItem('ipRecent') || '[]');
+            ipRecent.length = 0;
+            ipRecent.push(...rec);
+        } catch {}
+        if (typeof _fxRestoreActive === 'function') _fxRestoreActive();
     }
 
     // ── Chat ─────────────────────────────────────────────────────────

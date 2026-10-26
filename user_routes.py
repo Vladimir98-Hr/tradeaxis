@@ -24,6 +24,10 @@ class SettingsBody(BaseModel):
     settings: dict
 
 
+class DeviceStateBody(BaseModel):
+    state: dict
+
+
 class WatchlistItemSchema(BaseModel):
     symbol: str
     market: str = "crypto"
@@ -82,6 +86,51 @@ async def save_settings(
         settings_row = UserSettings(
             user_id=current_user.id,
             settings_json=json.dumps(body.settings, ensure_ascii=False),
+        )
+        db.add(settings_row)
+
+    await db.commit()
+    return {"ok": True}
+
+
+# --- Device state (кросс-платформенная синхронизация: тема, рисунки на графике,
+# раскладка мультиграфика, избранные/недавние индикаторы и т.п.) ---
+# Отдельно от /settings — там форма настроек целиком перезаписывает settings_json
+# при каждом сохранении, а device-state обновляется часто и небольшими кусками.
+
+@router.get("/device-state")
+async def get_device_state(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Возвращает сохранённое состояние устройства пользователя."""
+    result = await db.execute(
+        select(UserSettings).where(UserSettings.user_id == current_user.id)
+    )
+    settings_row = result.scalar_one_or_none()
+    if not settings_row or not settings_row.device_state_json:
+        return {"state": {}}
+    return {"state": json.loads(settings_row.device_state_json)}
+
+
+@router.put("/device-state")
+async def save_device_state(
+    body: DeviceStateBody,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Сохраняет состояние устройства пользователя (upsert)."""
+    result = await db.execute(
+        select(UserSettings).where(UserSettings.user_id == current_user.id)
+    )
+    settings_row = result.scalar_one_or_none()
+
+    if settings_row:
+        settings_row.device_state_json = json.dumps(body.state, ensure_ascii=False)
+    else:
+        settings_row = UserSettings(
+            user_id=current_user.id,
+            device_state_json=json.dumps(body.state, ensure_ascii=False),
         )
         db.add(settings_row)
 

@@ -49,6 +49,11 @@ class UserSettings(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     user_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.id"), unique=True, nullable=False)
     settings_json: Mapped[str] = mapped_column(Text, default="{}")
+    # Состояние устройства для кросс-платформенной синхронизации (тема, рисунки на
+    # графике, раскладка мультиграфика, избранные/недавние индикаторы и т.п.) —
+    # отдельно от settings_json, чтобы не смешивать с формой настроек (тот save
+    # перезаписывает settings_json целиком из полей формы).
+    device_state_json: Mapped[str] = mapped_column(Text, default="{}")
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
     user: Mapped["User"] = relationship("User", back_populates="settings")
@@ -135,5 +140,9 @@ async def init_db():
             pass  # Колонка уже существует
         try:
             await conn.execute(text("ALTER TABLE users ADD COLUMN reset_token_expires DATETIME"))
+        except Exception:
+            pass  # Колонка уже существует
+        try:
+            await conn.execute(text("ALTER TABLE user_settings ADD COLUMN device_state_json TEXT DEFAULT '{}'"))
         except Exception:
             pass  # Колонка уже существует
