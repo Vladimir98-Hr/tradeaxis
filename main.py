@@ -104,8 +104,11 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 
 @app.get("/")
 async def serve_frontend():
-    """Отдает главную HTML-страницу фронтенда."""
-    return FileResponse("static/index.html")
+    """Отдает главную HTML-страницу фронтенда.
+    Без явного Cache-Control браузер (особенно мобильный) может молча отдавать
+    старую закэшированную версию после деплоя, даже не сверяясь с сервером —
+    no-cache заставляет его каждый раз ревалидировать по ETag/Last-Modified."""
+    return FileResponse("static/index.html", headers={"Cache-Control": "no-cache"})
 
 
 
