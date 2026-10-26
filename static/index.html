@@ -2276,18 +2276,36 @@
     // ============================================================
     let drawingPanelOpen = false;
     let activeTool = 'cursor';
-    // Рисунки главного графика хранятся с ключом рынок+символ+таймфрейм, чтобы
-    // мультиграфик мог показать (read-only) именно те, что относятся к его
-    // паре+таймфрейму, а не всё подряд без разбора. Раньше это была чисто
-    // оперативная память — рисунки пропадали даже при простом обновлении страницы,
-    // не говоря уже о другом устройстве. Теперь восстанавливаются из localStorage
-    // (и из аккаунта на сервере, см. syncDeviceStateFromServer).
+    // Рисунки главного графика хранятся с ключом рынок+символ (БЕЗ таймфрейма) —
+    // как в TradingView: нарисовали на 15m, переключились на 1h на том же
+    // инструменте — рисунок остаётся виден (координаты абсолютные: время+цена,
+    // пересчитываются под любой масштаб через timeToCoordinate/priceToCoordinate).
+    // Раньше это была чисто оперативная память — рисунки пропадали даже при простом
+    // обновлении страницы, не говоря уже о другом устройстве. Теперь восстанавливаются
+    // из localStorage (и из аккаунта на сервере, см. syncDeviceStateFromServer).
     let drawingsStore = (() => {
         try { return JSON.parse(localStorage.getItem('drawingsStore') || '{}'); } catch { return {}; }
     })();
-    function _drawKey(symbol, tf) { return `${currentMarket}_${symbol}_${tf}`; }
+    // Одноразовая миграция старого формата ключа (рынок_символ_таймфрейм) в новый
+    // (рынок_символ) — для тех, у кого рисунки уже были сохранены до этого изменения.
+    // Старый ключ отличает ровно тем, что последний "_"-кусок — известный таймфрейм;
+    // после миграции такого больше не возникает, так что безопасно гонять при каждой
+    // загрузке (не только один раз).
+    (function _migrateDrawingsStoreKeys() {
+        const ALL_TF = ['1m', '5m', '15m', '1h', '4h', '1d', '1w'];
+        const migrated = {};
+        let changed = false;
+        for (const key in drawingsStore) {
+            const parts = key.split('_');
+            const last = parts[parts.length - 1];
+            const newKey = (parts.length >= 3 && ALL_TF.includes(last)) ? (changed = true, parts.slice(0, -1).join('_')) : key;
+            migrated[newKey] = (migrated[newKey] || []).concat(drawingsStore[key]);
+        }
+        if (changed) drawingsStore = migrated;
+    })();
+    function _drawKey(symbol) { return `${currentMarket}_${symbol}`; }
     function _curDrawings() {
-        const k = _drawKey(currentSymbol, currentTimeframe);
+        const k = _drawKey(currentSymbol);
         if (!drawingsStore[k]) drawingsStore[k] = [];
         return drawingsStore[k];
     }
@@ -4386,8 +4404,8 @@
 
     function undoDrawing() { _curDrawings().pop(); redrawCanvas(); }
     function clearDrawings() {
-        if (loadSettings().confirmClearAll && !confirm('Удалить все рисунки на этом графике (текущий символ и таймфрейм)? Это нельзя отменить.')) return;
-        drawingsStore[_drawKey(currentSymbol, currentTimeframe)] = [];
+        if (loadSettings().confirmClearAll && !confirm('Удалить все рисунки на этом инструменте (на всех таймфреймах)? Это нельзя отменить.')) return;
+        drawingsStore[_drawKey(currentSymbol)] = [];
         redrawCanvas();
     }
 
@@ -4426,7 +4444,7 @@
         const inst = mcInstances[i];
         if (!inst || !inst.ctx) return;
         inst.ctx.clearRect(0, 0, inst.canvas.width, inst.canvas.height);
-        const drawingsForCell = drawingsStore[_drawKey(mcSymbols[i], mcTf)] || [];
+        const drawingsForCell = drawingsStore[_drawKey(mcSymbols[i])] || [];
         for (const d of drawingsForCell) renderDrawing(inst.ctx, d, inst.canvas.width, inst.canvas.height, inst.series, inst.chart);
     }
 
@@ -5696,7 +5714,7 @@
             return Math.pow((1 - edge) / (1 + edge), 100 / riskPct);
         }
 
-        document.getElementById('kellyModalTitle').textContent = 'Анализ стратегии · ' + total + ' сделок';
+        document.getElementById('kellyModalTitleText').textContent = 'Анализ стратегии · ' + total + ' сделок';
         document.getElementById('km_total').textContent = wins.length + 'W / ' + losses.length + 'L';
         document.getElementById('km_winrate').textContent = (p * 100).toFixed(1) + '%';
         document.getElementById('km_avgR').textContent = wins.length > 0 ? '\u00d7' + avgR.toFixed(2) : '—';
@@ -7422,48 +7440,48 @@
     <div class="modal-overlay" id="kellyModal" style="display:none" onclick="if(event.target===this)this.style.display='none'">
         <div class="rc-box" style="width:420px">
             <div class="rc-header">
-                <span id="kellyModalTitle">Анализ стратегии</span>
+                <span id="kellyModalTitle"><span id="kellyModalTitleText">Анализ стратегии</span><span class="rc-help">?<span class="rc-help-pop">Критерий Келли — формула, которая считает, какой процент капитала оптимально рисковать на сделку, исходя из вашей статистики (винрейт и средний R:R). Здесь показан анализ по всем закрытым сделкам журнала. Не превышайте рекомендованный уровень риска — иначе растёт шанс слить депозит.</span></span></span>
                 <button class="rc-close" onclick="document.getElementById('kellyModal').style.display='none'">&#x00d7;</button>
             </div>
             <div class="rc-body">
                 <div class="rc-cards">
                     <div class="rc-card">
-                        <div class="rc-card-label">Итог сделок</div>
+                        <div class="rc-card-label">Итог сделок<span class="rc-help">?<span class="rc-help-pop">Сколько сделок закрыто с прибылью (W — win) и с убытком (L — loss) за весь период журнала.</span></span></div>
                         <div class="rc-card-val" id="km_total">—</div>
                     </div>
                     <div class="rc-card">
-                        <div class="rc-card-label">Винрейт</div>
+                        <div class="rc-card-label">Винрейт<span class="rc-help">?<span class="rc-help-pop">Доля прибыльных сделок от общего числа закрытых сделок. Например, 50% — каждая вторая сделка в плюсе.</span></span></div>
                         <div class="rc-card-val" id="km_winrate">—</div>
                     </div>
                 </div>
                 <div class="rc-cards" style="margin-top:8px">
                     <div class="rc-card">
-                        <div class="rc-card-label">Средний R:R (Win)</div>
+                        <div class="rc-card-label">Средний R:R (Win)<span class="rc-help">?<span class="rc-help-pop">Средний коэффициент «прибыль / риск» по прибыльным сделкам. ×2 означает, что в среднем выигрышная сделка приносит вдвое больше, чем вы рисковали.</span></span></div>
                         <div class="rc-card-val" id="km_avgR">—</div>
                     </div>
                     <div class="rc-card">
-                        <div class="rc-card-label">Мат. ожидание</div>
+                        <div class="rc-card-label">Мат. ожидание<span class="rc-help">?<span class="rc-help-pop">Математическое ожидание — средняя ожидаемая доходность на одну сделку с учётом винрейта и R:R. Положительное значение значит, что стратегия в среднем прибыльна.</span></span></div>
                         <div class="rc-card-val" id="km_edge">—</div>
                     </div>
                 </div>
                 <div class="rc-cards" style="margin-top:8px">
                     <div class="rc-card highlight">
-                        <div class="rc-card-label">Полный Келли</div>
+                        <div class="rc-card-label">Полный Келли<span class="rc-help">?<span class="rc-help-pop">Доля капитала на сделку, рассчитанная по формуле Келли как математически оптимальная. На практике это агрессивный уровень риска — обычно используют только часть от него.</span></span></div>
                         <div class="rc-card-val" id="km_kelly">—</div>
                         <div class="rc-card-sub" id="km_kellySub"></div>
                     </div>
                     <div class="rc-card">
-                        <div class="rc-card-label">&#x00bd; Келли (рекоменд.)</div>
+                        <div class="rc-card-label">&#x00bd; Келли (рекоменд.)<span class="rc-help">?<span class="rc-help-pop">Половина от полного Келли. Более безопасный и рекомендуемый уровень риска на сделку — почти такая же доходность, но с заметно меньшими просадками.</span></span></div>
                         <div class="rc-card-val" id="km_halfKelly">—</div>
                     </div>
                 </div>
                 <div class="rc-cards" style="margin-top:8px">
                     <div class="rc-card">
-                        <div class="rc-card-label">RoR при риске 2%</div>
+                        <div class="rc-card-label">RoR при риске 2%<span class="rc-help">?<span class="rc-help-pop">Risk of Ruin — вероятность полностью слить депозит, если рисковать 2% капитала на каждую сделку при текущей статистике стратегии.</span></span></div>
                         <div class="rc-card-val" id="km_ror2">—</div>
                     </div>
                     <div class="rc-card">
-                        <div class="rc-card-label">RoR при &#x00bd; Келли</div>
+                        <div class="rc-card-label">RoR при &#x00bd; Келли<span class="rc-help">?<span class="rc-help-pop">Вероятность слить депозит, если рисковать на сделку долей капитала, равной половине Келли (см. выше).</span></span></div>
                         <div class="rc-card-val" id="km_rorHalf">—</div>
                     </div>
                 </div>
@@ -7730,7 +7748,7 @@
                             <div class="sv2-group-title">Подтверждения</div>
                             <div class="sv2-row" data-search="подтвердить очистить удалить">
                                 <div><div class="sv2-label">Спрашивать при «Очистить всё»
-                                    <span class="rc-help">?<span class="rc-help-pop">Кнопка «Очистить всё» на панели рисования удаляет сразу все линии/разметку на текущем графике (символ + таймфрейм) без возможности отменить. Включите, чтобы перед удалением платформа каждый раз спрашивала подтверждение.</span></span>
+                                    <span class="rc-help">?<span class="rc-help-pop">Кнопка «Очистить всё» на панели рисования удаляет сразу все линии/разметку на текущем инструменте (на всех таймфреймах — рисунки общие для символа, как в TradingView) без возможности отменить. Включите, чтобы перед удалением платформа каждый раз спрашивала подтверждение.</span></span>
                                 </div><div class="sv2-sub">Инструменты рисования</div></div>
                                 <label class="sv2-toggle"><input type="checkbox" id="s_confirmClear" checked><span class="sv2-toggle-slider"></span></label>
                             </div>
