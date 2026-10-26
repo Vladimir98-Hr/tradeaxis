@@ -1,0 +1,475 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Force of Momentum — платформа принятия торгового решения</title>
+<link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
+<style>
+  :root{
+    --ink:#10131a;
+    --paper:#f1f3ec;
+    --paper-2:#e4e7dc;
+    --signal:#2f6fe0;
+    --structure:#1f3a5c;
+    --slate:#454f4a;
+    --gain:#3f8f6a;
+    --loss:#b0543f;
+    --line: rgba(16,19,26,.15);
+    --card:#ffffff;
+    --card-ink:#12151a;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --ink:#e6e8e0;
+      --paper:#0a0c09;
+      --paper-2:#121510;
+      --signal:#5b96ea;
+      --structure:#9fc1e6;
+      --slate:#8d968c;
+      --gain:#5fae82;
+      --loss:#c6705a;
+      --line: rgba(230,232,224,.15);
+      --card:#141813;
+      --card-ink:#e6e8e0;
+    }
+  }
+  :root[data-theme="dark"]{
+    --ink:#e6e8e0; --paper:#0a0c09; --paper-2:#121510; --signal:#5b96ea; --structure:#9fc1e6;
+    --slate:#8d968c; --gain:#5fae82; --loss:#c6705a; --line: rgba(230,232,224,.15); --card:#141813; --card-ink:#e6e8e0;
+  }
+  :root[data-theme="light"]{
+    --ink:#0d1014; --paper:#cfd3cc; --paper-2:#bec2ba; --signal:#3f7fe0; --structure:#1f3a5c;
+    --slate:#454f4a; --gain:#4a8f6a; --loss:#b0543f; --line: rgba(13,16,20,.16); --card:#e9ebe4; --card-ink:#12151a;
+  }
+
+  *{ box-sizing:border-box; }
+  html{ font-size:112.5%; } /* ~18px base — лучше читается при слабом зрении */
+  html,body{ margin:0; padding:0; overflow-x:hidden; }
+  body{
+    background:var(--paper); color:var(--ink);
+    font-family: "Iowan Old Style","Palatino Linotype","Book Antiqua",Georgia,serif;
+    -webkit-font-smoothing:antialiased; text-rendering:optimizeLegibility;
+  }
+  .sans{ font-family:"Segoe UI","Helvetica Neue",Helvetica,Arial,system-ui,sans-serif; }
+  .mono{ font-family: Consolas,"SF Mono","Cascadia Mono","Courier New",monospace; font-variant-numeric:tabular-nums; }
+  h1,h2,h3{ margin:0; text-wrap:balance; }
+  p{ margin:0; line-height:1.68; }
+  a{ color:inherit; }
+  ::selection{ background:var(--signal); color:var(--ink); }
+
+  .eyebrow{
+    font-family:"Segoe UI",system-ui,sans-serif; font-size:.72rem; letter-spacing:.16em; text-transform:uppercase;
+    color:var(--signal); font-weight:700;
+  }
+
+  /* -------- Nav -------- */
+  nav.top{
+    position:sticky; top:0; z-index:40;
+    display:flex; align-items:center; justify-content:space-between;
+    padding:1.1rem 6vw; background:color-mix(in srgb, var(--paper) 88%, transparent);
+    backdrop-filter:blur(10px); border-bottom:1px solid var(--line);
+  }
+  .brand{ display:flex; align-items:center; gap:.6rem; font-family:"Segoe UI",system-ui,sans-serif; font-weight:700; font-size:1rem; letter-spacing:.01em; }
+  .brand .mark{ width:9px; height:9px; background:var(--signal); border-radius:50%; box-shadow:0 0 0 3px color-mix(in srgb, var(--signal) 25%, transparent); }
+  .nav-links{ display:flex; gap:2rem; font-family:"Segoe UI",system-ui,sans-serif; font-size:.86rem; color:var(--slate); }
+  .nav-links a{ text-decoration:none; }
+  .nav-links a:hover{ color:var(--ink); }
+  .btn{
+    font-family:"Segoe UI",system-ui,sans-serif; font-weight:600; font-size:.86rem;
+    padding:.6rem 1.3rem; border-radius:2px; border:1px solid var(--ink); cursor:pointer;
+    background:none; color:var(--ink); text-decoration:none; display:inline-block; transition:transform .15s ease;
+  }
+  .btn-solid{ background:var(--signal); border-color:var(--signal); color:#f3f5f1; }
+  .btn:hover{ transform:translateY(-1px); }
+  .btn:focus-visible{ outline:2px solid var(--structure); outline-offset:2px; }
+
+  /* -------- Hero -------- */
+  .hero{ position:relative; padding:6.5rem 6vw 5rem; overflow:hidden; }
+  .hero-grid{ display:grid; grid-template-columns:1.1fr .9fr; gap:3rem; align-items:center; max-width:1240px; margin:0 auto; }
+  @media (max-width:860px){ .hero-grid{ grid-template-columns:1fr; } }
+  .hero h1{ font-size:clamp(2.6rem,5.2vw,4.4rem); line-height:1.03; font-weight:400; }
+  .hero h1 em{ font-style:italic; color:var(--signal); }
+  .hero .sub{ margin-top:1.4rem; max-width:50ch; font-size:1.18rem; color:var(--slate); line-height:1.6; }
+  .hero .cta-row{ display:flex; gap:1rem; margin-top:2.2rem; flex-wrap:wrap; align-items:center; }
+  .hero .fine{ font-family:"Segoe UI",system-ui,sans-serif; font-size:.78rem; color:var(--slate); margin-top:1.4rem; }
+  .chart-wrap{
+    position:relative; background:var(--card); border:1px solid var(--line); border-radius:4px; padding:1.1rem 1.2rem 1rem;
+    box-shadow:0 20px 50px -24px rgba(0,0,0,.35);
+  }
+  .chart-wrap .cw-head{ display:flex; justify-content:space-between; align-items:baseline; font-family:"Segoe UI",system-ui,sans-serif; margin-bottom:.6rem; }
+  .chart-wrap .cw-head .pair{ font-weight:700; font-size:.82rem; color:var(--card-ink); }
+  .chart-wrap .cw-head .state{ font-size:.68rem; letter-spacing:.08em; text-transform:uppercase; color:var(--gain); }
+  canvas#heroChart{ width:100%; height:220px; display:block; }
+  .chart-wrap .cw-foot{ display:flex; justify-content:space-between; font-family:"Segoe UI",system-ui,sans-serif; font-size:.72rem; color:var(--slate); margin-top:.5rem; }
+
+  /* -------- Sections -------- */
+  section{ padding:5.5rem 6vw; }
+  .wrap{ max-width:1100px; margin:0 auto; }
+  .wrap-narrow{ max-width:760px; margin:0 auto; }
+  .section-head{ margin-bottom:2.6rem; }
+  .section-head h2{ font-size:clamp(1.9rem,3.4vw,2.6rem); font-weight:400; margin-top:.6rem; max-width:22ch; }
+  .section-head p{ margin-top:1rem; font-size:1.05rem; color:var(--slate); max-width:58ch; }
+
+  .band-dark{ background:var(--ink); color:var(--paper); }
+  .band-dark .slate-on-dark{ color:color-mix(in srgb, var(--paper) 62%, var(--ink)); }
+  .band-dark .eyebrow{ color:var(--signal); }
+
+  /* problem grid */
+  .pain-grid{ display:grid; grid-template-columns:repeat(3,1fr); gap:1px; background:var(--line); border:1px solid var(--line); margin-top:1rem; }
+  @media (max-width:760px){ .pain-grid{ grid-template-columns:1fr; } }
+  .pain{ background:var(--card); padding:2rem 1.8rem; color:var(--card-ink); }
+  .pain .q{ font-size:1.15rem; font-style:italic; line-height:1.5; }
+  .pain .a{ margin-top:1rem; font-family:"Segoe UI",system-ui,sans-serif; font-size:.88rem; color:var(--slate); line-height:1.55; }
+
+  /* cycle */
+  .cycle{ display:grid; grid-template-columns:repeat(5,1fr); gap:0; margin-top:2.6rem; position:relative; }
+  @media (max-width:900px){ .cycle{ grid-template-columns:1fr; gap:1.4rem; } }
+  .cycle-step{ position:relative; padding-right:1.6rem; }
+  .cycle-step .num{ font-family:"Segoe UI",system-ui,sans-serif; font-size:.72rem; color:var(--signal); letter-spacing:.1em; }
+  .cycle-step .t{ margin-top:.5rem; font-size:1.05rem; }
+  .cycle-step .d{ margin-top:.5rem; font-family:"Segoe UI",system-ui,sans-serif; font-size:.82rem; color:var(--slate); line-height:1.5; }
+  .cycle-step::after{
+    content:"→"; position:absolute; right:-.3rem; top:0; color:var(--signal); font-size:1.1rem; opacity:.7;
+  }
+  .cycle-step:last-child::after{ content:""; }
+  @media (max-width:900px){ .cycle-step::after{ display:none; } }
+
+  /* feature grid */
+  .feat-grid{ display:grid; grid-template-columns:repeat(3,1fr); gap:1px; background:var(--line); border:1px solid var(--line); margin-top:1rem; }
+  @media (max-width:900px){ .feat-grid{ grid-template-columns:repeat(2,1fr); } }
+  @media (max-width:600px){ .feat-grid{ grid-template-columns:1fr; } }
+  .feat{ background:var(--card); color:var(--card-ink); padding:1.8rem 1.6rem; display:flex; flex-direction:column; gap:.6rem; }
+  .feat .tt{ font-family:"Segoe UI",system-ui,sans-serif; font-weight:700; font-size:.95rem; }
+  .feat .dd{ font-family:"Segoe UI",system-ui,sans-serif; font-size:.85rem; color:var(--slate); line-height:1.55; }
+  .feat .chip{ font-family:"Segoe UI",system-ui,sans-serif; font-size:.64rem; letter-spacing:.08em; text-transform:uppercase; color:var(--signal); }
+
+  /* comparison */
+  .table-wrap{ overflow-x:auto; margin-top:2rem; border:1px solid var(--line); }
+  table{ border-collapse:collapse; width:100%; min-width:560px; font-family:"Segoe UI",system-ui,sans-serif; font-size:.88rem; }
+  thead th{ text-align:left; padding:.8rem 1.1rem; background:var(--paper-2); font-size:.7rem; text-transform:uppercase; letter-spacing:.06em; color:var(--slate); border-bottom:1px solid var(--line); }
+  tbody td{ padding:.9rem 1.1rem; border-bottom:1px solid var(--line); color:var(--ink); vertical-align:top; }
+  tbody tr:last-child td{ border-bottom:none; }
+  tbody tr.us td{ background:color-mix(in srgb, var(--signal) 10%, transparent); font-weight:600; }
+
+  /* pricing */
+  .pricing{ display:grid; grid-template-columns:repeat(3,1fr); gap:1px; background:var(--line); border:1px solid var(--line); margin-top:2rem; }
+  @media (max-width:760px){ .pricing{ grid-template-columns:1fr; } }
+  .price{ background:var(--card); color:var(--card-ink); padding:2rem 1.7rem; display:flex; flex-direction:column; gap:.6rem; position:relative; }
+  .price.hi{ box-shadow: inset 0 3px 0 var(--signal); }
+  .price .name{ font-family:"Segoe UI",system-ui,sans-serif; font-size:.78rem; letter-spacing:.08em; text-transform:uppercase; color:var(--slate); }
+  .price .amt{ font-size:1.7rem; margin-top:.2rem; }
+  .price .per{ font-family:"Segoe UI",system-ui,sans-serif; font-size:.78rem; color:var(--slate); }
+  .price ul{ list-style:none; padding:0; margin:.8rem 0 0; display:flex; flex-direction:column; gap:.45rem; font-family:"Segoe UI",system-ui,sans-serif; font-size:.82rem; color:var(--slate); }
+  .price li::before{ content:"— "; color:var(--signal); }
+  .price:nth-child(3){ opacity:.78; }
+  .price:first-child{ box-shadow: inset 0 3px 0 var(--gain); }
+  .tag-live, .tag-soon{
+    align-self:flex-start; font-size:.64rem; letter-spacing:.07em; text-transform:uppercase;
+    padding:.3rem .6rem; border-radius:2px; margin-bottom:.4rem; white-space:nowrap;
+  }
+  .tag-live{ color:var(--gain); border:1px solid color-mix(in srgb, var(--gain) 55%, transparent); background:color-mix(in srgb, var(--gain) 12%, transparent); }
+  .tag-soon{ color:var(--slate); border:1px solid var(--line); background:color-mix(in srgb, var(--slate) 10%, transparent); }
+  .status-pill{
+    display:inline-block; margin-top:1.1rem; font-size:.78rem; color:var(--gain);
+    padding:.4rem .8rem; border:1px solid color-mix(in srgb, var(--gain) 45%, transparent);
+    border-radius:2px; background:color-mix(in srgb, var(--gain) 10%, transparent);
+  }
+  .price-footnote{ margin-top:1.6rem; font-size:.78rem; line-height:1.55; color:var(--slate); max-width:72ch; }
+
+  /* final CTA */
+  .cta-band{ text-align:left; padding:6rem 6vw; }
+  .cta-band .wrap{ display:flex; justify-content:space-between; align-items:flex-end; gap:2rem; flex-wrap:wrap; }
+  .cta-band h2{ font-size:clamp(2rem,4vw,3rem); font-weight:400; max-width:20ch; }
+  .cta-band .right{ display:flex; flex-direction:column; gap:1rem; align-items:flex-start; }
+
+  footer{ padding:2.4rem 6vw 3rem; font-family:"Segoe UI",system-ui,sans-serif; font-size:.78rem; color:var(--slate); display:flex; justify-content:space-between; flex-wrap:wrap; gap:.6rem; border-top:1px solid var(--line); }
+
+  @media (prefers-reduced-motion: reduce){ * { scroll-behavior:auto !important; } }
+
+  .reveal{ opacity:0; transform:translateY(14px); transition:opacity .6s ease, transform .6s ease; }
+  .reveal.in{ opacity:1; transform:none; }
+</style>
+</head>
+<body>
+
+<nav class="top">
+  <div class="brand"><span class="mark"></span>Force of Momentum</div>
+  <div class="nav-links">
+    <a href="#problem">Проблема</a>
+    <a href="#product">Платформа</a>
+    <a href="#how">Как это работает</a>
+    <a href="#pricing">Тарифы</a>
+  </div>
+  <a href="/app?auth=register" class="btn btn-solid">Зарегистрироваться</a>
+</nav>
+
+<header class="hero">
+  <div class="hero-grid">
+    <div>
+      <div class="eyebrow">Risk-first trading platform</div>
+      <h1>Торгуйте так, будто <em>завтра</em> снова нужно будет торговать.</h1>
+      <p class="sub">Force of Momentum — платформа принятия торгового решения для криптовалютного рынка и Московской биржи. Один цикл: план сделки → расчёт риска → исполнение → честный разбор ошибок. Не сигналы на удачу — система, которая не даёт нарушать то, что вы и так знаете.</p>
+      <div class="cta-row">
+        <a href="/app?auth=register" class="btn btn-solid">Создать аккаунт бесплатно</a>
+        <a href="#product" class="btn">Как это устроено</a>
+      </div>
+      <div class="fine sans">Бесплатный уровень без карты · Полная регистрация перед доступом к платформе</div>
+    </div>
+    <div class="chart-wrap reveal">
+      <div class="cw-head">
+        <span class="pair mono">BTC/USDT · 15m</span>
+        <span class="state">план соблюдён</span>
+      </div>
+      <canvas id="heroChart" width="560" height="220"></canvas>
+      <div class="cw-foot">
+        <span>Риск сделки: <strong class="mono" style="color:var(--card-ink)">1.2%</strong></span>
+        <span>Результат: <strong class="mono" style="color:var(--gain)">+2.1R</strong></span>
+      </div>
+    </div>
+  </div>
+</header>
+
+<section id="problem">
+  <div class="wrap">
+    <div class="section-head reveal">
+      <div class="eyebrow">Проблема</div>
+      <h2>Вы уже знаете правила. Вопрос — соблюдаете ли вы их в моменте.</h2>
+      <p>Большинство убытков у активных трейдеров не связаны с нехваткой индикаторов или идей. Их вызывают отсутствие заранее заданного риска, перенос стоп-лосса, увеличение позиции после серии неудач и попытка быстро «отыграться».</p>
+    </div>
+    <div class="pain-grid">
+      <div class="pain reveal">
+        <div class="q">«Я знал, где стоп, но подвинул его в последний момент.»</div>
+        <div class="a">План без обязательства перед сделкой легко нарушить. Force of Momentum фиксирует план до входа — и показывает, когда вы от него отклонились.</div>
+      </div>
+      <div class="pain reveal">
+        <div class="q">«После трёх убыточных я открыл четвёртую, чтобы отыграться.»</div>
+        <div class="a">Дневной лимит сделок и лимит потерь останавливают сессию автоматически — решение принимается заранее, а не в состоянии тильта.</div>
+      </div>
+      <div class="pain reveal">
+        <div class="q">«Я веду журнал, но не вижу, какая ошибка повторяется.»</div>
+        <div class="a">Статистика считает не только P&amp;L, но и R, соблюдение плана и повторяющиеся нарушения — по вашим собственным сделкам.</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="product" class="band-dark">
+  <div class="wrap">
+    <div class="section-head reveal">
+      <div class="eyebrow">Продукт</div>
+      <h2>Единый цикл «план → риск → факт»</h2>
+      <p class="slate-on-dark">Другие сервисы закрывают это по частям: графики без риск-менеджмента, калькуляторы риска без журнала, журналы без связи с планом сделки. Force of Momentum держит весь цикл в одном месте.</p>
+    </div>
+    <div class="cycle">
+      <div class="cycle-step reveal"><div class="num">01</div><div class="t">Анализ</div><div class="d sans slate-on-dark">Живой график на крипте и MOEX, авторские индикаторы и сканеры находят сетап.</div></div>
+      <div class="cycle-step reveal"><div class="num">02</div><div class="t">План</div><div class="d sans slate-on-dark">Тезис входа, условия подтверждения, стоп, цель и допустимый риск — фиксируются до сделки.</div></div>
+      <div class="cycle-step reveal"><div class="num">03</div><div class="t">Риск</div><div class="d sans slate-on-dark">Объём позиции считается по критерию Келли, с учётом дневного лимита и остатка риска за сессию.</div></div>
+      <div class="cycle-step reveal"><div class="num">04</div><div class="t">Сделка</div><div class="d sans slate-on-dark">Исполнение по плану — платформа предупреждает о нарушении лимита или сценария в моменте.</div></div>
+      <div class="cycle-step reveal"><div class="num">05</div><div class="t">Разбор</div><div class="d sans slate-on-dark">Короткий чек-лист после закрытия: план соблюдён, была ли ошибка, что повторяется из раза в раз.</div></div>
+    </div>
+  </div>
+</section>
+
+<section id="modules">
+  <div class="wrap">
+    <div class="section-head reveal">
+      <div class="eyebrow">Инструменты внутри</div>
+      <h2>Всё, что нужно для дисциплинированной сделки</h2>
+    </div>
+    <div class="feat-grid">
+      <div class="feat reveal"><span class="chip">Чартинг</span><div class="tt">Крипта + Мосбиржа в одном окне</div><div class="dd">Рабочий график в стиле TradingView на Lightweight Charts: криптовалюта через OKX, акции и фьючерсы — через ISS API Мосбиржи.</div></div>
+      <div class="feat reveal"><span class="chip">Сигналы</span><div class="tt">Дивергентные бары и фильтр Аллигатора</div><div class="dd">Авторская система на стыке дивергенций AO, фракталов и ангуляции Аллигатора Билла Вильямса — отсекает слабые точки входа.</div></div>
+      <div class="feat reveal"><span class="chip">Сканеры</span><div class="tt">Рынок сканируется без вас</div><div class="dd">Три независимых сканера — по дивергенциям, волатильности и спреду — находят активные сетапы по всему рынку.</div></div>
+      <div class="feat reveal"><span class="chip">Риск-менеджмент</span><div class="tt">Критерий Келли вместо «на глаз»</div><div class="dd">Калькулятор считает оптимальный размер позиции по вашей реальной статистике win rate и R, а не по интуиции.</div></div>
+      <div class="feat reveal"><span class="chip">Контроль сессии</span><div class="tt">Лимит сделок и лимит потерь</div><div class="dd">Автоматическая остановка после достижения дневного лимита — защита от тильта и эмоционального «отыгрыша».</div></div>
+      <div class="feat reveal"><span class="chip">Журнал</span><div class="tt">Разбор, а не просто архив</div><div class="dd">Каждая сделка фиксируется с планом, стопом, тейком и результатом в R — статистика показывает, что реально работает.</div></div>
+    </div>
+  </div>
+</section>
+
+<section id="how">
+  <div class="wrap-narrow">
+    <div class="section-head reveal">
+      <div class="eyebrow">Как это работает</div>
+      <h2>От регистрации до первой осмысленной сделки — один день</h2>
+    </div>
+    <div class="table-wrap reveal">
+      <table>
+        <thead><tr><th>Инструмент</th><th>Что умеет</th><th>Чего не хватает</th></tr></thead>
+        <tbody>
+          <tr><td><strong>Графики общего назначения</strong></td><td>Индикаторы, алерты, идеи сообщества</td><td>Не связаны с риском и планом конкретной сделки</td></tr>
+          <tr><td><strong>Журналы сделок</strong></td><td>Импорт истории, P&amp;L, базовая статистика</td><td>Анализируют то, что уже случилось — не управляют риском до входа</td></tr>
+          <tr><td><strong>Калькуляторы риска</strong></td><td>Быстрый расчёт объёма и стопа</td><td>Не связаны с графиком и дальнейшим разбором сделки</td></tr>
+          <tr class="us"><td><strong>Force of Momentum</strong></td><td>График, риск, план и разбор — один непрерывный цикл</td><td>—</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<section id="pricing" class="band-dark">
+  <div class="wrap">
+    <div class="section-head reveal">
+      <div class="eyebrow">Тарифы</div>
+      <h2>Free и Trader/Pro — бесплатны и доступны уже сейчас</h2>
+      <p class="slate-on-dark">Платёжные тарифы ещё не включены — на этапе запуска весь функционал Free и Trader/Pro открыт всем зарегистрированным пользователям без оплаты. В разработке остаётся только командный уровень Team/Coach.</p>
+      <div class="status-pill sans">● Free и Trader/Pro — активны и бесплатны · Team/Coach — в разработке</div>
+    </div>
+    <div class="pricing">
+      <div class="price reveal">
+        <div class="tag-live sans">Доступно сейчас</div>
+        <div class="name">Free</div>
+        <div class="amt mono">0 ₽</div>
+        <ul>
+          <li>Базовый журнал сделок</li>
+          <li>Риск-калькулятор</li>
+          <li>Часть индикаторов</li>
+        </ul>
+      </div>
+      <div class="price hi reveal">
+        <div class="tag-live sans">Доступно сейчас</div>
+        <div class="name">Trader / Pro</div>
+        <div class="amt mono">0 ₽</div><div class="per">на этапе запуска · целевая цена 990–3 490 ₽/мес</div>
+        <ul>
+          <li>Полный журнал и статистика по R</li>
+          <li>Сканеры рынка и авторские индикаторы<sup>*</sup></li>
+          <li>Лимиты сессии и план сделки</li>
+        </ul>
+      </div>
+      <div class="price reveal">
+        <div class="tag-soon sans">В разработке</div>
+        <div class="name">Team / Coach</div>
+        <div class="amt mono">от 4 990 ₽</div><div class="per">в месяц · ориентировочно</div>
+        <ul>
+          <li>Кабинеты учеников или команды</li>
+          <li>Контроль риск-лимитов группы</li>
+          <li>Групповые отчёты по дисциплине</li>
+        </ul>
+      </div>
+    </div>
+    <p class="sans price-footnote">* Сканеры дивергенций, волатильности и EMA сейчас работают только на криптовалютных парах. На Мосбирже (Finam) они временно отключены из-за ограничений API поставщика данных (ошибки 400/429 по лимиту запросов) — раздел Finam пока ограничен чартингом без сканеров.</p>
+  </div>
+</section>
+
+<section id="register" class="cta-band">
+  <div class="wrap">
+    <h2>Доступ к платформе — только через регистрацию.</h2>
+    <div class="right">
+      <a href="/app?auth=register" class="btn btn-solid">Зарегистрироваться бесплатно</a>
+      <span class="sans" style="font-size:.8rem;color:var(--slate)">Займёт меньше минуты — email и пароль</span>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <span>Force of Momentum — momentforce.ru</span>
+  <span>Сервис не даёт индивидуальных инвестиционных рекомендаций</span>
+</footer>
+
+<script>
+(function(){
+  var canvas = document.getElementById('heroChart');
+  if(!canvas) return;
+  var ctx = canvas.getContext('2d');
+  var dpr = window.devicePixelRatio || 1;
+  function size(){
+    var r = canvas.getBoundingClientRect();
+    canvas.width = r.width*dpr; canvas.height = r.height*dpr;
+    ctx.setTransform(dpr,0,0,dpr,0,0);
+  }
+  size();
+  window.addEventListener('resize', size);
+
+  var reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  // Generate a path: volatile/chaotic on the left, settling into a controlled
+  // upward move on the right — visual metaphor for "discipline tames momentum".
+  var n = 80, pts = [];
+  var seed = 7;
+  function rnd(){ seed = (seed*9301+49297)%233280; return seed/233280; }
+  var y = 0.55;
+  for(var i=0;i<n;i++){
+    var t = i/(n-1);
+    var chaos = Math.max(0, 1-t*1.6);
+    var drift = 0.012 + t*0.01;
+    y += (rnd()-0.5)*0.09*chaos + drift;
+    y = Math.max(0.12, Math.min(0.85, y));
+    pts.push(y);
+  }
+
+  function getVars(){
+    var cs = getComputedStyle(document.documentElement);
+    return { line: cs.getPropertyValue('--structure').trim(), fill: cs.getPropertyValue('--signal').trim() };
+  }
+
+  function draw(progress){
+    var r = canvas.getBoundingClientRect();
+    var w = r.width, h = r.height;
+    ctx.clearRect(0,0,w,h);
+    var vars = getVars();
+    var count = Math.max(2, Math.floor(n*progress));
+
+    // faint grid
+    ctx.strokeStyle = 'rgba(128,128,128,.14)';
+    ctx.lineWidth = 1;
+    for(var gy=1; gy<4; gy++){
+      ctx.beginPath(); ctx.moveTo(0, h*gy/4); ctx.lineTo(w, h*gy/4); ctx.stroke();
+    }
+
+    ctx.beginPath();
+    for(var i=0;i<count;i++){
+      var x = (i/(n-1))*w;
+      var yy = h - pts[i]*h;
+      if(i===0) ctx.moveTo(x,yy); else ctx.lineTo(x,yy);
+    }
+    ctx.strokeStyle = vars.line; ctx.lineWidth = 2; ctx.stroke();
+
+    // fill under curve
+    ctx.lineTo((Math.min(count,n)-1)/(n-1)*w, h);
+    ctx.lineTo(0,h);
+    ctx.closePath();
+    ctx.globalAlpha = .12;
+    ctx.fillStyle = vars.line;
+    ctx.fill();
+    ctx.globalAlpha = 1;
+
+    // endpoint dot
+    if(count>0){
+      var ex = (Math.min(count,n)-1)/(n-1)*w;
+      var ey = h - pts[Math.min(count,n)-1]*h;
+      ctx.beginPath(); ctx.arc(ex,ey,4,0,Math.PI*2);
+      ctx.fillStyle = vars.fill; ctx.fill();
+    }
+  }
+
+  if(reduced){ draw(1); }
+  else {
+    var start = null, dur = 1800;
+    function frame(ts){
+      if(!start) start = ts;
+      var p = Math.min(1, (ts-start)/dur);
+      draw(p);
+      if(p<1) requestAnimationFrame(frame);
+    }
+    requestAnimationFrame(frame);
+  }
+
+  // redraw on theme change (prefers-color-scheme toggles mid-session via data-theme)
+  var mo = new MutationObserver(function(){ draw(1); });
+  mo.observe(document.documentElement, { attributes:true, attributeFilter:['data-theme'] });
+})();
+</script>
+
+<script>
+(function(){
+  var items = document.querySelectorAll('.reveal');
+  if(!('IntersectionObserver' in window)){ items.forEach(function(el){el.classList.add('in');}); return; }
+  var io = new IntersectionObserver(function(entries){
+    entries.forEach(function(e){ if(e.isIntersecting){ e.target.classList.add('in'); io.unobserve(e.target); } });
+  }, { threshold:.15 });
+  items.forEach(function(el){ io.observe(el); });
+})();
+</script>
+</body>
+</html>

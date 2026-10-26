@@ -57,6 +57,11 @@ RESET_TOKEN_EXPIRE_MINUTES = 60
 # База данных пользователей (SQLite)
 DATABASE_URL = os.getenv("DATABASE_URL", "sqlite+aiosqlite:///./users.db")
 
+# DeepSeek API — для автогенерации черновиков статей о психологии трейдера
+# (см. content_agent.py). Пусто = фоновая генерация черновиков выключена.
+DEEPSEEK_API_KEY = os.getenv("DEEPSEEK_API_KEY", "")
+DEEPSEEK_BASE_URL = os.getenv("DEEPSEEK_BASE_URL", "https://api.deepseek.com")
+
 # Finam Trade API — secret-токен(ы) из личного кабинета Финама, раздел «Токены».
 # Пусто = раздел Finam в терминале недоступен. Доступен всем зарегистрированным пользователям.
 #

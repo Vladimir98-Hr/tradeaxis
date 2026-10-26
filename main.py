@@ -18,6 +18,7 @@ from user_routes import router as user_router
 from chat import router as chat_router
 from news_routes import router as news_router
 from feedback_routes import router as feedback_router
+from draft_routes import router as draft_router
 from finam_routes import router as finam_router
 from database import init_db
 
@@ -44,6 +45,7 @@ app.include_router(auth_router)
 app.include_router(user_router)
 app.include_router(news_router)
 app.include_router(feedback_router)
+app.include_router(draft_router)
 app.include_router(finam_router)
 
 
@@ -90,6 +92,8 @@ async def startup():
     asyncio.create_task(run_finam_catalog_refresher())
     from finam_routes import run_finam_chart_prewarmer
     asyncio.create_task(run_finam_chart_prewarmer())
+    from content_agent import run_article_draft_generator
+    asyncio.create_task(run_article_draft_generator())
 
 # Создаём папку uploads заранее (StaticFiles требует существующую директорию)
 import os as _os
@@ -103,11 +107,17 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 
 
 @app.get("/")
-async def serve_frontend():
-    """Отдает главную HTML-страницу фронтенда.
+async def serve_landing():
+    """Отдаёт публичный лендинг (до регистрации).
     Без явного Cache-Control браузер (особенно мобильный) может молча отдавать
     старую закэшированную версию после деплоя, даже не сверяясь с сервером —
     no-cache заставляет его каждый раз ревалидировать по ETag/Last-Modified."""
+    return FileResponse("static/landing.html", headers={"Cache-Control": "no-cache"})
+
+
+@app.get("/app")
+async def serve_frontend():
+    """Отдаёт главную HTML-страницу платформы (графики, журнал и т.д.)."""
     return FileResponse("static/index.html", headers={"Cache-Control": "no-cache"})
 
 

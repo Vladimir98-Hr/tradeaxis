@@ -5710,8 +5710,16 @@
         const halfKelly = kelly / 2;
 
         function calcRoR(riskPct) {
-            if (riskPct <= 0 || edge <= 0) return edge <= 0 ? 1.0 : null;
-            return Math.pow((1 - edge) / (1 + edge), 100 / riskPct);
+            if (riskPct <= 0) return null;
+            if (edge <= 0) return 1.0;
+            // Диффузионная аппроксимация риска разорения: учитывает разброс (дисперсию)
+            // результатов сделок, а не только средний edge — корректна и при
+            // несимметричном R:R (выигрыш и проигрыш разного размера).
+            const variance = p * Math.pow(b - edge, 2) + (1 - p) * Math.pow(-1 - edge, 2);
+            if (variance <= 0) return 0;
+            const bankrollUnits = 100 / riskPct;
+            const ror = Math.exp(-2 * edge * bankrollUnits / variance);
+            return Math.min(1, Math.max(0, ror));
         }
 
         document.getElementById('kellyModalTitleText').textContent = 'Анализ стратегии · ' + total + ' сделок';
@@ -6702,7 +6710,22 @@
         return fetch(url, opts);
     }
 
+    function _openAuthFromLandingLink() {
+        // Переход с публичного лендинга (?auth=register|login) сразу открывает
+        // нужную вкладку формы поверх рабочего стола — пользователь не должен
+        // искать кнопку входа сам после клика "Зарегистрироваться" на лендинге.
+        const params = new URLSearchParams(location.search);
+        const authParam = params.get('auth');
+        if (authParam === 'register' || authParam === 'login') {
+            openAuthModal(authParam);
+            params.delete('auth');
+            const rest = params.toString();
+            history.replaceState(null, '', location.pathname + (rest ? '?' + rest : '') + location.hash);
+        }
+    }
+
     async function initAuth() {
+        _openAuthFromLandingLink();
         if (!authToken) { _updateAuthUI(); return; }
         try {
             const r = await fetch('/auth/me', { headers: { 'Authorization': 'Bearer ' + authToken } });
