@@ -3272,6 +3272,7 @@
     let mcSymbols = [];
     let mcTf = '1h';
     let mcPriceInterval = null;
+    let mcIndicatorInterval = null;
     // Дефолт оставлен только как миграционный фоллбэк для уже существующих
     // пользователей, у которых mc_syms_crypto ещё не сохранён — новые/пустые
     // случаи (в т.ч. всегда для Finam) получают просто пустой набор [].
@@ -3296,7 +3297,15 @@
         mcBuildGrid();
         mcRenderTfBtns();
         mcLoadAll();
-        if (currentMarket === 'crypto') mcPriceInterval = setInterval(mcUpdatePrices, 3000);
+        if (currentMarket === 'crypto') {
+            mcPriceInterval = setInterval(mcUpdatePrices, 3000);
+            // mcUpdatePrices() только двигает цену/последнюю свечу — Аллигатор и
+            // Bollinger Bands остаются от последней полной загрузки и "замирают",
+            // пока не откроешь пару заново (та же причина, по которой на основном
+            // графике есть refreshLiveTail() — здесь её аналог, но проще: полная
+            // перезагрузка ячейки реже, раз в 15с, а не на каждый тик цены).
+            mcIndicatorInterval = setInterval(mcLoadAll, 15000);
+        }
         if (currentMarket === 'finam') _mcLoadFinamSymbolCache();
     }
 
@@ -3304,6 +3313,7 @@
         mcOpen = false;
         document.getElementById('multiChartOverlay').style.display = 'none';
         clearInterval(mcPriceInterval); mcPriceInterval = null;
+        clearInterval(mcIndicatorInterval); mcIndicatorInterval = null;
         mcInstances.forEach(inst => { if (inst.ro) inst.ro.disconnect(); if (inst.chart) inst.chart.remove(); });
         mcInstances = [];
     }
@@ -3619,6 +3629,16 @@
         fetchVisibleTickers();
         if (document.getElementById('volScanList')) fetchVolScan();
         if (document.getElementById('emaScanList')) fetchEmaScan();
+        // Вкладка снова на экране — возможно, за это время успели что-то поменять
+        // с другого устройства (телефон/другой компьютер). Подтягиваем свежее
+        // состояние, а не ждём следующего логина/перезагрузки страницы — иначе
+        // давно открытая вкладка могла бы следующим же своим действием затереть
+        // чужие более свежие изменения (пуш всегда полностью перезаписывает).
+        if (authToken) {
+            syncSettingsFromServer();
+            syncWatchlistFromServer();
+            syncDeviceStateFromServer();
+        }
     });
 
     // Свайп вниз — обновление страницы (на мобиле). Раскладка держится на внутренних
@@ -7197,11 +7217,25 @@
     }
 
     async function pushDeviceState() {
+        clearTimeout(_deviceStatePushTimer);
+        _deviceStatePushTimer = null;
         if (!authToken) return;
         try {
             await _authFetch('/user/device-state', { method: 'PUT', body: { state: _collectDeviceState() } });
         } catch {}
     }
+
+    // На телефоне вкладка часто сворачивается/закрывается почти сразу после
+    // действия (добавили пару в мультиграфик и сразу свернули приложение) —
+    // 1.5с дебаунса может просто не успеть сработать, и изменение никогда не
+    // долетает до сервера. При уходе со страницы досылаем немедленно, если
+    // есть несохранённые изменения (таймер ещё висит).
+    document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'hidden' && _deviceStatePushTimer) pushDeviceState();
+    });
+    window.addEventListener('pagehide', () => {
+        if (_deviceStatePushTimer) pushDeviceState();
+    });
 
     async function syncDeviceStateFromServer() {
         if (!authToken) return;
@@ -7247,6 +7281,17 @@
             ipRecent.push(...rec);
         } catch {}
         if (typeof _fxRestoreActive === 'function') _fxRestoreActive();
+        // Если мультиграфик уже открыт на этой вкладке — перечитать раскладку
+        // из localStorage и перестроить сетку, иначе открытая панель продолжит
+        // показывать старый набор пар, пока её не закроют и не откроют заново.
+        if (mcOpen) {
+            try {
+                const saved = localStorage.getItem(`mc_syms_${currentMarket}`);
+                mcSymbols = saved ? JSON.parse(saved) : [];
+            } catch { mcSymbols = []; }
+            mcBuildGrid();
+            mcLoadAll();
+        }
     }
 
     // ── Chat ─────────────────────────────────────────────────────────
