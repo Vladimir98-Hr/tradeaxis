@@ -1618,6 +1618,8 @@
                         <button data-tf="1h" class="active">1H</button>
                         <button data-tf="4h">4H</button>
                         <button data-tf="1d">1D</button>
+                        <button data-tf="1w">1W</button>
+                        <button data-tf="1mo">1M</button>
                     </div>
                     <div class="chart-type-toggle">
                         <button id="typeCandle" class="active">Свечи</button>
@@ -2324,7 +2326,7 @@
     let allSymbols = []; // [{symbol: 'BTCUSDT', name: 'BTC/USDT', base: 'BTC'}, ...]
 
     // Таймфреймы, доступные на каждом рынке (используются и основным графиком, и мультиграфиком)
-    const TF_LIST_CRYPTO = ['1m','5m','15m','1h','4h','1d','1w'];
+    const TF_LIST_CRYPTO = ['1m','5m','15m','1h','4h','1d','1w','1mo'];
     const TF_LIST_FINAM  = ['5m','15m','1h','4h','1d','1w']; // без 1m — Finam не отдаёт минутные свечи
 
     // ============================================================
@@ -2387,7 +2389,7 @@
     }
 
     function getTimeframeMs(tf) {
-        const map = { '1m':60000,'5m':300000,'10m':600000,'15m':900000,'30m':1800000,'1h':3600000,'4h':14400000,'1d':86400000,'1w':604800000 };
+        const map = { '1m':60000,'5m':300000,'10m':600000,'15m':900000,'30m':1800000,'1h':3600000,'4h':14400000,'1d':86400000,'1w':604800000,'1mo':2592000000 };
         return map[tf] || 3600000;
     }
 
@@ -3106,14 +3108,6 @@
     /** Показывает/скрывает кнопки таймфреймов для выбранного рынка (crypto | finam) */
     function updateTimeframesForMarket(market) {
         const tfContainer = document.getElementById('timeframes');
-        // Добавить кнопку 1w, если её ещё нет в DOM
-        let w1btn = tfContainer.querySelector('[data-tf="1w"]');
-        if (!w1btn) {
-            w1btn = document.createElement('button');
-            w1btn.dataset.tf = '1w';
-            w1btn.textContent = '1W';
-            tfContainer.appendChild(w1btn);
-        }
         const visible = market === 'finam' ? TF_LIST_FINAM : TF_LIST_CRYPTO;
         tfContainer.querySelectorAll('button[data-tf]').forEach(btn => {
             btn.style.display = visible.includes(btn.dataset.tf) ? '' : 'none';
@@ -3691,13 +3685,25 @@
     // Смена таймфрейма
     document.getElementById('timeframes').addEventListener('click', (e) => {
         if (e.target.tagName !== 'BUTTON') return;
-        document.querySelectorAll('#timeframes button').forEach(b => b.classList.remove('active'));
-        e.target.classList.add('active');
-        currentTimeframe = e.target.dataset.tf;
-        _rememberTimeframe(currentMarket, currentTimeframe);
+        setChartTimeframe(e.target.dataset.tf);
         fetchAll();
         redrawCanvas();
     });
+
+    // Переключает таймфрейм главного графика программно (не кликом по кнопке) —
+    // используется там, где нужно гарантированно показать то же самое, что
+    // только что было найдено на другом таймфрейме (например, клик по результату
+    // сканера дивергенций, который сканирует на divScanTimeframe из настроек, а
+    // не обязательно на текущем таймфрейме графика — иначе сигнал, найденный на
+    // дневках, открывался бы на часовике, где его бар попросту не существует).
+    function setChartTimeframe(tf) {
+        const btn = document.querySelector(`#timeframes button[data-tf="${tf}"]`);
+        if (!btn || btn.style.display === 'none') return;
+        document.querySelectorAll('#timeframes button').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        currentTimeframe = tf;
+        _rememberTimeframe(currentMarket, currentTimeframe);
+    }
 
     // Переключатель типа графика (Свечи / Бары)
     let chartType = 'candle';
@@ -4082,9 +4088,12 @@
                 list.innerHTML = '<div class="div-scan-empty">Дивергенций не найдено</div>';
             } else {
                 list.innerHTML = json.divergences.map(d => {
+                    // Скан ищет дивергенцию на divTf (не обязательно текущем таймфрейме
+                    // графика) — без принудительного переключения клик открывал нужный
+                    // символ, но на старом таймфрейме, где этого бара вообще нет.
                     const onclick = isFinam
-                        ? `currentFinamCategory='${d.cat}'; selectPair({symbol:'${d.symbol}',name:'${d.name}'})`
-                        : `selectPair({symbol:'${d.symbol}',name:'${d.name}',base:'${d.base}'})`;
+                        ? `currentFinamCategory='${d.cat}'; setChartTimeframe('${divTf}'); selectPair({symbol:'${d.symbol}',name:'${d.name}'})`
+                        : `setChartTimeframe('${divTf}'); selectPair({symbol:'${d.symbol}',name:'${d.name}',base:'${d.base}'})`;
                     return `<div class="div-scan-item ${d.type}" onclick="${onclick}">
                         <span class="div-scan-badge">${d.type === 'bull' ? '▲' : '▼'}</span>
                         <span class="div-scan-name">${d.name}</span>
