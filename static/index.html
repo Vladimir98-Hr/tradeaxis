@@ -6170,13 +6170,15 @@
         return r;
     };
 
+    // Затравка первым баром (как ta.ema на TradingView), а не ожидание полных
+    // `len` баров под SMA-затравку — иначе на фиксированном окне истории
+    // длиннопериодные EMA (100/200) рисуются только на хвосте графика или
+    // вовсе не рисуются, если баров меньше `len` (см. EMA Setup).
     IND._ema = function(arr, len) {
         const k = 2 / (len + 1), r = new Array(arr.length).fill(null);
         let ema = null;
         for (let i = 0; i < arr.length; i++) {
-            if (i < len - 1) continue;
-            if (ema === null) { let s = 0; for (let j = 0; j < len; j++) s += arr[j]; ema = s / len; }
-            else ema = arr[i] * k + ema * (1 - k);
+            ema = ema === null ? arr[i] : arr[i] * k + ema * (1 - k);
             r[i] = ema;
         }
         return r;
