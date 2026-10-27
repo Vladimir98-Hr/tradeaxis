@@ -290,17 +290,27 @@ async def fetch_ohlcv_finam(symbol: str, timeframe: str = '1d', limit: int = 100
 
             async def _fetch_window(ws: datetime, we: datetime, client: httpx.AsyncClient):
                 async with sem:
-                    data = await _finam_get(
-                        f"/v1/instruments/{symbol}/bars",
-                        params={
-                            "timeframe": tf,
-                            "interval.start_time": ws.strftime('%Y-%m-%dT%H:%M:%SZ'),
-                            "interval.end_time": we.strftime('%Y-%m-%dT%H:%M:%SZ'),
-                        },
-                        retries=3,
-                        client=client,
-                    )
-                    return data.get("bars", [])
+                    try:
+                        data = await _finam_get(
+                            f"/v1/instruments/{symbol}/bars",
+                            params={
+                                "timeframe": tf,
+                                "interval.start_time": ws.strftime('%Y-%m-%dT%H:%M:%SZ'),
+                                "interval.end_time": we.strftime('%Y-%m-%dT%H:%M:%SZ'),
+                            },
+                            retries=3,
+                            client=client,
+                        )
+                        return data.get("bars", [])
+                    except Exception:
+                        # Самые старые окна у низколиквидных инструментов (напр.
+                        # непрерывные фьючерсы на мягкое сырьё) иногда не имеют
+                        # данных так глубоко — Finam отвечает ошибкой на то
+                        # конкретное окно. Раньше это роняло всю загрузку графика
+                        # (gather без return_exceptions), хотя остальные окна
+                        # успешно вернули данные. Деградируем до меньшей глубины
+                        # истории вместо жёсткого отказа.
+                        return []
 
             async with httpx.AsyncClient(timeout=20) as shared_client:
                 pages = await asyncio.gather(*[_fetch_window(ws, we, shared_client) for ws, we in windows])
