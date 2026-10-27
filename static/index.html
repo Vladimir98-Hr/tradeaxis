@@ -6816,6 +6816,34 @@
         authToken = null;
         currentUser = null;
         localStorage.removeItem('auth_token');
+
+        // Полная очистка персональных данных этого браузера — после выхода
+        // гостевой режим не должен показывать ничей след (вотчлист, журнал,
+        // планы, рисунки, мультиграфик и т.п. прошлой сессии).
+        DEVICE_STATE_KEYS.forEach(k => localStorage.removeItem(k));
+        ['crypto', 'finam'].forEach(market => {
+            localStorage.removeItem('watchlist_' + market);
+            localStorage.removeItem('lastTimeframe_' + market);
+            localStorage.removeItem(`${VOL_LOG_KEY}_${market}`);
+            localStorage.removeItem(`${EMA_LOG_KEY}_${market}`);
+        });
+        localStorage.removeItem('cryptoSettings');
+
+        for (const k in drawingsStore) delete drawingsStore[k];
+        ipFavorites = new Set();
+        ipRecent = [];
+        mcSymbols = [];
+        _journalCache = [];
+        if (mcOpen) closeMultiChart();
+        resetSession();
+
+        document.body.dataset.theme = 'dark';
+        updateThemeIcon();
+        applyThemeToCharts();
+        redrawCanvas();
+        if (typeof jRender === 'function') jRender();
+        if (typeof wlRender === 'function') wlRender();
+
         _updateAuthUI();
         closeChat();
         const dd = document.getElementById('profileDropdown');
@@ -6950,10 +6978,11 @@
             const r = await _authFetch('/user/settings');
             if (!r.ok) return;
             const { settings } = await r.json();
-            if (settings && Object.keys(settings).length > 0) {
-                localStorage.setItem('cryptoSettings', JSON.stringify(settings));
-                if (typeof applySettings === 'function') applySettings(settings);
-            }
+            // Перезаписываем локальные настройки ответом сервера всегда, а не только
+            // если там что-то есть — иначе пустой аккаунт наследует настройки,
+            // оставшиеся в этом браузере от предыдущего вошедшего пользователя.
+            localStorage.setItem('cryptoSettings', JSON.stringify(settings || {}));
+            if (typeof applySettings === 'function') applySettings(settings || {});
         } catch {}
     }
 
@@ -6963,20 +6992,22 @@
             const r = await _authFetch('/user/watchlist');
             if (!r.ok) return;
             const { items } = await r.json();
-            if (items && items.length > 0) {
-                const byMarket = {};
-                items.forEach(it => {
-                    const sym = it.symbol;
-                    const base = sym.endsWith('USDT') ? sym.slice(0, -4) : sym;
-                    const name = sym.endsWith('USDT') ? base + '/USDT' : sym;
-                    if (!byMarket[it.market]) byMarket[it.market] = [];
-                    byMarket[it.market].push({ symbol: sym, name, base });
-                });
-                Object.entries(byMarket).forEach(([market, list]) => {
-                    localStorage.setItem('watchlist_' + market, JSON.stringify(list));
-                });
-                if (typeof wlRender === 'function') wlRender();
-            }
+            // Перезаписываем локальный вотчлист ответом сервера всегда (в т.ч. пустым
+            // списком для рынка, где у аккаунта ничего не сохранено) — иначе пустой
+            // аккаунт наследует вотчлист, оставшийся в этом браузере от предыдущего
+            // вошедшего пользователя.
+            const byMarket = { crypto: [], finam: [] };
+            (items || []).forEach(it => {
+                const sym = it.symbol;
+                const base = sym.endsWith('USDT') ? sym.slice(0, -4) : sym;
+                const name = sym.endsWith('USDT') ? base + '/USDT' : sym;
+                if (!byMarket[it.market]) byMarket[it.market] = [];
+                byMarket[it.market].push({ symbol: sym, name, base });
+            });
+            Object.entries(byMarket).forEach(([market, list]) => {
+                localStorage.setItem('watchlist_' + market, JSON.stringify(list));
+            });
+            if (typeof wlRender === 'function') wlRender();
         } catch {}
     }
 

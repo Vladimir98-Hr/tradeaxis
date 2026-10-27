@@ -83,6 +83,17 @@
   .btn-solid{ background:var(--signal); border-color:var(--signal); color:#f3f5f1; }
   .btn:hover{ transform:translateY(-1px); }
   .btn:focus-visible{ outline:2px solid var(--structure); outline-offset:2px; }
+  .nav-toggle{
+    display:none; background:none; border:none; font-size:1.5rem; line-height:1; cursor:pointer;
+    color:var(--ink); padding:.2rem .3rem;
+  }
+  @media (max-width:760px){
+    nav.top{ flex-wrap:wrap; }
+    .nav-toggle{ display:block; }
+    .nav-panel{ display:none; flex-basis:100%; flex-direction:column; align-items:flex-start; gap:1.2rem; margin-top:1.2rem; }
+    .nav-panel.open{ display:flex; }
+    .nav-links{ flex-direction:column; gap:1.1rem; }
+  }
 
   /* -------- Hero -------- */
   .hero{ position:relative; padding:6.5rem 6vw 5rem; overflow:hidden; }
@@ -195,21 +206,24 @@
 
 <nav class="top">
   <div class="brand"><span class="mark"></span>Force of Momentum</div>
-  <div class="nav-links">
-    <a href="#problem">Проблема</a>
-    <a href="#product">Платформа</a>
-    <a href="#how">Как это работает</a>
-    <a href="#pricing">Тарифы</a>
+  <button class="nav-toggle" id="navToggle" aria-label="Открыть меню" aria-expanded="false" aria-controls="navPanel">&#9776;</button>
+  <div class="nav-panel" id="navPanel">
+    <div class="nav-links">
+      <a href="#problem">Проблема</a>
+      <a href="#product">Платформа</a>
+      <a href="#how">Как это работает</a>
+      <a href="#pricing">Тарифы</a>
+    </div>
+    <a href="/app?auth=login" class="btn">Войти</a>
+    <a href="/app?auth=register" class="btn btn-solid">Зарегистрироваться</a>
   </div>
-  <a href="/app?auth=login" class="btn">Войти</a>
-  <a href="/app?auth=register" class="btn btn-solid">Зарегистрироваться</a>
 </nav>
 
 <header class="hero">
   <div class="hero-grid">
     <div>
       <div class="eyebrow">Risk-first trading platform</div>
-      <h1>Торгуйте так, будто <em>завтра</em> снова нужно будет торговать.</h1>
+      <h1>Если выпадет орёл — я выигрываю. Если решка — <em>я почти ничего не теряю</em>.</h1>
       <p class="sub">Force of Momentum — платформа принятия торгового решения для криптовалютного рынка и Московской биржи. Один цикл: план сделки → расчёт риска → исполнение → честный разбор ошибок. Не сигналы на удачу — система, которая не даёт нарушать то, что вы и так знаете.</p>
       <div class="cta-row">
         <a href="/app?auth=register" class="btn btn-solid">Создать аккаунт бесплатно</a>
@@ -374,13 +388,24 @@
   if(!canvas) return;
   var ctx = canvas.getContext('2d');
   var dpr = window.devicePixelRatio || 1;
+  var lastProgress = 0;
   function size(){
     var r = canvas.getBoundingClientRect();
     canvas.width = r.width*dpr; canvas.height = r.height*dpr;
     ctx.setTransform(dpr,0,0,dpr,0,0);
   }
   size();
-  window.addEventListener('resize', size);
+  // На мобильных финальная раскладка (грид в одну колонку, карточка под
+  // текстом) может ещё не устояться в момент выполнения этого скрипта —
+  // getBoundingClientRect() выше иногда отдаёт нулевую/неверную ширину, и
+  // без ResizeObserver canvas так и остаётся пустым, потому что на мобильном
+  // событие window resize обычно не происходит само по себе.
+  if('ResizeObserver' in window){
+    var ro = new ResizeObserver(function(){ size(); draw(lastProgress || 1); });
+    ro.observe(canvas);
+  } else {
+    window.addEventListener('resize', size);
+  }
 
   var reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
@@ -405,6 +430,7 @@
   }
 
   function draw(progress){
+    lastProgress = progress;
     var r = canvas.getBoundingClientRect();
     var w = r.width, h = r.height;
     ctx.clearRect(0,0,w,h);
@@ -470,6 +496,26 @@
     entries.forEach(function(e){ if(e.isIntersecting){ e.target.classList.add('in'); io.unobserve(e.target); } });
   }, { threshold:.15 });
   items.forEach(function(el){ io.observe(el); });
+})();
+</script>
+
+<script>
+(function(){
+  var toggle = document.getElementById('navToggle');
+  var panel = document.getElementById('navPanel');
+  if(!toggle || !panel) return;
+  toggle.addEventListener('click', function(){
+    var open = panel.classList.toggle('open');
+    toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+    toggle.innerHTML = open ? '&#10005;' : '&#9776;';
+  });
+  panel.querySelectorAll('a').forEach(function(a){
+    a.addEventListener('click', function(){
+      panel.classList.remove('open');
+      toggle.setAttribute('aria-expanded', 'false');
+      toggle.innerHTML = '&#9776;';
+    });
+  });
 })();
 </script>
 </body>
