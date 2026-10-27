@@ -6728,23 +6728,31 @@
         return fetch(url, opts);
     }
 
+    function _stripAuthParamFromUrl() {
+        const params = new URLSearchParams(location.search);
+        if (!params.has('auth')) return;
+        params.delete('auth');
+        const rest = params.toString();
+        history.replaceState(null, '', location.pathname + (rest ? '?' + rest : '') + location.hash);
+    }
+
     function _openAuthFromLandingLink() {
         // Переход с публичного лендинга (?auth=register|login) сразу открывает
         // нужную вкладку формы поверх рабочего стола — пользователь не должен
         // искать кнопку входа сам после клика "Зарегистрироваться" на лендинге.
+        // Вызывается только когда УЖЕ известно, что пользователь не авторизован
+        // (см. initAuth) — иначе уже залогиненного каждый раз встречала бы
+        // ненужная форма входа поверх его рабочего стола.
         const params = new URLSearchParams(location.search);
         const authParam = params.get('auth');
         if (authParam === 'register' || authParam === 'login') {
             openAuthModal(authParam);
-            params.delete('auth');
-            const rest = params.toString();
-            history.replaceState(null, '', location.pathname + (rest ? '?' + rest : '') + location.hash);
+            _stripAuthParamFromUrl();
         }
     }
 
     async function initAuth() {
-        _openAuthFromLandingLink();
-        if (!authToken) { _updateAuthUI(); return; }
+        if (!authToken) { _updateAuthUI(); _openAuthFromLandingLink(); return; }
         try {
             const r = await fetch('/auth/me', { headers: { 'Authorization': 'Bearer ' + authToken } });
             if (r.ok) {
@@ -6753,12 +6761,16 @@
                 await syncSettingsFromServer();
                 await syncWatchlistFromServer();
                 await syncDeviceStateFromServer();
+                // Уже залогинен — ?auth=login|register с лендинга тут ни к чему,
+                // просто убираем параметр из адресной строки без всплывающей формы.
+                _stripAuthParamFromUrl();
             } else {
                 authToken = null;
                 localStorage.removeItem('auth_token');
                 _updateAuthUI();
+                _openAuthFromLandingLink();
             }
-        } catch { _updateAuthUI(); }
+        } catch { _updateAuthUI(); _openAuthFromLandingLink(); }
     }
 
     async function submitLogin() {
