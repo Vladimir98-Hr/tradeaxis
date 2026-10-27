@@ -6913,12 +6913,20 @@
         { selector: '#emaScanCard', title: 'Сканер MA/EMA', text: 'Отслеживает пересечения скользящих средних — классический сигнал смены тренда.' },
         { selector: '#openPlansCard', title: 'Открытые планы', text: 'Сюда попадают сделки, сохранённые из калькулятора риска как план — они ждут закрытия и разбора. Пока сделок нет, здесь так и будет написано.' },
         { selector: '#journalCard', title: 'Журнал сделок', text: 'После закрытия сделки она попадает сюда с полным разбором. «Келли» считает оптимальный размер ставки по вашей статистике, «Дисциплина» показывает, насколько вы следуете своим же торговым планам.' },
+        { selector: '#onbHelpBtn', title: 'Повторить тур в любой момент', text: 'Пропустили тур или хотите пройти его заново — нажимайте сюда. Заодно заново покажется и подсказка про Finam, когда вы туда перейдёте.' },
     ];
     let _onbStepIdx = 0;
 
-    function startOnboardingTour() {
+    // force=true — запуск вручную с кнопки-подсказки #onbHelpBtn: игнорирует
+    // onboardingDone и заодно сбрасывает подсказку про Finam, чтобы при следующем
+    // переходе туда она тоже показалась заново ("всё абсолютно заново").
+    function startOnboardingTour(force) {
         if (!currentUser || currentUser.is_admin) return;
-        if (localStorage.getItem('onboardingDone')) return;
+        if (!force && localStorage.getItem('onboardingDone')) return;
+        if (force) {
+            localStorage.removeItem('finamNoticeShown');
+            scheduleDeviceStateSync();
+        }
         _onbStepIdx = 0;
         document.getElementById('onbOverlay').style.display = 'block';
         window.addEventListener('resize', _onbReposition);

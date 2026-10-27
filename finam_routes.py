@@ -15,7 +15,6 @@ from config import FINAM_SYMBOLS, FINAM_INSTRUMENTS, FINAM_SECRET_TOKEN
 from cache import get_cache_key, get_cached_data, set_cached_data, get_or_compute
 from indicators import calculate_alligator, calculate_ao, calculate_bw_mfi, find_fractals, find_divergences, calculate_bollinger_bands
 from finam import fetch_ohlcv_finam, fetch_finam_assets
-from routes import _check_last_bar_divergence
 
 router = APIRouter(prefix="/finam", tags=["finam"])
 
@@ -174,50 +173,6 @@ async def _all_instruments() -> list:
     for group in per_category:
         instruments.extend(group)
     return instruments
-
-
-@router.get("/scan/divergences")
-async def finam_scan_divergences(timeframe: str = "1d", current_user: User = Depends(get_current_user)):
-    """
-    Сканер дивергентных баров по Finam-инструментам — аналог /scan/divergences
-    для крипто (routes.py), на curated-списке (без живого расширения каталога,
-    чтобы не множить запросы к Finam сверх необходимого).
-    """
-    cache_ttl = 3600 if timeframe in ('1d', '1w') else 900
-    key = get_cache_key("finam_scan", timeframe, 0, "scan_div")
-    sem = asyncio.Semaphore(3)  # Finam чувствителен к параллельной нагрузке — см. finam.py
-
-    async def scan_one(inst):
-        async with sem:
-            try:
-                df = await fetch_ohlcv_finam(inst['symbol'], timeframe, 200, deep_history=False)
-                if len(df) < 10:
-                    return None
-                ao = calculate_ao(df)
-                is_bull, is_bear = _check_last_bar_divergence(df, ao)
-                if not is_bull and not is_bear:
-                    return None
-                return {
-                    "symbol": inst['symbol'], "name": inst['name'], "base": inst['base'],
-                    "cat": inst['cat'], "type": "bull" if is_bull else "bear",
-                    "close": float(df['Close'].iloc[-1]),
-                }
-            except Exception:
-                return None
-
-    async def compute():
-        per_category = [_curated_instruments(c) for c in _ALL_CATEGORIES]
-        instruments = [i for group in per_category for i in group]
-        results = await asyncio.gather(*[scan_one(i) for i in instruments])
-        divergences = [r for r in results if r]
-        return {
-            "timeframe": timeframe,
-            "count": len(divergences),
-            "scanned": len(instruments),
-            "divergences": divergences,
-        }
-
-    return await get_or_compute(key, compute, ttl=cache_ttl)
 
 
 # Прогреваем кеш только для дневного/недельного графика — они самые тяжёлые при
