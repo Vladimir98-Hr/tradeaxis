@@ -105,7 +105,10 @@ def _send_email_sync(to_email: str, subject: str, body: str) -> None:
 
 async def send_reset_email(to_email: str, token: str) -> None:
     """Отправляет письмо со ссылкой сброса пароля. Если SMTP не настроен — логирует ссылку в консоль."""
-    link = f"{FRONTEND_URL}/?reset_token={token}"
+    # /app, а не / — ведёт сразу на рабочую платформу с JS-обработчиком
+    # reset_token, а не на публичный лендинг, где пользователь, не помнящий
+    # пароль, не мог ни войти, ни снова зарегистрироваться (аккаунт уже есть).
+    link = f"{FRONTEND_URL}/app?reset_token={token}"
     subject = "Force of Momentum — восстановление пароля"
     body = (
         f"Вы запросили восстановление пароля.\n\n"
