@@ -3970,6 +3970,12 @@
         const list = document.getElementById('emaScanList');
         const info = document.getElementById('emaScanInfo');
         info.textContent = emaSignalLog.length ? `Журнал: ${emaSignalLog.length} сигналов` : '';
+        // Весь журнал сигналов накоплен на одном таймфрейме — emaScanTimeframe
+        // (как и divScanTimeframe у дивергенций). Без принудительного переключения
+        // клик открывал нужную монету на ТЕКУЩЕМ таймфрейме графика, а не на том,
+        // где сигнал реально сработал — сигнал на дневках мог просто не быть
+        // виден на часовике. См. тот же фикс для сканера дивергенций.
+        const emaTf = loadSettings().emaScanTimeframe || '15m';
         list.innerHTML = emaSignalLog.length
             ? emaSignalLog.map(p => {
                 const flash = freshKeys.has(p._key) ? ' vol-flash' : '';
@@ -3980,7 +3986,7 @@
                 const touchBadges = (p.touches || [])
                     .map(period => `<span class="div-scan-badge vol-info">EMA${period}</span>`)
                     .join('');
-                return `<div class="div-scan-item ema-scan-item${flash}" onclick="selectPair({symbol:'${p.symbol}',name:'${p.name}',base:'${p.base}'})">
+                return `<div class="div-scan-item ema-scan-item${flash}" onclick="setChartTimeframe('${emaTf}'); selectPair({symbol:'${p.symbol}',name:'${p.name}',base:'${p.base}'})">
                     <span class="div-scan-name">${p.name}<span class="vol-log-time">${t}</span></span>
                     <div class="ema-scan-badges">${crossBadge}${touchBadges}</div>
                 </div>`;
