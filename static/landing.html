@@ -75,6 +75,9 @@
   .nav-links{ display:flex; gap:2rem; font-family:"Segoe UI",system-ui,sans-serif; font-size:.86rem; color:var(--slate); }
   .nav-links a{ text-decoration:none; }
   .nav-links a:hover{ color:var(--ink); }
+  /* На десктопе nav-panel — просто строка (ссылки + кнопки рядом, справа от
+     лого); на мобильном превращается в выпадающее меню (см. медиа-запрос ниже). */
+  .nav-panel{ display:flex; align-items:center; gap:2.2rem; }
   .btn{
     font-family:"Segoe UI",system-ui,sans-serif; font-weight:600; font-size:.86rem;
     padding:.6rem 1.3rem; border-radius:2px; border:1px solid var(--ink); cursor:pointer;
