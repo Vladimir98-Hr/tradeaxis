@@ -1441,7 +1441,7 @@
             <svg viewBox="0 0 24 24"><path d="M3.5 18.49l6-6.01 4 4L22 6.92l-1.41-1.41-7.09 7.97-4-4L2 16.99z"/></svg>
         </div>
         <div class="sidebar-icons">
-            <button class="sidebar-btn active" title="Графики" onclick="openMultiChart()">
+            <button class="sidebar-btn active" id="multiChartBtn" title="Графики" onclick="openMultiChart()">
                 <svg viewBox="0 0 24 24"><path d="M3 13h2v-2H3v2zm0 4h2v-2H3v2zm0-8h2V7H3v2zm4 4h14v-2H7v2zm0 4h14v-2H7v2zM7 7v2h14V7H7z"/></svg>
             </button>
             <button class="sidebar-btn" id="riskCalcBtn" title="Калькулятор риска" onclick="openRiskCalc()">
@@ -1456,6 +1456,9 @@
             </button>
             <button class="sidebar-btn" id="settingsBtn" title="Настройки" onclick="openSettings()">
                 <svg viewBox="0 0 24 24"><path d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58c.18-.14.23-.41.12-.61l-1.92-3.32c-.12-.22-.37-.29-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54c-.04-.24-.24-.41-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.07.62-.07.94s.02.64.07.94l-2.03 1.58c-.18.14-.23.41-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"/></svg>
+            </button>
+            <button class="sidebar-btn" id="onbHelpBtn" title="Обучающий тур" onclick="startOnboardingTour(true)" style="display:none">
+                <svg viewBox="0 0 24 24"><path d="M11 18h2v-2h-2v2zm1-16C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm0-14c-2.21 0-4 1.79-4 4h2c0-1.1.9-2 2-2s2 .9 2 2c0 2-3 1.75-3 5h2c0-2.25 3-2.5 3-5 0-2.21-1.79-4-4-4z"/></svg>
             </button>
             <button class="sidebar-btn" title="Информация" onclick="openInfoModal()">
                 <svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"/></svg>
@@ -1737,7 +1740,7 @@
             </div>
         </div>
         <!-- Открытые планы (ожидают пост-разбора) -->
-        <div class="card div-scan-card">
+        <div class="card div-scan-card" id="openPlansCard">
             <div class="div-scan-header">
                 <span>Открытые планы</span>
             </div>
@@ -1746,7 +1749,7 @@
             </div>
         </div>
         <!-- Журнал сделок (закрытые, с полным разбором) -->
-        <div class="card div-scan-card">
+        <div class="card div-scan-card" id="journalCard">
             <div class="div-scan-header">
                 <span>Журнал сделок</span>
                 <span id="journalCounter" style="font-size:11px;font-weight:400;color:var(--text-secondary)">0 закрыто</span>
@@ -3163,6 +3166,7 @@
         if (volCard) volCard.style.display = market === 'finam' ? 'none' : '';
         if (emaCard) emaCard.style.display = market === 'finam' ? 'none' : '';
         if (market === 'finam') {
+            _maybeShowFinamNotice();
             _rcCurInstrument = null;
             _rcResetCalcOnInstrumentChange();
             if (tickerInterval) clearInterval(tickerInterval);
@@ -3743,6 +3747,7 @@
     }
     function _volSaveLog() {
         try { localStorage.setItem(_volLogKey(), JSON.stringify(volSignalLog.slice(0, VOL_LOG_MAX))); } catch {}
+        scheduleDeviceStateSync();
     }
     function volLogClear() {
         volSignalLog = [];
@@ -3899,6 +3904,7 @@
     }
     function _emaSaveLog() {
         try { localStorage.setItem(_emaLogKey(), JSON.stringify(emaSignalLog.slice(0, EMA_LOG_MAX))); } catch {}
+        scheduleDeviceStateSync();
     }
     function emaLogClear() {
         emaSignalLog = [];
@@ -5424,7 +5430,9 @@
         const open = plans.filter(p => !reviewedIds.has(p.id));
         const list = document.getElementById('openPlansList');
         if (!open.length) {
-            list.innerHTML = '<div class="div-scan-empty">Нет открытых планов</div>';
+            list.innerHTML = authToken
+                ? '<div class="div-scan-empty">Нет открытых планов</div>'
+                : '<div class="div-scan-empty">Войдите в аккаунт, чтобы видеть журнал</div>';
         } else {
             list.innerHTML = open.map(p => `
                 <div class="journal-item">
@@ -5521,7 +5529,9 @@
         document.getElementById('journalCounter').textContent = reviews.length + ' закрыто';
         const list = document.getElementById('journalList');
         if (!reviews.length) {
-            list.innerHTML = '<div class="div-scan-empty">Нет закрытых сделок</div>';
+            list.innerHTML = authToken
+                ? '<div class="div-scan-empty">Нет закрытых сделок</div>'
+                : '<div class="div-scan-empty">Войдите в аккаунт, чтобы видеть журнал</div>';
             return;
         }
         list.innerHTML = reviews.map(r => {
@@ -6821,6 +6831,7 @@
             localStorage.setItem('auth_token', authToken);
             closeAuthModal();
             _updateAuthUI();
+            startOnboardingTour();
         } catch { err.textContent = 'Ошибка соединения'; }
     }
 
@@ -6885,6 +6896,112 @@
         if (finamTab) finamTab.style.display = currentUser ? '' : 'none';
         const draftsBtn = document.getElementById('draftsBtn');
         if (draftsBtn) draftsBtn.style.display = (currentUser && currentUser.is_admin) ? '' : 'none';
+        const onbHelpBtn = document.getElementById('onbHelpBtn');
+        if (onbHelpBtn) onbHelpBtn.style.display = (currentUser && !currentUser.is_admin) ? '' : 'none';
+    }
+
+    // ============================================================
+    // Обучающий тур для новых пользователей (не показывается админу)
+    // ============================================================
+    const ONBOARDING_STEPS = [
+        { selector: '#marketTabs', title: 'Крипто и Finam', text: 'Платформа работает с двумя рынками: «Крипто» — пары с биржи OKX, «Finam» — акции и другие инструменты Московской биржи через брокера Finam. Переключайтесь между ними этими вкладками.' },
+        { selector: '#multiChartBtn', title: 'Мультиграфик', text: 'Открывает сетку из нескольких графиков одновременно — удобно следить сразу за несколькими парами или акциями.' },
+        { selector: '#riskCalcBtn', title: 'Калькулятор риска', text: 'Считает, сколько можно рисковать на одной сделке и за всю сессию исходя из вашего капитала, помогает поставить стоп и тейк и сохраняет план сделки в журнал.' },
+        { selector: '#drawPanelBtn', title: 'Инструменты рисования', text: 'Линии, уровни, фигуры, линейка — прямо на графике. Рисунок сохраняется и виден на любом таймфрейме этого инструмента, как в TradingView.' },
+        { selector: '#divScanCard', title: 'Сканер дивергенций', text: 'Ищет расхождение между ценой и осциллятором AO — ранний сигнал возможного разворота. Запускается вручную кнопкой «Сканировать».' },
+        { selector: '#volScanCard', title: 'Сканер волатильности', text: 'Показывает монеты, которые прямо сейчас начинают резко двигаться — по ускорению цены и аномальному объёму. Обновляется автоматически.' },
+        { selector: '#emaScanCard', title: 'Сканер MA/EMA', text: 'Отслеживает пересечения скользящих средних — классический сигнал смены тренда.' },
+        { selector: '#openPlansCard', title: 'Открытые планы', text: 'Сюда попадают сделки, сохранённые из калькулятора риска как план — они ждут закрытия и разбора. Пока сделок нет, здесь так и будет написано.' },
+        { selector: '#journalCard', title: 'Журнал сделок', text: 'После закрытия сделки она попадает сюда с полным разбором. «Келли» считает оптимальный размер ставки по вашей статистике, «Дисциплина» показывает, насколько вы следуете своим же торговым планам.' },
+    ];
+    let _onbStepIdx = 0;
+
+    function startOnboardingTour() {
+        if (!currentUser || currentUser.is_admin) return;
+        if (localStorage.getItem('onboardingDone')) return;
+        _onbStepIdx = 0;
+        document.getElementById('onbOverlay').style.display = 'block';
+        window.addEventListener('resize', _onbReposition);
+        _onbShowStep();
+    }
+
+    // Пропускает шаги, чей элемент сейчас не виден (например, карточка скрыта
+    // для текущего рынка) — ищет ближайший видимый шаг начиная с fromIdx.
+    function _onbNextVisibleIdx(fromIdx) {
+        for (let i = fromIdx; i < ONBOARDING_STEPS.length; i++) {
+            const el = document.querySelector(ONBOARDING_STEPS[i].selector);
+            if (el && el.offsetParent !== null) return i;
+        }
+        return -1;
+    }
+
+    function _onbShowStep() {
+        const idx = _onbNextVisibleIdx(_onbStepIdx);
+        if (idx === -1) { _onbFinish(); return; }
+        _onbStepIdx = idx;
+        const step = ONBOARDING_STEPS[idx];
+        const el = document.querySelector(step.selector);
+        if (el.scrollIntoView) el.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+        document.getElementById('onbProgress').textContent = `Шаг ${idx + 1} из ${ONBOARDING_STEPS.length}`;
+        document.getElementById('onbTitle').textContent = step.title;
+        document.getElementById('onbText').textContent = step.text;
+        document.getElementById('onbNextBtn').textContent = idx === ONBOARDING_STEPS.length - 1 ? 'Готово' : 'Далее';
+        requestAnimationFrame(_onbReposition);
+    }
+
+    function _onbReposition() {
+        if (document.getElementById('onbOverlay').style.display === 'none') return;
+        const step = ONBOARDING_STEPS[_onbStepIdx];
+        const el = step && document.querySelector(step.selector);
+        if (!el) return;
+        const rect = el.getBoundingClientRect();
+        const pad = 6;
+        const hl = document.getElementById('onbHighlight');
+        hl.style.top = (rect.top - pad) + 'px';
+        hl.style.left = (rect.left - pad) + 'px';
+        hl.style.width = (rect.width + pad * 2) + 'px';
+        hl.style.height = (rect.height + pad * 2) + 'px';
+
+        const card = document.getElementById('onbCard');
+        const cardW = card.offsetWidth || 280;
+        const cardH = card.offsetHeight || 150;
+        const margin = 14;
+        let left, top;
+        if (rect.right + margin + cardW < window.innerWidth) {
+            left = rect.right + margin;
+            top = Math.min(Math.max(rect.top, margin), window.innerHeight - cardH - margin);
+        } else if (rect.left - margin - cardW > 0) {
+            left = rect.left - margin - cardW;
+            top = Math.min(Math.max(rect.top, margin), window.innerHeight - cardH - margin);
+        } else if (rect.bottom + margin + cardH < window.innerHeight) {
+            top = rect.bottom + margin;
+            left = Math.min(Math.max(rect.left, margin), window.innerWidth - cardW - margin);
+        } else {
+            top = Math.max(rect.top - margin - cardH, margin);
+            left = Math.min(Math.max(rect.left, margin), window.innerWidth - cardW - margin);
+        }
+        card.style.left = left + 'px';
+        card.style.top = top + 'px';
+    }
+
+    function onbNext() { _onbStepIdx++; _onbShowStep(); }
+    function onbSkip() { _onbFinish(); }
+
+    function _onbFinish() {
+        document.getElementById('onbOverlay').style.display = 'none';
+        window.removeEventListener('resize', _onbReposition);
+        localStorage.setItem('onboardingDone', '1');
+        scheduleDeviceStateSync();
+    }
+
+    // Разовая подсказка при первом переходе на Finam — сканеры там не работают
+    // (лимиты Мосбиржи на запросы), и это НЕ ошибка на стороне пользователя.
+    function _maybeShowFinamNotice() {
+        if (!currentUser || currentUser.is_admin) return;
+        if (localStorage.getItem('finamNoticeShown')) return;
+        localStorage.setItem('finamNoticeShown', '1');
+        scheduleDeviceStateSync();
+        document.getElementById('finamNotice').style.display = 'block';
     }
 
     function openAuthModal(tab) {
@@ -7043,6 +7160,9 @@
         'theme', 'lastMarket', 'lastTimeframe_crypto', 'lastTimeframe_finam',
         'rcCapitalPersist', 'rcSessionState', 'fxActiveIndicators',
         'mc_syms_crypto', 'mc_syms_finam', 'ipFavorites', 'ipRecent', 'drawingsStore',
+        'onboardingDone', 'finamNoticeShown',
+        'volSignalLog_v1_crypto', 'volSignalLog_v1_finam',
+        'emaSignalLog_v1_crypto', 'emaSignalLog_v1_finam',
     ];
 
     function _collectDeviceState() {
@@ -8073,6 +8193,30 @@
 
 <!-- Затемнение для мобильных выдвигаемых панелей -->
 <div id="mobBackdrop" class="mob-backdrop" onclick="mobCloseAll()"></div>
+
+<!-- Обучающий тур для новых пользователей (не показывается админу) -->
+<div id="onbOverlay" style="display:none;position:fixed;inset:0;z-index:5000;">
+    <div id="onbHighlight" style="position:absolute;border-radius:8px;box-shadow:0 0 0 9999px rgba(0,0,0,.65);pointer-events:none;transition:top .25s ease,left .25s ease,width .25s ease,height .25s ease;"></div>
+    <div id="onbCard" style="position:absolute;background:var(--bg-color);border:1px solid var(--border-color);border-radius:10px;padding:16px;width:280px;max-width:calc(100vw - 24px);box-shadow:0 8px 28px rgba(0,0,0,.45);transition:top .25s ease,left .25s ease;">
+        <div style="font-size:11px;color:var(--text-secondary);margin-bottom:6px" id="onbProgress"></div>
+        <div style="font-weight:700;font-size:15px;margin-bottom:6px;color:var(--text-primary)" id="onbTitle"></div>
+        <div style="font-size:13px;line-height:1.55;color:var(--text-secondary);margin-bottom:14px" id="onbText"></div>
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:8px">
+            <button onclick="onbSkip()" style="background:none;border:none;color:var(--text-secondary);font-size:12px;cursor:pointer;padding:4px 0">Пропустить тур</button>
+            <button onclick="onbNext()" class="div-scan-btn" id="onbNextBtn" style="padding:6px 16px">Далее</button>
+        </div>
+    </div>
+</div>
+
+<!-- Разовая подсказка при первом переходе на Finam -->
+<div id="finamNotice" style="display:none;position:fixed;left:50%;bottom:24px;transform:translateX(-50%);z-index:4500;background:var(--bg-color);border:1px solid var(--border-color);border-radius:10px;padding:14px 16px;max-width:420px;box-shadow:0 8px 28px rgba(0,0,0,.45);">
+    <div style="font-size:13px;line-height:1.55;color:var(--text-primary)">
+        На Finam пока нет сканеров волатильности, дивергенций и MA/EMA — Мосбиржа ограничивает частоту запросов данных, и мы ещё дорабатываем эту часть, чтобы она работала стабильно. Графики, журнал сделок и калькулятор риска уже полноценно работают.
+    </div>
+    <div style="text-align:right;margin-top:10px">
+        <button onclick="document.getElementById('finamNotice').style.display='none'" class="div-scan-btn" style="padding:4px 14px">Понятно</button>
+    </div>
+</div>
 
 <!-- ============================================================
      Информация — презентация платформы Force of Momentum
