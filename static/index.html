@@ -2208,7 +2208,10 @@
                 <div class="rc-label" style="margin-top:8px">Вход против старшего ТФ?</div>
                 <div class="rc-radio-group" id="pr_againstHigherTF"><button class="rc-radio-btn" data-val="yes" onclick="setReviewToggle('againstHigherTF','yes',this)">Да</button><button class="rc-radio-btn active" data-val="no" onclick="setReviewToggle('againstHigherTF','no',this)">Нет</button></div>
 
-                <div class="rc-label" style="margin-top:8px">Комментарий к сделке</div>
+                <div class="rc-label" style="margin-top:8px;display:flex;align-items:center;justify-content:space-between">
+                    <span>Комментарий к сделке</span>
+                    <button type="button" class="rc-mic-btn" id="prComment_mic" onclick="startVoiceInput('prComment', this)" title="Голосовой ввод">&#127908;</button>
+                </div>
                 <textarea class="rc-input" id="prComment" rows="3" style="resize:vertical;font-family:inherit" placeholder="Как прошла сделка, что запомнить..."></textarea>
 
                 <div style="margin-top:10px">
