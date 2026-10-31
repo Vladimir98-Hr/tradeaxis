@@ -18,6 +18,7 @@ from user_routes import router as user_router
 from chat import router as chat_router
 from news_routes import router as news_router
 from feedback_routes import router as feedback_router
+from support_routes import router as support_router, ws_router as support_ws_router
 from draft_routes import router as draft_router
 from finam_routes import router as finam_router
 from database import init_db
@@ -37,8 +38,11 @@ app.add_middleware(
 )
 
 # Подключение маршрутов REST API и WebSocket
-# chat_router должен быть до ws_router, иначе /ws/{symbol} перехватит /ws/chat
+# chat_router/support_ws_router должны быть до ws_router, иначе /ws/{symbol}
+# перехватит /ws/chat и /ws/support
 app.include_router(chat_router)
+app.include_router(support_router)
+app.include_router(support_ws_router)
 app.include_router(api_router)
 app.include_router(ws_router)
 app.include_router(auth_router)

@@ -106,6 +106,32 @@ class Feedback(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
 
+class SupportThread(Base):
+    """Один ряд на пользователя — его переписка 1-на-1 с администратором.
+    acknowledged отмечает только САМО ПЕРВОЕ обращение ("обработано") — дальше
+    это уже обычный чат, статус к отдельным сообщениям не применяется."""
+    __tablename__ = "support_threads"
+
+    user_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.id"), primary_key=True)
+    username: Mapped[str] = mapped_column(String(50), nullable=False)
+    acknowledged: Mapped[bool] = mapped_column(Boolean, default=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    last_message_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+
+class SupportMessage(Base):
+    __tablename__ = "support_messages"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    user_id: Mapped[int] = mapped_column(Integer, ForeignKey("support_threads.user_id"), nullable=False)
+    sender_is_admin: Mapped[bool] = mapped_column(Boolean, default=False)
+    sender_username: Mapped[str] = mapped_column(String(50), nullable=False)
+    message: Mapped[str] = mapped_column(Text, nullable=False)
+    screenshot_path: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    read: Mapped[bool] = mapped_column(Boolean, default=False)  # прочитано ДРУГОЙ стороной
+
+
 class ArticleDraft(Base):
     __tablename__ = "article_drafts"
 

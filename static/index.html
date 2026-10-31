@@ -115,6 +115,16 @@
         }
         .sidebar-btn:hover { background: var(--hover-bg); color: var(--text-primary); }
         .sidebar-btn.active { background: var(--accent-blue); color: #fff; }
+        .sidebar-badge {
+            position: absolute; top: 2px; right: 2px;
+            min-width: 14px; height: 14px; padding: 0 3px;
+            background: #ef5350; color: #fff; border-radius: 8px;
+            font-size: 9px; font-weight: 700; line-height: 14px; text-align: center;
+            display: none; pointer-events: none;
+        }
+        .sidebar-badge.show { display: block; }
+        @keyframes sidebarBlink { 0%,100% { opacity: 1; } 50% { opacity: .25; } }
+        .sidebar-btn.blink { animation: sidebarBlink .9s ease-in-out 4; }
         .sidebar-btn svg { width: 20px; height: 20px; fill: currentColor; }
         .sidebar-bottom {
             margin-top: auto;
@@ -1104,7 +1114,6 @@
         .chat-msg { font-size:12px; line-height:1.5; }
         .chat-msg-author { font-weight:600; color:var(--accent-blue); margin-right:4px; }
         .chat-msg-text { color:var(--text-primary); word-break:break-word; }
-        .chat-msg-time { font-size:10px; color:var(--text-secondary); margin-left:4px; }
         .chat-input-row { display:flex; gap:6px; padding:10px; border-top:1px solid var(--border-color); flex-shrink:0; }
         .chat-input { flex:1; background:rgba(255,255,255,.06); border:1px solid var(--border-color); border-radius:6px; color:var(--text-primary); font-size:12px; padding:7px 10px; outline:none; }
         .chat-input:focus { border-color:var(--accent-blue); }
@@ -1460,17 +1469,18 @@
             <button class="sidebar-btn" id="onbHelpBtn" title="Обучающий тур" onclick="startOnboardingTour(true)" style="display:none">
                 <svg viewBox="0 0 24 24"><path d="M11 18h2v-2h-2v2zm1-16C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm0-14c-2.21 0-4 1.79-4 4h2c0-1.1.9-2 2-2s2 .9 2 2c0 2-3 1.75-3 5h2c0-2.25 3-2.5 3-5 0-2.21-1.79-4-4-4z"/></svg>
             </button>
-            <button class="sidebar-btn" title="Информация" onclick="openInfoModal()">
-                <svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"/></svg>
-            </button>
+            <a class="sidebar-btn" href="https://t.me/Vlabimir_Olegovich" target="_blank" rel="noopener" title="Вопросы — в Telegram">
+                <svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm4.64 6.8l-1.7 8.02c-.12.57-.46.71-.93.44l-2.57-1.89-1.24 1.19c-.14.14-.25.25-.5.25l.18-2.57 4.64-4.19c.2-.18-.04-.28-.31-.1l-5.73 3.61-2.52-.79c-.55-.17-.56-.55.11-.81l9.84-3.79c.46-.17.86.11.71.8-.01.01-.01.01-.01 0z"/></svg>
+            </a>
             <button class="sidebar-btn" id="newsBtn" title="Журнал автора" onclick="openNews()">
                 <svg viewBox="0 0 24 24"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-5 14H7v-2h7v2zm3-4H7v-2h10v2zm0-4H7V7h10v2z"/></svg>
             </button>
             <button class="sidebar-btn" id="chatBtn" title="Чат сообщества" onclick="openChat()">
                 <svg viewBox="0 0 24 24"><path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm0 14H5.17L4 17.17V4h16v12z"/></svg>
             </button>
-            <button class="sidebar-btn" id="feedbackBtn" title="Жалобы и предложения" onclick="openFeedback()">
+            <button class="sidebar-btn" id="feedbackBtn" title="Поддержка" onclick="openFeedback()" style="position:relative">
                 <svg viewBox="0 0 24 24"><path d="M20 2H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h3v4l5.33-4H20c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm-9 9H9V7h2v4zm4 0h-2V7h2v4z"/></svg>
+                <span class="sidebar-badge" id="supportBadge"></span>
             </button>
             <button class="sidebar-btn" id="draftsBtn" title="Черновики статей" onclick="openDrafts()" style="display:none">
                 <svg viewBox="0 0 24 24"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>
@@ -4524,6 +4534,10 @@
             initDrawingOverlay();
             setupResizeObserver();
             _fxRestoreActive();
+            // Соединение держим живым с самого входа на платформу (не только
+            // когда открыта панель поддержки) — иначе уведомление (бейдж +
+            // звук + мигание иконки) не придёт, пока админ просто работает с графиком.
+            if (authToken && currentUser) { _connectSupportWS(); _refreshSupportBadge(); }
             // "Открывать последний рынок" (настройки → Модули) — если включено и в
             // прошлый раз открывали Finam, стартуем сразу с него вместо Крипто.
             const _initSettings = loadSettings();
@@ -7360,7 +7374,6 @@
         const div = document.createElement('div');
         div.className = 'chat-msg';
         div.id = 'chat-msg-' + msg.id;
-        const time = new Date(msg.timestamp).toLocaleTimeString('ru', { hour: '2-digit', minute: '2-digit' });
         const adminBadge = msg.is_admin ? '<span class="chat-admin-badge">Админ</span>' : '';
         const delBtn = (currentUser && currentUser.is_admin)
             ? '<button class="chat-del-btn" title="Удалить" onclick="_deleteChatMsg(' + msg.id + ')">&#10005;</button>'
@@ -7368,7 +7381,6 @@
         div.innerHTML = '<span class="chat-msg-author">' + _esc(msg.username) + '</span>' +
                         adminBadge +
                         '<span class="chat-msg-text">' + _esc(msg.text) + '</span>' +
-                        '<span class="chat-msg-time">' + time + '</span>' +
                         delBtn;
         container.appendChild(div);
     }
@@ -7410,15 +7422,6 @@
     function mobCloseAll() {
         Object.values(_mobPanelSelectors).forEach(sel => document.querySelector(sel).classList.remove('mob-open'));
         document.getElementById('mobBackdrop').classList.remove('active');
-    }
-
-    function openInfoModal() {
-        document.getElementById('infoModal').classList.add('open');
-        document.body.style.overflow = 'hidden';
-    }
-    function closeInfoModal() {
-        document.getElementById('infoModal').classList.remove('open');
-        document.body.style.overflow = '';
     }
 
     async function adminLoadUsers() {
@@ -7522,74 +7525,221 @@
         } catch { alert('Ошибка соединения'); }
     }
 
-    // ── Жалобы и предложения ─────────────────────────────────────
+    // ── Поддержка: чат 1-на-1 с администратором (раньше — "Жалобы и предложения",
+    // одноразовый тикет без ответа; теперь обращение открывает обычную переписку) ──
+    let _supportWS = null;
+    let _supportCurrentUserId = null; // открытый тред на стороне админа; у обычного юзера не используется
+
     function openFeedback() {
         document.getElementById('feedbackPanel').classList.add('open');
-        const form = document.getElementById('feedbackForm');
         const guestMsg = document.getElementById('feedbackGuestMsg');
         const loggedIn = !!(authToken && currentUser);
-        if (form) form.style.display = (loggedIn && !currentUser.is_admin) ? 'flex' : 'none';
-        if (guestMsg) guestMsg.style.display = loggedIn ? 'none' : 'block';
-        if (loggedIn && currentUser.is_admin) loadFeedbackAdmin();
-        else document.getElementById('feedbackAdminList').innerHTML = '';
+        guestMsg.style.display = loggedIn ? 'none' : 'block';
+        if (!loggedIn) {
+            document.getElementById('supportThreadList').style.display = 'none';
+            document.getElementById('supportChatView').style.display = 'none';
+            return;
+        }
+        _connectSupportWS();
+        if (currentUser.is_admin) {
+            _supportShowThreadList();
+        } else {
+            document.getElementById('supportHeaderTitle').textContent = 'Поддержка';
+            document.getElementById('supportThreadList').style.display = 'none';
+            document.getElementById('supportBackBtn').style.display = 'none';
+            document.getElementById('supportChatView').style.display = 'flex';
+            loadSupportChat(null);
+        }
     }
     function closeFeedback() { document.getElementById('feedbackPanel').classList.remove('open'); }
 
-    function feedbackFileChanged(input) {
-        const el = document.getElementById('feedbackFileName');
+    function _supportFileChanged(input) {
+        const el = document.getElementById('supportFileName');
         if (el) el.textContent = input.files.length ? input.files[0].name : '';
     }
 
-    async function submitFeedback() {
-        if (!authToken || !currentUser) return;
-        const text = document.getElementById('feedbackText').value.trim();
-        const fileInput = document.getElementById('feedbackScreenshot');
-        const msgEl = document.getElementById('feedbackMsg');
-        if (!text) { msgEl.style.color = 'var(--red)'; msgEl.textContent = 'Введите текст обращения'; return; }
-        const fd = new FormData();
-        fd.append('message', text);
-        if (fileInput.files.length) fd.append('screenshot', fileInput.files[0]);
-        try {
-            const r = await fetch('/feedback', { method: 'POST', headers: { 'Authorization': 'Bearer ' + authToken }, body: fd });
-            if (!r.ok) { const j = await r.json().catch(() => ({})); msgEl.style.color = 'var(--red)'; msgEl.textContent = j.detail || 'Ошибка отправки'; return; }
-            document.getElementById('feedbackText').value = '';
-            fileInput.value = '';
-            document.getElementById('feedbackFileName').textContent = '';
-            msgEl.style.color = '#26a69a';
-            msgEl.textContent = 'Отправлено, спасибо!';
-        } catch { msgEl.style.color = 'var(--red)'; msgEl.textContent = 'Ошибка соединения'; }
-    }
-
-    async function loadFeedbackAdmin() {
-        const list = document.getElementById('feedbackAdminList');
+    // ── Admin: список тредов ──
+    async function loadSupportThreadList() {
+        const list = document.getElementById('supportThreadList');
         list.innerHTML = '<div style="text-align:center;color:var(--text-secondary);font-size:12px;margin-top:20px">Загрузка...</div>';
         try {
-            const r = await _authFetch('/feedback');
+            const r = await _authFetch('/support/threads');
             const data = await r.json();
-            const items = data.items || [];
+            const items = data.threads || [];
             if (!items.length) { list.innerHTML = '<div style="text-align:center;color:var(--text-secondary);font-size:12px;margin-top:20px">Обращений пока нет</div>'; return; }
-            list.innerHTML = items.map(_renderFeedbackItem).join('');
+            list.innerHTML = items.map(t => {
+                const date = new Date(t.last_message_at).toLocaleString('ru-RU', {day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'});
+                const unread = t.unread_count > 0 ? `<span class="sidebar-badge show" style="position:static;display:inline-block;margin-left:6px">${t.unread_count}</span>` : '';
+                const newLabel = t.acknowledged ? '' : `<span style="font-size:10px;color:#ff9800;margin-left:6px">новое</span>`;
+                return `<div class="news-post" style="cursor:pointer" onclick="_supportOpenThread(${t.user_id}, '${_esc(t.username)}')">
+                    <div class="news-post-meta">${_esc(t.username)} · ${date}${unread}${newLabel}</div>
+                    <div class="news-post-text" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${_esc(t.last_message)}</div>
+                </div>`;
+            }).join('');
         } catch { list.innerHTML = '<div style="color:#e91e63;font-size:12px;text-align:center">Ошибка загрузки</div>'; }
     }
 
-    function _renderFeedbackItem(f) {
-        const date = new Date(f.created_at).toLocaleString('ru-RU', {day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'});
-        const shot = f.screenshot_url ? `<div class="news-media-grid"><img src="${f.screenshot_url}" onclick="window.open('${f.screenshot_url}','_blank')" alt="screenshot"></div>` : '';
-        const resolveBtn = f.status === 'resolved'
-            ? `<span style="font-size:11px;color:#26a69a">✓ Обработано</span>`
-            : `<button class="news-delete-btn" onclick="resolveFeedback(${f.id})">✓ Обработано</button>`;
-        return `<div class="news-post" id="feedback-${f.id}">
-            <div class="news-post-meta">${_esc(f.username)} · ${date}</div>
-            <div class="news-post-text">${_esc(f.message)}</div>
-            ${shot}
-            ${resolveBtn}
-        </div>`;
+    function _supportShowThreadList() {
+        _supportCurrentUserId = null;
+        document.getElementById('supportHeaderTitle').textContent = 'Поддержка';
+        document.getElementById('supportThreadList').style.display = 'flex';
+        document.getElementById('supportChatView').style.display = 'none';
+        loadSupportThreadList();
     }
 
-    async function resolveFeedback(id) {
-        if (!currentUser || !currentUser.is_admin) return;
-        await _authFetch('/feedback/' + id + '/resolve', { method: 'POST' });
-        loadFeedbackAdmin();
+    async function _supportOpenThread(userId, username) {
+        _supportCurrentUserId = userId;
+        document.getElementById('supportThreadList').style.display = 'none';
+        document.getElementById('supportChatView').style.display = 'flex';
+        document.getElementById('supportBackBtn').style.display = 'block';
+        document.getElementById('supportHeaderTitle').textContent = username;
+        await loadSupportChat(userId);
+    }
+
+    // ── Общее: загрузка сообщений (своих — для юзера; чужого треда — для админа) ──
+    async function loadSupportChat(userId) {
+        const msgBox = document.getElementById('supportMessages');
+        msgBox.innerHTML = '<div style="text-align:center;color:var(--text-secondary);font-size:12px;margin-top:20px">Загрузка...</div>';
+        try {
+            const qs = userId ? ('?user_id=' + userId) : '';
+            const r = await _authFetch('/support/messages' + qs);
+            const data = await r.json();
+            msgBox.innerHTML = '';
+            (data.messages || []).forEach(_appendSupportMessage);
+            msgBox.scrollTop = msgBox.scrollHeight;
+            _updateAckUI(data.acknowledged);
+            _refreshSupportBadge();
+        } catch { msgBox.innerHTML = '<div style="color:#e91e63;font-size:12px;text-align:center">Ошибка загрузки</div>'; }
+    }
+
+    // "Обработано" относится только к первому обращению треда, не к каждому
+    // сообщению: админ видит кнопку, пока не нажмёт; пользователь — баннер
+    // подтверждения, но только ПОСЛЕ того как админ нажал, не раньше.
+    function _updateAckUI(acknowledged) {
+        const isAdmin = currentUser && currentUser.is_admin;
+        document.getElementById('supportAckBanner').style.display = (!isAdmin && acknowledged) ? 'block' : 'none';
+        document.getElementById('supportAckAdminRow').style.display = (isAdmin && !acknowledged) ? 'block' : 'none';
+    }
+
+    async function _supportAcknowledgeCurrent() {
+        if (!_supportCurrentUserId) return;
+        await _authFetch('/support/' + _supportCurrentUserId + '/acknowledge', { method: 'POST' });
+        document.getElementById('supportAckAdminRow').style.display = 'none';
+    }
+
+    function _appendSupportMessage(m) {
+        const container = document.getElementById('supportMessages');
+        if (!container) return;
+        const div = document.createElement('div');
+        div.className = 'chat-msg';
+        div.id = 'support-msg-' + m.id;
+        const adminBadge = m.is_admin ? '<span class="chat-admin-badge">Админ</span>' : '';
+        const shot = m.screenshot_url
+            ? `<div class="news-media-grid" style="margin-top:4px"><img src="${m.screenshot_url}" onclick="window.open('${m.screenshot_url}','_blank')" alt="screenshot" style="max-width:100%;border-radius:6px;cursor:pointer"></div>`
+            : '';
+        div.innerHTML = '<span class="chat-msg-author">' + _esc(m.sender_username) + '</span>' +
+                         adminBadge +
+                         '<span class="chat-msg-text">' + _esc(m.text) + '</span>' +
+                         shot;
+        container.appendChild(div);
+    }
+
+    async function sendSupportMessage() {
+        if (!authToken || !currentUser) return;
+        const input = document.getElementById('supportInput');
+        const text = input.value.trim();
+        const fileInput = document.getElementById('supportScreenshot');
+        if (!text) return;
+        if (currentUser.is_admin && !_supportCurrentUserId) return;
+        const fd = new FormData();
+        fd.append('message', text);
+        if (currentUser.is_admin) fd.append('user_id', String(_supportCurrentUserId));
+        if (fileInput.files.length) fd.append('screenshot', fileInput.files[0]);
+        try {
+            const r = await fetch('/support/message', { method: 'POST', headers: { 'Authorization': 'Bearer ' + authToken }, body: fd });
+            if (!r.ok) return;
+            const msg = await r.json();
+            input.value = '';
+            fileInput.value = '';
+            document.getElementById('supportFileName').textContent = '';
+            _appendSupportMessage(msg);
+            const msgBox = document.getElementById('supportMessages');
+            msgBox.scrollTop = msgBox.scrollHeight;
+        } catch {}
+    }
+
+    // ── Реалтайм-доставка + уведомление (бейдж/звук/мигание), см. /ws/support ──
+    function _connectSupportWS() {
+        if (!authToken) return;
+        if (_supportWS && _supportWS.readyState < 2) return;
+        const proto = location.protocol === 'https:' ? 'wss' : 'ws';
+        _supportWS = new WebSocket(`${proto}://${location.host}/ws/support?token=${authToken}`);
+        _supportWS.onmessage = (e) => {
+            let msg;
+            try { msg = JSON.parse(e.data); } catch { return; }
+            if (!currentUser) return;
+            if (msg.type === 'new_message') {
+                const isAdmin = currentUser.is_admin;
+                const fromSelf = msg.is_admin === isAdmin && msg.sender_username === currentUser.username;
+                if (fromSelf) return; // своё сообщение уже отрисовано локально при отправке
+                const panelOpen = document.getElementById('feedbackPanel').classList.contains('open');
+                const viewingThisThread = isAdmin
+                    ? (_supportCurrentUserId === msg.user_id && document.getElementById('supportChatView').style.display !== 'none')
+                    : true; // у обычного пользователя всегда один тред — свой
+                if (panelOpen && viewingThisThread) {
+                    _appendSupportMessage(msg);
+                    const msgBox = document.getElementById('supportMessages');
+                    msgBox.scrollTop = msgBox.scrollHeight;
+                    _authFetch('/support/messages' + (isAdmin ? ('?user_id=' + msg.user_id) : '')); // отмечаем прочитанным на сервере
+                } else {
+                    _supportNotify();
+                    if (panelOpen && isAdmin) loadSupportThreadList();
+                }
+            } else if (msg.type === 'acknowledged') {
+                if (!currentUser.is_admin) {
+                    const panelOpen = document.getElementById('feedbackPanel').classList.contains('open');
+                    if (panelOpen) document.getElementById('supportAckBanner').style.display = 'block';
+                }
+            }
+        };
+        _supportWS.onclose = () => { _supportWS = null; };
+    }
+
+    async function _refreshSupportBadge() {
+        if (!authToken || !currentUser) return;
+        try {
+            const r = await _authFetch('/support/unread_count');
+            const data = await r.json();
+            const badge = document.getElementById('supportBadge');
+            if (!badge) return;
+            if (data.count > 0) { badge.textContent = data.count > 9 ? '9+' : String(data.count); badge.classList.add('show'); }
+            else badge.classList.remove('show');
+        } catch {}
+    }
+
+    let _supportAudioCtx = null;
+    function _supportPlayBeep() {
+        try {
+            if (!_supportAudioCtx) _supportAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            const ctx = _supportAudioCtx;
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            osc.type = 'sine';
+            osc.frequency.value = 880;
+            gain.gain.setValueAtTime(0.0001, ctx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.15, ctx.currentTime + 0.01);
+            gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.35);
+            osc.connect(gain).connect(ctx.destination);
+            osc.start();
+            osc.stop(ctx.currentTime + 0.35);
+        } catch {}
+    }
+
+    function _supportNotify() {
+        _refreshSupportBadge();
+        _supportPlayBeep();
+        const btn = document.getElementById('feedbackBtn');
+        if (btn) { btn.classList.remove('blink'); void btn.offsetWidth; btn.classList.add('blink'); }
     }
 
     // ── Черновики статей (агент) ──────────────────────────────────
@@ -8226,31 +8376,41 @@
   </div>
 </div>
 
-<!-- Жалобы и предложения — панель -->
+<!-- Жалобы и предложения → чат 1-на-1 с администратором -->
 <div class="news-panel" id="feedbackPanel">
   <div class="chat-header">
     <div>
-      <div class="chat-header-title">Жалобы и предложения</div>
+      <div class="chat-header-title" id="supportHeaderTitle">Поддержка</div>
     </div>
     <button class="chat-close" onclick="closeFeedback()">&#10005;</button>
   </div>
-  <!-- Форма отправки — видна всем залогиненным -->
-  <div class="news-admin-form" id="feedbackForm" style="display:none">
-    <textarea class="news-admin-textarea" id="feedbackText" placeholder="Опишите проблему или предложение..." rows="3"></textarea>
-    <div class="news-admin-row">
-      <label style="cursor:pointer;font-size:12px;color:#2196f3;display:flex;align-items:center;gap:4px">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="#2196f3"><path d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z"/></svg>
-        Приложить скриншот
-        <input type="file" id="feedbackScreenshot" accept="image/*" style="display:none" onchange="feedbackFileChanged(this)">
-      </label>
-      <span id="feedbackFileName" style="font-size:11px;color:var(--text-secondary)"></span>
-      <button class="chat-send-btn" style="margin-left:auto" onclick="submitFeedback()">&#10148;</button>
+
+  <!-- ADMIN: список тредов (кто писал) -->
+  <div class="news-feed" id="supportThreadList" style="display:none"></div>
+
+  <!-- Сам чат — и для обычного пользователя (свой тред), и для админа (открытый тред) -->
+  <div id="supportChatView" style="display:none;flex:1;flex-direction:column;min-height:0;overflow:hidden">
+    <button class="chat-close" id="supportBackBtn" style="display:none;align-self:flex-start;font-size:12px;padding:8px 10px 0" onclick="_supportShowThreadList()">&#8592; К списку обращений</button>
+    <div id="supportAckBanner" style="display:none;margin:8px 10px 0;padding:6px 10px;background:rgba(38,166,154,.12);border:1px solid #26a69a;border-radius:6px;font-size:11px;color:#26a69a">Ваше обращение принято в обработку администратором</div>
+    <div class="chat-messages" id="supportMessages"></div>
+    <div id="supportAckAdminRow" style="display:none;padding:0 10px 8px">
+      <button class="chat-send-btn" style="width:100%" onclick="_supportAcknowledgeCurrent()">Отметить обработанным</button>
     </div>
-    <div id="feedbackMsg" style="font-size:12px;margin-top:4px"></div>
+    <div class="news-admin-row" style="padding:6px 10px 0">
+      <label style="cursor:pointer;font-size:11px;color:#2196f3;display:flex;align-items:center;gap:4px">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="#2196f3"><path d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z"/></svg>
+        Приложить скриншот
+        <input type="file" id="supportScreenshot" accept="image/*" style="display:none" onchange="_supportFileChanged(this)">
+      </label>
+      <span id="supportFileName" style="font-size:10px;color:var(--text-secondary)"></span>
+    </div>
+    <div class="chat-input-row">
+      <input class="chat-input" id="supportInput" type="text" placeholder="Написать..." maxlength="1000" onkeydown="if(event.key==='Enter')sendSupportMessage()">
+      <button class="chat-send-btn" onclick="sendSupportMessage()">&#10148;</button>
+    </div>
   </div>
-  <div class="chat-guest-msg" id="feedbackGuestMsg" style="display:none">Войдите, чтобы отправить жалобу или предложение</div>
-  <!-- Список обращений — только для admin -->
-  <div class="news-feed" id="feedbackAdminList"></div>
+
+  <div class="chat-guest-msg" id="feedbackGuestMsg" style="display:none">Войдите, чтобы написать администратору</div>
 </div>
 
 <!-- Черновики статей от агента — панель (только admin) -->
@@ -8295,282 +8455,6 @@
     </div>
 </div>
 
-<!-- ============================================================
-     Информация — презентация платформы Force of Momentum
-     ============================================================ -->
-<div id="infoModal" class="info-overlay" onclick="if(event.target===this)closeInfoModal()">
-  <div class="info-panel">
-
-    <!-- Hero -->
-    <div class="info-hero">
-      <button class="info-close-btn" onclick="closeInfoModal()">&#x00d7;</button>
-      <div class="info-logo-row">
-        <div class="info-logo-icon">
-          <svg viewBox="0 0 32 32" width="32" height="32" fill="none">
-            <path d="M4 24 L16 8 L28 24" stroke="#2962FF" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
-            <path d="M10 24 L16 16 L22 24" stroke="#00BCD4" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
-          </svg>
-        </div>
-        <div>
-          <div class="info-platform-name">Force of Momentum</div>
-          <div class="info-platform-sub">Система принятия торгового решения</div>
-        </div>
-      </div>
-      <p class="info-hero-desc">Профессиональная платформа для дискреционной торговли на криптовалютных и фондовых рынках с расширенной системой фильтрации сигналов и управления рисками.</p>
-      <div class="info-hero-tags">
-        <span class="info-tag" style="background:rgba(41,98,255,.2);color:#2962ff;border:1px solid rgba(41,98,255,.4)">Дискреционные стратегии</span>
-        <span class="info-tag" style="background:rgba(0,188,212,.2);color:#00bcd4;border:1px solid rgba(0,188,212,.4)">Риск-менеджмент</span>
-        <span class="info-tag" style="background:rgba(76,175,80,.2);color:#4caf50;border:1px solid rgba(76,175,80,.4)">Real-time сканеры</span>
-        <span class="info-tag" style="background:rgba(156,39,176,.2);color:#9c27b0;border:1px solid rgba(156,39,176,.4)">Авторские индикаторы</span>
-      </div>
-    </div>
-
-    <!-- Body -->
-    <div class="info-body">
-
-      <!-- Секция 1: Дивергентные бары -->
-      <div class="info-section">
-        <div class="info-section-title">
-          <span class="info-section-num" style="background:linear-gradient(135deg,#2962ff,#00bcd4)">1</span>
-          Дивергентные бары
-        </div>
-        <p class="info-section-desc">Дивербар — разворотный бар, определяемый по расхождению (дивергенции) между движением цены и гистограммой Awesome Oscillator (AO).</p>
-        <div class="info-cards">
-          <div class="info-card accent-green">
-            <div class="info-card-header">
-              <span style="font-size:20px;margin-right:8px">&#11044;</span>
-              <span class="info-badge badge-green">Бычий дивербар</span>
-            </div>
-            <div class="info-steps">
-              <div class="info-step"><span class="info-step-num">1.</span><span>Цена обновляет локальный <strong>минимум</strong> (идёт вниз)</span></div>
-              <div class="info-step"><span class="info-step-num">2.</span><span>Гистограмма AO при этом показывает <strong>более высокий минимум</strong> (идёт вверх)</span></div>
-              <div class="info-step"><span class="info-step-num">✦</span><span>На графике маркируется <strong style="color:#00bcd4">голубым кружком с плюсом</strong></span></div>
-            </div>
-          </div>
-          <div class="info-card accent-red">
-            <div class="info-card-header">
-              <span style="font-size:20px;margin-right:8px;color:#9c27b0">&#11044;</span>
-              <span class="info-badge badge-red">Медвежий дивербар</span>
-            </div>
-            <div class="info-steps">
-              <div class="info-step"><span class="info-step-num">1.</span><span>Цена обновляет локальный <strong>максимум</strong> (идёт вверх)</span></div>
-              <div class="info-step"><span class="info-step-num">2.</span><span>Гистограмма AO при этом показывает <strong>более низкий максимум</strong> (идёт вниз)</span></div>
-              <div class="info-step"><span class="info-step-num">✦</span><span>На графике маркируется <strong style="color:#9c27b0">фиолетовым кружком с плюсом</strong></span></div>
-            </div>
-          </div>
-        </div>
-        <div class="info-formula">AO(n) = SMA(5, HL/2)<sub>n</sub> &minus; SMA(34, HL/2)<sub>n</sub></div>
-        <div class="info-highlight" style="border-left-color:#ff9800;background:rgba(255,152,0,.06)">
-          <div class="info-highlight-title" style="color:#ff9800">Сильная точка входа</div>
-          <p>Пересечение дивербара со сформированным фракталом в этой же точке (с зафиксированным объёмом) в <strong>90% случаев означает разворот тенденции</strong> и является сильной точкой входа.</p>
-        </div>
-      </div>
-
-      <!-- Секция 2: Пробой Боллинджера -->
-      <div class="info-section">
-        <div class="info-section-title">
-          <span class="info-section-num" style="background:linear-gradient(135deg,#9c27b0,#e91e63)">2</span>
-          Пробой Лент Боллинджера
-        </div>
-        <p class="info-section-desc">Паттерн «Импульс на продолжение тренда» — ищет поглощение противоположной силы на границах канала в моменты всплеска волатильности и объёмов.</p>
-        <div class="info-cards">
-          <div class="info-card" style="border-left:3px solid #e91e63">
-            <div class="info-card-header">
-              <span class="info-badge" style="background:rgba(233,30,99,.2);color:#e91e63">Сценарий вниз — продолжение Short</span>
-            </div>
-            <div class="info-steps">
-              <div class="info-step"><span class="info-step-num">1.</span><span>Цена находится у <strong>нижней границы</strong> Лент Боллинджера</span></div>
-              <div class="info-step"><span class="info-step-num">2.</span><span>Появляется <strong style="color:#00bcd4">бычий дивербар</strong> (голубой кружок с плюсом), но фрактал под ним <strong>НЕ формируется</strong></span></div>
-              <div class="info-step"><span class="info-step-num">3.</span><span>Цена пробивает <strong>Low</strong> этого дивербара и уходит ниже</span></div>
-              <div class="info-step"><span class="info-step-num">4.</span><span>Ленты BB начинают <strong>расширяться</strong> — бычья сила поглощена, открывается Short</span></div>
-            </div>
-          </div>
-          <div class="info-card accent-blue">
-            <div class="info-card-header">
-              <span class="info-badge" style="background:rgba(41,98,255,.2);color:#2962ff">Сценарий вверх — продолжение Long</span>
-            </div>
-            <div class="info-steps">
-              <div class="info-step"><span class="info-step-num">1.</span><span>Цена находится у <strong>верхней границы</strong> Лент Боллинджера</span></div>
-              <div class="info-step"><span class="info-step-num">2.</span><span>Появляется <strong style="color:#9c27b0">медвежий дивербар</strong> (фиолетовый кружок с плюсом), но фрактал над ним <strong>НЕ образуется</strong></span></div>
-              <div class="info-step"><span class="info-step-num">3.</span><span>Цена пробивает <strong>High</strong> этого дивербара вверх</span></div>
-              <div class="info-step"><span class="info-step-num">4.</span><span>Ленты BB <strong>расширяются</strong> — медвежье сопротивление сломлено, открывается Long</span></div>
-            </div>
-          </div>
-        </div>
-        <div class="info-formula">BB = SMA(20) &plusmn; 2&sigma; &nbsp;|&nbsp; Расширение лент = подтверждение импульса</div>
-        <div class="info-highlight" style="border-left-color:#9c27b0;background:rgba(156,39,176,.06)">
-          <div class="info-highlight-title" style="color:#9c27b0">Ключевое условие</div>
-          <p>Отсутствие фрактала — принципиально важно. Если фрактал сформировался, это уже другой паттерн (разворот). Здесь дивербар поглощается рынком и служит топливом для продолжения движения.</p>
-        </div>
-      </div>
-
-      <!-- Секция 3: Фильтр Аллигатора -->
-      <div class="info-section">
-        <div class="info-section-title">
-          <span class="info-section-num" style="background:linear-gradient(135deg,#ff6d00,#ff9800)">3</span>
-          Фильтрация через Аллигатор и Ангуляцию
-        </div>
-        <p class="info-section-desc">Аллигатор используется для оценки силы разворота через понятие <strong>ангуляции</strong> — угла и расстояния расхождения между ценой и линиями Аллигатора.</p>
-        <div class="info-cards">
-          <div class="info-card" style="border-left:3px solid #e91e63">
-            <div class="info-card-header">
-              <span class="info-badge" style="background:rgba(233,30,99,.2);color:#e91e63">Идеальный Short-разворот</span>
-            </div>
-            <div class="info-steps">
-              <div class="info-step"><span class="info-step-num">1.</span><span>Цена резко уходит <strong>вверх</strong>, сильно отдаляясь от линий Аллигатора — высокая ангуляция / перекупленность</span></div>
-              <div class="info-step"><span class="info-step-num">2.</span><span>На пике формируется <strong style="color:#9c27b0">медвежий дивербар</strong> (фиолетовый кружок с плюсом)</span></div>
-              <div class="info-step"><span class="info-step-num">3.</span><span>Дивербар подтверждён <strong>верхним фракталом</strong></span></div>
-              <div class="info-step"><span class="info-step-num">4.</span><span>Сильный сигнал на <strong>разворот вниз</strong></span></div>
-            </div>
-          </div>
-          <div class="info-card accent-blue">
-            <div class="info-card-header">
-              <span class="info-badge" style="background:rgba(41,98,255,.2);color:#2962ff">Идеальный Long-разворот</span>
-            </div>
-            <div class="info-steps">
-              <div class="info-step"><span class="info-step-num">1.</span><span>Цена импульсно <strong>падает</strong> далеко вниз от линий Аллигатора — высокая ангуляция / перепроданность</span></div>
-              <div class="info-step"><span class="info-step-num">2.</span><span>На дне формируется <strong style="color:#00bcd4">бычий дивербар</strong> (голубой кружок с плюсом)</span></div>
-              <div class="info-step"><span class="info-step-num">3.</span><span>Одновременно подтверждён <strong>нижним фракталом</strong></span></div>
-              <div class="info-step"><span class="info-step-num">4.</span><span>Сильный сигнал на <strong>разворот вверх</strong></span></div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- Секция 4: Система сканеров -->
-      <div class="info-section">
-        <div class="info-section-title">
-          <span class="info-section-num" style="background:linear-gradient(135deg,#00bcd4,#009688)">4</span>
-          Система сканеров
-        </div>
-        <p class="info-section-desc">Force of Momentum автоматически сканирует весь рынок, выявляя инструменты с активными сигналами по трём независимым каналам.</p>
-        <div class="info-cards">
-          <div class="info-card accent-blue">
-            <div class="info-card-header">
-              <span class="info-badge" style="background:rgba(41,98,255,.2);color:#2962ff">1. Сканер дивергенций (D1)</span>
-            </div>
-            <p style="font-size:13px;color:var(--text-secondary);margin:8px 0 0">Отслеживает появление дивербаров на <strong>дневных графиках</strong>. Выводит активы с метками:</p>
-            <div style="margin-top:10px;display:flex;flex-direction:column;gap:6px">
-              <div style="display:flex;align-items:center;gap:8px;font-size:13px"><span style="color:#e91e63;font-size:16px">▼</span><span><strong style="color:#e91e63">Красная стрелка вниз</strong> — сформирован бычий дивербар (сигнал на покупку)</span></div>
-              <div style="display:flex;align-items:center;gap:8px;font-size:13px"><span style="color:#4caf50;font-size:16px">▲</span><span><strong style="color:#4caf50">Зелёная стрелка вверх</strong> — сформирован медвежий дивербар (сигнал на продажу)</span></div>
-            </div>
-          </div>
-          <div class="info-card accent-green">
-            <div class="info-card-header">
-              <span class="info-badge badge-green">2. Сканер волатильности (30m)</span>
-            </div>
-            <p style="font-size:13px;color:var(--text-secondary);margin:8px 0 0">Опрашивает рынок каждые <strong>5 минут</strong>. Рассчитывает изменение цены на основе 5-минутных свечей за последние полчаса.</p>
-            <div style="margin-top:10px;padding:8px 12px;background:rgba(76,175,80,.1);border-radius:6px;font-size:13px">
-              Если изменение <strong>&gt; 3%</strong> — актив попадает в блок высокой волатильности
-            </div>
-          </div>
-          <div class="info-card" style="border-left:3px solid #ff9800">
-            <div class="info-card-header">
-              <span class="info-badge" style="background:rgba(255,152,0,.2);color:#ff9800">3. Сканер MA/EMA (15m)</span>
-            </div>
-            <p style="font-size:13px;color:var(--text-secondary);margin:8px 0 0">Скальпинг-сетап по MA20 и EMA20/50/100/200 на 15-минутных свечах. Два типа сигналов:</p>
-            <div style="margin-top:10px;display:flex;flex-direction:column;gap:6px">
-              <div style="display:flex;align-items:center;gap:8px;font-size:13px"><span class="div-scan-badge vol-pos" style="flex-shrink:0">MA20↑EMA20</span><span>пересечение MA20 и EMA20 — краткосрочный сигнал смены импульса</span></div>
-              <div style="display:flex;align-items:center;gap:8px;font-size:13px"><span class="div-scan-badge vol-info" style="flex-shrink:0">EMA50</span><span>цена последнего бара коснулась EMA20/50/100/200 — отработка уровня поддержки/сопротивления</span></div>
-            </div>
-            <p style="font-size:13px;color:var(--text-secondary);margin:10px 0 0">Отдельно считается для крипто и Финама. Сигналы копятся в журнале (как у сканера волатильности), а не затираются при каждом обновлении.</p>
-          </div>
-        </div>
-        <div class="info-highlight" style="border-left-color:#ff9800;background:rgba(255,152,0,.06)">
-          <div class="info-highlight-title" style="color:#ff9800">Супер-сигнал — «Изюминка» стратегии</div>
-          <p>Если монета <strong>одновременно</strong> выдаёт сигнал по дневному сканеру дивергенций <em>и</em> попадает в 30-минутный сканер высокой волатильности — этот сетап имеет <strong>наивысший приоритет</strong> для отработки. Совпадение двух независимых фильтров многократно повышает вероятность успешного входа.</p>
-        </div>
-      </div>
-
-      <!-- Секция 5: Риск-менеджмент -->
-      <div class="info-section">
-        <div class="info-section-title">
-          <span class="info-section-num" style="background:linear-gradient(135deg,#4caf50,#8bc34a)">5</span>
-          Риск-менеджмент и Критерий Келли
-        </div>
-        <p class="info-section-desc">Строгое управление капиталом — основа долгосрочной прибыльности. Force of Momentum рассчитывает оптимальный размер позиции на основе статистики ваших сделок.</p>
-        <div class="info-cards">
-
-          <!-- Калькулятор лимитов -->
-          <div class="info-card" style="border-left:3px solid #4caf50">
-            <div class="info-card-header">
-              <span class="info-badge badge-green">Калькулятор позиции</span>
-            </div>
-            <p style="font-size:13px;color:var(--text-secondary);margin:8px 0 10px">Введите размер капитала — калькулятор автоматически рассчитает допустимый лимит на каждую сделку. Система ограничивает количество активных сделок до <strong>3 в день</strong>: это позволяет торговать осознанно, без «перегрева» и эмоциональных решений.</p>
-            <div class="info-formula">Лимит на сделку = Капитал × f*</div>
-            <div class="info-formula" style="margin-top:6px">f* = W &minus; (1&minus;W) / R</div>
-            <div style="margin-top:10px;display:flex;flex-direction:column;gap:5px;font-size:12px;color:var(--text-secondary)">
-              <div><strong style="color:var(--text-primary)">W</strong> — win rate, доля прибыльных сделок</div>
-              <div><strong style="color:var(--text-primary)">R</strong> — среднее соотношение прибыли к убытку</div>
-              <div><strong style="color:var(--text-primary)">f*</strong> — оптимальная доля капитала по Келли</div>
-            </div>
-          </div>
-
-          <!-- Стоп-лосс и счётчик сессии -->
-          <div class="info-card" style="border-left:3px solid #2196f3">
-            <div class="info-card-header">
-              <span class="info-badge" style="background:rgba(33,150,243,.2);color:#2196f3">Стоп и счётчик сессии</span>
-            </div>
-            <div class="info-steps">
-              <div class="info-step"><span class="info-step-num">1.</span><span>Выбирается <strong>кредитное плечо</strong> (рекомендуется 5–20×) либо торговля без плеча, тип позиции (Long/Short) и цена входа</span></div>
-              <div class="info-step"><span class="info-step-num">2.</span><span>Указывается <strong>объём позиции</strong> (сумма сделки) или размер маржи (залога). Оптимальный R:R — <strong>3–5%</strong> от стоп‑лосса</span></div>
-              <div class="info-step"><span class="info-step-num">3.</span><span><strong>Лимит сделок</strong>: в идеале одна сделка в сессии, максимум — три. Лимит потерь рассчитывается на три сделки, что защищает баланс при серии неудачных входов</span></div>
-            </div>
-          </div>
-
-          <!-- Стиль торговли -->
-          <div class="info-card" style="border-left:3px solid #9c27b0">
-            <div class="info-card-header">
-              <span class="info-badge" style="background:rgba(156,39,176,.2);color:#9c27b0">Стиль торговли</span>
-            </div>
-            <div class="info-steps">
-              <div class="info-step"><span><strong>Скальпинг</strong> — для краткосрочных импульсных сделок внутри мелких таймфреймов</span></div>
-              <div class="info-step"><span><strong>Интрадей</strong> — оптимальный режим, удержание позиции в течение одной торговой сессии (дня)</span></div>
-              <div class="info-step"><span><strong>Свинг</strong> — для позиций, переносимых на несколько дней или недель</span></div>
-            </div>
-          </div>
-
-        </div>
-        <div class="info-highlight" style="border-left-color:#4caf50;background:rgba(76,175,80,.06)">
-          <div class="info-highlight-title" style="color:#4caf50">Журнал сделок</div>
-          <p>Встроенный журнал фиксирует каждую сделку: точку входа, стоп-лосс, тейк-профит и результат в R-кратных. Накопленная статистика автоматически пересчитывает оптимальный размер позиции по Келли, обеспечивая самоадаптирующуюся систему управления риском.</p>
-        </div>
-      </div>
-
-      <!-- Секция 6: Связь с автором -->
-      <div class="info-section" style="border-top:1px solid var(--border-color);margin-top:8px;padding-top:24px">
-        <div class="info-section-title">
-          <span class="info-section-num" style="background:linear-gradient(135deg,#e91e63,#9c27b0)">6</span>
-          Связь с автором
-        </div>
-        <p class="info-section-desc">По всем вопросам — работа с платформой, торговые стратегии, сотрудничество или доверительное управление капиталом — пишите напрямую.</p>
-        <div class="info-cards">
-          <div class="info-card" style="border-left:3px solid #2196f3">
-            <div class="info-card-header">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="#2196f3" style="margin-right:8px;flex-shrink:0"><path d="M20 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4l-8 5-8-5V6l8 5 8-5v2z"/></svg>
-              <span class="info-badge" style="background:rgba(33,150,243,.2);color:#2196f3">Email</span>
-            </div>
-            <a href="mailto:vladimir.olegovish@gmail.com" style="color:#2196f3;text-decoration:none;font-size:14px;font-weight:500;display:block;margin-top:6px">vladimir.olegovish@gmail.com</a>
-          </div>
-          <div class="info-card" style="border-left:3px solid #29b6f6">
-            <div class="info-card-header">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="#29b6f6" style="margin-right:8px;flex-shrink:0"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm4.64 6.8l-1.7 8.02c-.12.57-.46.71-.93.44l-2.57-1.89-1.24 1.19c-.14.14-.25.25-.5.25l.18-2.57 4.64-4.19c.2-.18-.04-.28-.31-.1L7.97 15.1l-2.52-.79c-.55-.17-.56-.55.11-.81l9.84-3.79c.46-.17.86.11.71.8-.01.01-.01.01-.01 0z"/></svg>
-              <span class="info-badge" style="background:rgba(41,182,246,.2);color:#29b6f6">Telegram</span>
-            </div>
-            <a href="https://t.me/Vlabimir_Olegovich" target="_blank" style="color:#29b6f6;text-decoration:none;font-size:14px;font-weight:500;display:block;margin-top:6px">@Vlabimir_Olegovich</a>
-          </div>
-        </div>
-        <!-- Подпись автора -->
-        <div style="margin-top:28px;padding:20px 24px;background:linear-gradient(135deg,rgba(233,30,99,.08),rgba(156,39,176,.08));border:1px solid rgba(156,39,176,.25);border-radius:12px;text-align:center">
-          <div style="font-size:11px;letter-spacing:2px;text-transform:uppercase;color:var(--text-secondary);margin-bottom:10px">Автор платформы</div>
-          <div style="font-size:22px;font-weight:700;background:linear-gradient(135deg,#e91e63,#9c27b0,#2962ff);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;margin-bottom:4px">Хорев Владимир Олегович</div>
-          <div style="font-size:12px;color:var(--text-secondary)">Force of Momentum</div>
-        </div>
-      </div>
-
-    </div><!-- /info-body -->
-  </div><!-- /info-panel -->
-</div><!-- /infoModal -->
 
 </body>
 </html>
