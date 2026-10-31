@@ -6842,6 +6842,7 @@
             localStorage.setItem('auth_token', authToken);
             closeAuthModal();
             _updateAuthUI();
+            jRender();
             await syncSettingsFromServer();
             await syncWatchlistFromServer();
             await syncDeviceStateFromServer();
@@ -6871,6 +6872,7 @@
             localStorage.setItem('auth_token', authToken);
             closeAuthModal();
             _updateAuthUI();
+            jRender();
             startOnboardingTour();
         } catch { err.textContent = 'Ошибка соединения'; }
     }
@@ -7130,6 +7132,7 @@
             document.getElementById('resetPwModal').style.display = 'none';
             closeAuthModal();
             _updateAuthUI();
+            jRender();
             await syncSettingsFromServer();
             await syncWatchlistFromServer();
             await syncDeviceStateFromServer();
