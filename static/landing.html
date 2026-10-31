@@ -5,6 +5,18 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Force of Momentum — платформа принятия торгового решения</title>
 <link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
+<script>
+  // Страховка на случай, если ссылка на сброс пароля из письма всё же привела
+  // сюда (на публичный лендинг), а не в приложение — например, из-за старого
+  // письма, отправленного до деплоя фикса, или неверно настроенного
+  // FRONTEND_URL на сервере. Лендинг не умеет показывать форму смены пароля
+  // (там только "Войти"/"Зарегистрироваться"), поэтому сразу перебрасываем
+  // в приложение с тем же токеном, где эта форма уже реализована.
+  (function(){
+    var token = new URLSearchParams(location.search).get('reset_token');
+    if (token) location.replace('/app?reset_token=' + encodeURIComponent(token));
+  })();
+</script>
 <style>
   :root{
     --ink:#10131a;
