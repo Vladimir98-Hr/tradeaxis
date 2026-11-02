@@ -3176,6 +3176,7 @@
             _maybeShowFinamNotice();
             _rcCurInstrument = null;
             _rcResetCalcOnInstrumentChange();
+            loadSessionState();
             if (tickerInterval) clearInterval(tickerInterval);
             if (visibleTickerInterval) clearInterval(visibleTickerInterval);
             document.getElementById('wsStatus').textContent = 'Finam: исторические данные';
@@ -3208,6 +3209,7 @@
             document.getElementById('chartSymbolName').textContent = 'BTC/USDT';
             _rcCurInstrument = null;
             _rcResetCalcOnInstrumentChange();
+            loadSessionState();
             updateTimeframesForMarket('crypto');
             _restoreTimeframe('crypto');
             fetchSymbolsList().then(() => { fetchAll(); startTicker(); });
@@ -4621,6 +4623,12 @@
         return currentMarket === 'crypto' ? '$' : '₽';
     }
 
+    // Капитал/сессия риск-калькулятора хранятся отдельно для каждого рынка —
+    // без этого убыток по крипто-сделке "утекал" бы в баланс Finam и обратно.
+    function _rcCapKey(base) {
+        return base + '_' + currentMarket;
+    }
+
     function _rcUpdateCurrencyLabels() {
         const ccy = _rcAccountCcy();
         const capCcyEl = document.getElementById('rcCapCcy');
@@ -4749,7 +4757,27 @@
         }
     });
 
+    // Разовая миграция: капитал калькулятора раньше был общим на оба рынка —
+    // у уже заходивших пользователей старое значение лежит без суффикса рынка.
+    // Переносим его в _crypto (жалоба пришла именно с крипто-стороны), Finam
+    // стартует с нуля — так и было задумано для отдельного капитала по рынку.
+    function _rcMigrateCapitalToMarketScopedKeysV1() {
+        if (localStorage.getItem('rcCapMigV1')) return;
+        const oldCapital = localStorage.getItem('rcCapitalPersist');
+        const oldSession = localStorage.getItem('rcSessionState');
+        if (oldCapital != null && localStorage.getItem('rcCapitalPersist_crypto') == null) {
+            localStorage.setItem('rcCapitalPersist_crypto', oldCapital);
+        }
+        if (oldSession != null && localStorage.getItem('rcSessionState_crypto') == null) {
+            localStorage.setItem('rcSessionState_crypto', oldSession);
+        }
+        localStorage.removeItem('rcCapitalPersist');
+        localStorage.removeItem('rcSessionState');
+        localStorage.setItem('rcCapMigV1', '1');
+    }
+
     function openRiskCalc() {
+        _rcMigrateCapitalToMarketScopedKeysV1();
         document.getElementById('riskCalcModal').style.display = 'flex';
         _rcUpdateCurrencyLabels();
         _rcUpdateBlockBFields();
@@ -4833,7 +4861,7 @@
 
         _rcTradeRisk  = tradeRisk;
         _rcSessLimit  = sessLimit;
-        localStorage.setItem('rcCapitalPersist', capital);
+        localStorage.setItem(_rcCapKey('rcCapitalPersist'), capital);
         scheduleDeviceStateSync();
 
         _rcUpdateCurrencyLabels();
@@ -4864,7 +4892,7 @@
     }
 
     function saveSessionState() {
-        localStorage.setItem('rcSessionState', JSON.stringify({
+        localStorage.setItem(_rcCapKey('rcSessionState'), JSON.stringify({
             date: _rcToday(),
             capital: document.getElementById('rcCapital').value,
             sessionStartCapital: _rcSessionStartCapital,
@@ -4878,7 +4906,7 @@
 
     function loadSessionState() {
         let state;
-        try { state = JSON.parse(localStorage.getItem('rcSessionState')); } catch { state = null; }
+        try { state = JSON.parse(localStorage.getItem(_rcCapKey('rcSessionState'))); } catch { state = null; }
         const capitalEl = document.getElementById('rcCapital');
         if (state && state.date === _rcToday()) {
             // Сессия за сегодня уже была открыта — восстанавливаем якорь, пик и текущий
@@ -4894,7 +4922,7 @@
         }
         // Капитал переиспользуется изо дня в день, если сессии на сегодня ещё не было.
         if (!capitalEl.value) {
-            const persisted = localStorage.getItem('rcCapitalPersist');
+            const persisted = localStorage.getItem(_rcCapKey('rcCapitalPersist'));
             if (persisted) capitalEl.value = persisted;
         }
         if (capitalEl.value) {
@@ -4907,11 +4935,16 @@
     // {reviewId: resultUsd} по сделкам, закрытым сегодня через "Открытые планы → Закрыть сделку"
     function _rcTodayReviewMap() {
         const today = _rcToday();
+        const all = _journalCache || [];
+        const plansById = {};
+        all.forEach(t => { if (t.type === 'plan') plansById[t.id] = t; });
         const map = {};
-        (_journalCache || []).forEach(t => {
-            if (t.type === 'review' && t.ts && new Date(t.ts).toISOString().slice(0, 10) === today) {
-                map[t.id] = t.resultUsd || 0;
-            }
+        all.forEach(t => {
+            if (t.type !== 'review' || !t.ts) return;
+            if (new Date(t.ts).toISOString().slice(0, 10) !== today) return;
+            const plan = plansById[t.planId];
+            if ((plan?.market || 'crypto') !== currentMarket) return;
+            map[t.id] = t.resultUsd || 0;
         });
         return map;
     }
@@ -4938,6 +4971,7 @@
             capEl.value = ((isNaN(cur) ? _rcSessionStartCapital : cur) + delta).toFixed(2);
         }
         _rcRecomputeTrailing();
+        saveSessionState();
     }
 
     function _rcSessionLocked() {
@@ -5442,8 +5476,8 @@
         document.getElementById('rcResA').style.display = 'none';
         document.getElementById('rcResB').style.display = 'none';
         document.getElementById('rcCalcBBtn').disabled = true;
-        localStorage.removeItem('rcSessionState');
-        localStorage.removeItem('rcCapitalPersist');
+        localStorage.removeItem(_rcCapKey('rcSessionState'));
+        localStorage.removeItem(_rcCapKey('rcCapitalPersist'));
         scheduleDeviceStateSync();
         _rcRecomputeTrailing();
     }
@@ -7241,7 +7275,8 @@
     // а не по кнопке — пользователь не должен думать о "сохранении".
     const DEVICE_STATE_KEYS = [
         'theme', 'lastMarket', 'lastTimeframe_crypto', 'lastTimeframe_finam',
-        'rcCapitalPersist', 'rcSessionState', 'fxActiveIndicators',
+        'rcCapitalPersist_crypto', 'rcCapitalPersist_finam',
+        'rcSessionState_crypto', 'rcSessionState_finam', 'fxActiveIndicators',
         'mc_syms_crypto', 'mc_syms_finam', 'ipFavorites', 'ipRecent', 'drawingsStore',
         'onboardingDone', 'finamNoticeShown',
         'volSignalLog_v1_crypto', 'volSignalLog_v1_finam',
@@ -7341,6 +7376,11 @@
             } catch { mcSymbols = []; }
             mcBuildGrid();
             mcLoadAll();
+        }
+        // Если риск-калькулятор уже открыт на этой вкладке — перечитать капитал/
+        // сессию с другого устройства сразу, а не только при следующем openRiskCalc().
+        if (document.getElementById('riskCalcModal').style.display === 'flex') {
+            loadSessionState();
         }
     }
 
