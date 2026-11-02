@@ -4082,9 +4082,10 @@
         }
         try {
             const divTf = loadSettings().divScanTimeframe || '1d';
+            const liveBar = loadSettings().divScanLiveBar ? '1' : '0';
             const url = isFinam
                 ? `${API_BASE}/finam/scan/divergences?timeframe=${divTf}`
-                : `${API_BASE}/scan/divergences?timeframe=${divTf}&limit=50`;
+                : `${API_BASE}/scan/divergences?timeframe=${divTf}&limit=50&live_bar=${liveBar}`;
             const res = isFinam ? await _authFetch(url) : await fetch(url);
             const json = await res.json();
             if (!res.ok) throw new Error(json.detail || 'Ошибка');
@@ -5924,7 +5925,7 @@
         volAutoRefresh: true,
         // Новые ключи
         showGrid: true, logScale: false, autoScale: true,
-        divScanTimeframe: '1d',
+        divScanTimeframe: '1d', divScanLiveBar: true,
         emaScanTimeframe: '15m',
         rememberLastMarket: true, rememberLastTimeframe: true,
         rememberFxIndicators: false, confirmClearAll: true,
@@ -5936,7 +5937,20 @@
     function loadSettings() {
         try {
             const stored = JSON.parse(localStorage.getItem('cryptoSettings') || '{}');
-            return Object.assign({}, SETTINGS_DEFAULTS, stored);
+            const merged = Object.assign({}, SETTINGS_DEFAULTS, stored);
+            // Разовая миграция: сканер дивергенции раньше по умолчанию проверял
+            // последний ЗАКРЫТЫЙ бар (на дневном ТФ это "вчера" до ~03:00 МСК),
+            // у уже заходивших пользователей это явно сохранено как false в
+            // localStorage. Переключаем на "сегодняшний" бар один раз, дальше
+            // пользователь может сам выключить — его выбор больше не трогаем.
+            if (!localStorage.getItem('divLiveBarMigV1')) {
+                merged.divScanLiveBar = true;
+                try {
+                    localStorage.setItem('cryptoSettings', JSON.stringify(Object.assign({}, stored, { divScanLiveBar: true })));
+                    localStorage.setItem('divLiveBarMigV1', '1');
+                } catch {}
+            }
+            return merged;
         } catch { return Object.assign({}, SETTINGS_DEFAULTS); }
     }
 
@@ -5960,6 +5974,7 @@
             logScale:             document.getElementById('s_logScale').checked,
             autoScale:            document.getElementById('s_autoScale').checked,
             divScanTimeframe:     document.getElementById('s_divTimeframe').value,
+            divScanLiveBar:       document.getElementById('s_divLiveBar').checked,
             emaScanTimeframe:     document.getElementById('s_emaTimeframe').value,
             rememberLastMarket:   document.getElementById('s_rememberMarket').checked,
             rememberLastTimeframe:document.getElementById('s_rememberTf').checked,
@@ -6039,6 +6054,7 @@
         document.getElementById('s_volCrypto').value         = s.volScoreThresholdCrypto;
         document.getElementById('s_volAutoRefresh').checked  = s.volAutoRefresh;
         document.getElementById('s_divTimeframe').value      = s.divScanTimeframe || '1d';
+        document.getElementById('s_divLiveBar').checked      = !!s.divScanLiveBar;
         document.getElementById('s_emaTimeframe').value      = s.emaScanTimeframe || '15m';
         document.getElementById('s_showGrid').checked        = s.showGrid;
         document.getElementById('s_logScale').checked        = s.logScale;
@@ -8092,6 +8108,10 @@
                                     <option value="4h">4 часа</option>
                                     <option value="1d" selected>1 день</option>
                                 </select>
+                            </div>
+                            <div class="sv2-row" data-search="дивергенция живой формирующийся бар">
+                                <div><div class="sv2-label">Проверять ещё формирующийся («живой») бар<span class="rc-help">?<span class="rc-help-pop">По умолчанию сканер ищет дивергенцию только на последнем полностью закрытом баре — это надёжно, но на дневном таймфрейме "сегодняшний" бар закрывается только около 03:00 МСК, поэтому до этого времени сканер показывает вчерашний. Включите, если хотите видеть дивергенцию на сегодняшнем, ещё не закрытом баре — но учтите: пока бар не закрылся, сигнал может измениться или пропасть.</span></span></div></div>
+                                <label class="sv2-toggle"><input type="checkbox" id="s_divLiveBar" onchange="applySettingsLive()"><span class="sv2-toggle-slider"></span></label>
                             </div>
                         </div>
                         <div class="sv2-group">

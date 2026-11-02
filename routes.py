@@ -17,16 +17,18 @@ from indicators import calculate_alligator, calculate_ao, calculate_bw_mfi, find
 router = APIRouter()
 
 
-def _check_last_bar_divergence(df, ao):
+def _check_last_bar_divergence(df, ao, use_live_bar: bool = False):
     """
-    Проверяет, есть ли дивергентный бар на последнем ЗАКРЫТОМ баре (логика из
-    Pine Script / ccxt-сканера). Последний элемент df/ao — ещё формирующийся
-    бар (биржа всегда отдаёт его последним), поэтому берём предпоследний —
-    иначе условие, верное на снэпшоте сканирования, успевает перестать быть
-    верным к моменту, когда пользователь откроет график (бар ещё дорисовывается,
-    а результат сканера к тому же кеширован на час для дневного ТФ).
+    Проверяет, есть ли дивергентный бар на последнем баре. По умолчанию берётся
+    последний ЗАКРЫТЫЙ бар (логика из Pine Script / ccxt-сканера) — последний
+    элемент df/ao ещё формирующийся (биржа всегда отдаёт его последним), и
+    условие, верное на снэпшоте сканирования, успевает перестать быть верным
+    к моменту, когда пользователь откроет график (бар ещё дорисовывается, а
+    результат сканера к тому же кеширован на час для дневного ТФ). Если
+    use_live_bar=True, проверяется именно ещё формирующийся бар — сигнал может
+    быть нестабильным и исчезнуть/измениться после закрытия бара.
     """
-    i = len(df) - 2
+    i = len(df) - 1 if use_live_bar else len(df) - 2
     if i < 4:
         return False, False
     low_window = df['Low'].iloc[i - 4:i + 1].values
@@ -474,10 +476,10 @@ async def get_chart_data(symbol: str = "BTCUSDT", timeframe: str = "1h", limit: 
 
 
 @router.get("/scan/divergences")
-async def scan_divergences(timeframe: str = "1d", limit: int = 50):
-    """Сканирует все USDT пары на дивергентный бар последнего закрытого бара."""
+async def scan_divergences(timeframe: str = "1d", limit: int = 50, live_bar: bool = False):
+    """Сканирует все USDT пары на дивергентный бар последнего закрытого (или, если live_bar, ещё формирующегося) бара."""
     cache_ttl = 3600 if timeframe in ('1d', '1w') else 900
-    key = get_cache_key("scan", timeframe, limit, "scan_div")
+    key = get_cache_key("scan", timeframe, limit, "scan_div_live" if live_bar else "scan_div")
     sem = asyncio.Semaphore(6)
 
     async def scan_one(sym_info):
@@ -487,7 +489,7 @@ async def scan_divergences(timeframe: str = "1d", limit: int = 50):
                 if len(df) < 10:
                     return None
                 ao = calculate_ao(df)
-                is_bull, is_bear = _check_last_bar_divergence(df, ao)
+                is_bull, is_bear = _check_last_bar_divergence(df, ao, use_live_bar=live_bar)
                 if not is_bull and not is_bear:
                     return None
                 return {
