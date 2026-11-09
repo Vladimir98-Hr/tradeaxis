@@ -4293,19 +4293,20 @@
     function renderDaySeparators(ctx, W, H) {
         if (!DAY_SEPARATOR_TIMEFRAMES.includes(currentTimeframe)) return;
         if (!loadSettings().showDaySeparators) return;
-        let range;
-        try { range = mainChart.timeScale().getVisibleRange(); } catch { return; }
-        if (!range || range.from == null || range.to == null) return;
+        if (!lastCandlesRaw || lastCandlesRaw.length < 2) return;
         const DAY = 86400;
-        let ts = Math.ceil(range.from / DAY) * DAY;
         ctx.save();
-        ctx.strokeStyle = 'rgba(150,150,150,0.35)';
+        ctx.strokeStyle = 'rgba(150,150,150,0.45)';
         ctx.lineWidth = 1;
         ctx.setLineDash([4, 4]);
-        for (let i = 0; i < 400 && ts <= range.to; i++, ts += DAY) {
-            const x = mainChart.timeScale().timeToCoordinate(ts);
-            if (x == null) continue;
-            ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, H); ctx.stroke();
+        let prevDay = Math.floor(lastCandlesRaw[0].time / DAY);
+        for (let i = 1; i < lastCandlesRaw.length; i++) {
+            const day = Math.floor(lastCandlesRaw[i].time / DAY);
+            if (day !== prevDay) {
+                const x = mainChart.timeScale().timeToCoordinate(lastCandlesRaw[i].time);
+                if (x != null) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, H); ctx.stroke(); }
+            }
+            prevDay = day;
         }
         ctx.restore();
     }
