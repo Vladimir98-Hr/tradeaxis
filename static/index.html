@@ -4280,9 +4280,34 @@
         _scheduleDrawingsPersist();
         if (!drawCtx) return;
         drawCtx.clearRect(0, 0, drawCanvas.width, drawCanvas.height);
+        renderDaySeparators(drawCtx, drawCanvas.width, drawCanvas.height);
         const cur = _curDrawings();
         const all = currentDraw ? [...cur, currentDraw] : cur;
         for (const d of all) renderDrawing(drawCtx, d, drawCanvas.width, drawCanvas.height, candleSeries, mainChart);
+    }
+
+    // Разделители дня (как в MetaTrader) — вертикальные линии на границах суток
+    // (00:00 UTC), только на внутридневных таймфреймах. Рисуются ДО пользовательских
+    // рисунков, чтобы последние были визуально поверх.
+    const DAY_SEPARATOR_TIMEFRAMES = ['1m', '5m', '15m', '1h', '4h'];
+    function renderDaySeparators(ctx, W, H) {
+        if (!DAY_SEPARATOR_TIMEFRAMES.includes(currentTimeframe)) return;
+        if (!loadSettings().showDaySeparators) return;
+        let range;
+        try { range = mainChart.timeScale().getVisibleRange(); } catch { return; }
+        if (!range || range.from == null || range.to == null) return;
+        const DAY = 86400;
+        let ts = Math.ceil(range.from / DAY) * DAY;
+        ctx.save();
+        ctx.strokeStyle = 'rgba(150,150,150,0.35)';
+        ctx.lineWidth = 1;
+        ctx.setLineDash([4, 4]);
+        for (let i = 0; i < 400 && ts <= range.to; i++, ts += DAY) {
+            const x = mainChart.timeScale().timeToCoordinate(ts);
+            if (x == null) continue;
+            ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, H); ctx.stroke();
+        }
+        ctx.restore();
     }
 
     // Единая точка: любое изменение рисунков (добавление/удаление/перенос/отмена)
@@ -5958,7 +5983,7 @@
         volScoreThresholdCrypto: 60,
         volAutoRefresh: true,
         // Новые ключи
-        showGrid: true, logScale: false, autoScale: true,
+        showGrid: true, logScale: false, autoScale: true, showDaySeparators: true,
         divScanTimeframe: '1d', divScanLiveBar: true,
         emaScanTimeframe: '15m',
         rememberLastMarket: true, rememberLastTimeframe: true,
@@ -6005,6 +6030,7 @@
             volScoreThresholdCrypto: parseFloat(document.getElementById('s_volCrypto').value),
             volAutoRefresh:       document.getElementById('s_volAutoRefresh').checked,
             showGrid:             document.getElementById('s_showGrid').checked,
+            showDaySeparators:    document.getElementById('s_showDaySeparators').checked,
             logScale:             document.getElementById('s_logScale').checked,
             autoScale:            document.getElementById('s_autoScale').checked,
             divScanTimeframe:     document.getElementById('s_divTimeframe').value,
@@ -6040,6 +6066,8 @@
             if (typeof oscPanes !== 'undefined') oscPanes.forEach(p => { if (p && p.chart) allC.push(p.chart); });
             allC.forEach(ch => { if (ch) ch.applyOptions({ grid: gridOpt }); });
         } catch(e) {}
+        // Разделители дня — рисуются на canvas-оверлее, не через applyOptions серии
+        redrawCanvas();
         // Логарифм
         try {
             if (mainChart) mainChart.priceScale('right').applyOptions({ mode: s.logScale ? 1 : 0 });
@@ -6091,6 +6119,7 @@
         document.getElementById('s_divLiveBar').checked      = !!s.divScanLiveBar;
         document.getElementById('s_emaTimeframe').value      = s.emaScanTimeframe || '15m';
         document.getElementById('s_showGrid').checked        = s.showGrid;
+        document.getElementById('s_showDaySeparators').checked = s.showDaySeparators;
         document.getElementById('s_logScale').checked        = s.logScale;
         document.getElementById('s_autoScale').checked       = s.autoScale;
         document.getElementById('s_rememberMarket').checked  = s.rememberLastMarket;
@@ -8089,6 +8118,10 @@
                             <div class="sv2-row" data-search="сетка линии грид">
                                 <div><div class="sv2-label">Сетка</div><div class="sv2-sub">Горизонтальные и вертикальные линии</div></div>
                                 <label class="sv2-toggle"><input type="checkbox" id="s_showGrid" checked onchange="applySettingsLive()"><span class="sv2-toggle-slider"></span></label>
+                            </div>
+                            <div class="sv2-row" data-search="разделители дня границы суток период">
+                                <div><div class="sv2-label">Разделители дня</div><div class="sv2-sub">Вертикальные линии на границах суток (как в MetaTrader)</div></div>
+                                <label class="sv2-toggle"><input type="checkbox" id="s_showDaySeparators" checked onchange="applySettingsLive()"><span class="sv2-toggle-slider"></span></label>
                             </div>
                             <div class="sv2-row" data-search="логарифм шкала лог">
                                 <div><div class="sv2-label">Логарифмическая шкала</div></div>
