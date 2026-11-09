@@ -4287,11 +4287,9 @@
     }
 
     // Разделители дня (как в MetaTrader) — вертикальные линии на границах суток
-    // (00:00 UTC), только на внутридневных таймфреймах. Рисуются ДО пользовательских
+    // (00:00 UTC), на всех таймфреймах. Рисуются ДО пользовательских
     // рисунков, чтобы последние были визуально поверх.
-    const DAY_SEPARATOR_TIMEFRAMES = ['1m', '5m', '15m', '1h', '4h'];
     function renderDaySeparators(ctx, W, H) {
-        if (!DAY_SEPARATOR_TIMEFRAMES.includes(currentTimeframe)) return;
         if (!loadSettings().showDaySeparators) return;
         if (!lastCandlesRaw || lastCandlesRaw.length < 2) return;
         const DAY = 86400;
