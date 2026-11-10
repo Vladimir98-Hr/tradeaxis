@@ -4314,10 +4314,11 @@
         if (!lastCandlesRaw || lastCandlesRaw.length < 2) return;
         const level = PERIOD_SEPARATOR_LEVEL[currentTimeframe];
         if (!level) return;
+        const isDark = document.body.dataset.theme === 'dark';
         ctx.save();
-        ctx.strokeStyle = 'rgba(150,150,150,0.45)';
+        ctx.strokeStyle = isDark ? 'rgba(210,215,225,0.6)' : 'rgba(60,65,80,0.5)';
         ctx.lineWidth = 1;
-        ctx.setLineDash([2, 2]);
+        ctx.setLineDash([3, 3]);
         let prevKey = _periodKey(lastCandlesRaw[0].time, level);
         for (let i = 1; i < lastCandlesRaw.length; i++) {
             const key = _periodKey(lastCandlesRaw[i].time, level);
