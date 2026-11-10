@@ -115,11 +115,23 @@ async def _build_finam_chart_data(symbol: str, timeframe: str, limit: int, deep_
     df_bb = calculate_bollinger_bands(df)
     bollinger = df_bb.to_dict("records")
 
+    # Индикаторы считаем на всей глубокой истории (нужен прогрев SMMA/EMA),
+    # но в ответ отдаём только последние `limit` баров — иначе на фронте
+    # (где chart.timeScale().fitContent() растягивает все полученные бары
+    # на ширину экрана) умещаются сотни баров вместо ожидаемых ~limit,
+    # и всё, что считается "на видимый диапазон" (например, разделители
+    # периодов), становится в разы плотнее, чем должно быть.
+    cutoff_ts = ohlcv[-limit]["timestamp"] if len(ohlcv) > limit else None
+    def _tail(records):
+        if cutoff_ts is None:
+            return records
+        return [r for r in records if r["timestamp"] >= cutoff_ts]
+
     return {
         "symbol": symbol, "timeframe": timeframe,
-        "data": ohlcv, "alligator": alligator, "ao": ao_data,
-        "bwmfi": bwmfi, "fractal_highs": fractal_highs, "fractal_lows": fractal_lows,
-        "bearish": bearish, "bullish": bullish, "bollinger": bollinger,
+        "data": ohlcv[-limit:], "alligator": alligator[-limit:], "ao": ao_data[-limit:],
+        "bwmfi": bwmfi[-limit:], "fractal_highs": _tail(fractal_highs), "fractal_lows": _tail(fractal_lows),
+        "bearish": _tail(bearish), "bullish": _tail(bullish), "bollinger": bollinger[-limit:],
     }
 
 
