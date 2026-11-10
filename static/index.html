@@ -4314,13 +4314,25 @@
         if (!lastCandlesRaw || lastCandlesRaw.length < 2) return;
         const level = PERIOD_SEPARATOR_LEVEL[currentTimeframe];
         if (!level) return;
+        // Рисуем только то, что реально попадает в видимый диапазон — иначе
+        // на Финаме, где бэкенд отдаёт всю глубокую историю (не только
+        // последние ~limit баров), fitContent() после загрузки сжимает
+        // сотни баров в ширину экрана, и разделителей получается в разы
+        // больше, чем видно одновременно на MetaTrader.
+        let visRange;
+        try { visRange = mainChart.timeScale().getVisibleLogicalRange(); } catch { return; }
+        if (!visRange) return;
+        const n = lastCandlesRaw.length;
+        const from = Math.max(1, Math.floor(visRange.from) - 1);
+        const to = Math.min(n - 1, Math.ceil(visRange.to) + 1);
+        if (from > to) return;
         const isDark = document.body.dataset.theme === 'dark';
         ctx.save();
         ctx.strokeStyle = isDark ? 'rgba(210,215,225,0.6)' : 'rgba(60,65,80,0.5)';
         ctx.lineWidth = 1;
         ctx.setLineDash([3, 3]);
-        let prevKey = _periodKey(lastCandlesRaw[0].time, level);
-        for (let i = 1; i < lastCandlesRaw.length; i++) {
+        let prevKey = _periodKey(lastCandlesRaw[from - 1 >= 0 ? from - 1 : 0].time, level);
+        for (let i = from; i <= to; i++) {
             const key = _periodKey(lastCandlesRaw[i].time, level);
             if (key !== prevKey) {
                 const x = mainChart.timeScale().timeToCoordinate(lastCandlesRaw[i].time);
